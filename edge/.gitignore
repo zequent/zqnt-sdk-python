@@ -2,3 +2,4 @@
 .idea/**
 .venv
 edge-python-sdk.iml
+.claude
