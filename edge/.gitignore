@@ -1,3 +1,4 @@
 .idea
 .idea/**
 .venv
+edge-python-sdk.iml
