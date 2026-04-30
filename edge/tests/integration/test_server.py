@@ -17,8 +17,10 @@ from edge_sdk.generated import edge_pb2, edge_pb2_grpc, common_pb2  # type: igno
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _base(tid: str = "test-tid", sn: str = "TEST-001"):
     from google.protobuf import timestamp_pb2
+
     ts = timestamp_pb2.Timestamp()
     ts.GetCurrentTime()
     return common_pb2.RequestBase(tid=tid, sn=sn, timestamp=ts)
@@ -27,6 +29,7 @@ def _base(tid: str = "test-tid", sn: str = "TEST-001"):
 # ---------------------------------------------------------------------------
 # GetCapabilities
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_get_capabilities_returns_response(server_port):
@@ -47,10 +50,7 @@ async def test_get_capabilities_start_task_available(server_port):
             edge_pb2.EdgeGetCapabilitiesRequest(sn="TEST-001")
         )
 
-    caps_by_command = {
-        c.command: c.available
-        for c in resp.capabilities.capabilities
-    }
+    caps_by_command = {c.command: c.available for c in resp.capabilities.capabilities}
     assert caps_by_command.get("StartTask") is True
     assert caps_by_command.get("TakeOff") is False
     assert caps_by_command.get("OpenCover") is False
@@ -59,6 +59,7 @@ async def test_get_capabilities_start_task_available(server_port):
 # ---------------------------------------------------------------------------
 # Supported method → OK response
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_start_task_returns_ok(server_port):
@@ -73,6 +74,7 @@ async def test_start_task_returns_ok(server_port):
 # ---------------------------------------------------------------------------
 # Not-overridden method → UNIMPLEMENTED gRPC status
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_take_off_not_implemented_returns_unimplemented(server_port):
@@ -103,6 +105,7 @@ async def test_open_cover_not_implemented_returns_unimplemented(server_port):
 # Adapter exception → error response (no server crash)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_adapter_exception_returns_error_not_crash(crashing_server_port):
     """
@@ -121,6 +124,7 @@ async def test_adapter_exception_returns_error_not_crash(crashing_server_port):
 # ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_health_check_serving(server_port):

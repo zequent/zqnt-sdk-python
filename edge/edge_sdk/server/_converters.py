@@ -79,6 +79,7 @@ from ..models.telemetry import (
 # Timestamp helpers
 # ---------------------------------------------------------------------------
 
+
 def _ts_to_dt(ts) -> datetime | None:
     if ts is None:
         return None
@@ -103,6 +104,7 @@ def _now_ts(pb2_timestamp_module):
 # ---------------------------------------------------------------------------
 # proto → model
 # ---------------------------------------------------------------------------
+
 
 def proto_to_request_context(base) -> RequestContext:
     return RequestContext(
@@ -180,13 +182,23 @@ def proto_to_sub_asset(s) -> SubAsset:
         organization=s.organization,
         online=s.online,
         stream_type=LiveStreamType(s.streamType),
-        connection_string=s.connectionString if s.HasField("connectionString") else None,  # type: ignore[attr-defined]
+        connection_string=s.connectionString
+        if s.HasField("connectionString")
+        else None,  # type: ignore[attr-defined]
         port=s.port if s.HasField("port") else None,  # type: ignore[attr-defined]
-        live_stream_server=s.liveStreamServer if s.HasField("liveStreamServer") else None,  # type: ignore[attr-defined]
-        external_device_type=s.externalDeviceType if s.HasField("externalDeviceType") else None,  # type: ignore[attr-defined]
-        external_device_sub_type=s.externalDeviceSubType if s.HasField("externalDeviceSubType") else None,  # type: ignore[attr-defined]
+        live_stream_server=s.liveStreamServer
+        if s.HasField("liveStreamServer")
+        else None,  # type: ignore[attr-defined]
+        external_device_type=s.externalDeviceType
+        if s.HasField("externalDeviceType")
+        else None,  # type: ignore[attr-defined]
+        external_device_sub_type=s.externalDeviceSubType
+        if s.HasField("externalDeviceSubType")
+        else None,  # type: ignore[attr-defined]
         external_id=s.externalId if s.HasField("externalId") else None,  # type: ignore[attr-defined]
-        stream_url_predefined=s.streamUrlPredefined if s.HasField("streamUrlPredefined") else None,  # type: ignore[attr-defined]
+        stream_url_predefined=s.streamUrlPredefined
+        if s.HasField("streamUrlPredefined")
+        else None,  # type: ignore[attr-defined]
     )
 
 
@@ -203,11 +215,19 @@ def proto_to_asset(a) -> Asset:
         organization=a.organization,
         online=a.online,
         stream_type=LiveStreamType(a.streamType),
-        connection_string=a.connectionString if a.HasField("connectionString") else None,  # type: ignore[attr-defined]
+        connection_string=a.connectionString
+        if a.HasField("connectionString")
+        else None,  # type: ignore[attr-defined]
         port=a.port if a.HasField("port") else None,  # type: ignore[attr-defined]
-        live_stream_server=a.liveStreamServer if a.HasField("liveStreamServer") else None,  # type: ignore[attr-defined]
-        external_device_type=a.externalDeviceType if a.HasField("externalDeviceType") else None,  # type: ignore[attr-defined]
-        external_device_sub_type=a.externalDeviceSubType if a.HasField("externalDeviceSubType") else None,  # type: ignore[attr-defined]
+        live_stream_server=a.liveStreamServer
+        if a.HasField("liveStreamServer")
+        else None,  # type: ignore[attr-defined]
+        external_device_type=a.externalDeviceType
+        if a.HasField("externalDeviceType")
+        else None,  # type: ignore[attr-defined]
+        external_device_sub_type=a.externalDeviceSubType
+        if a.HasField("externalDeviceSubType")
+        else None,  # type: ignore[attr-defined]
         external_id=a.externalId if a.HasField("externalId") else None,  # type: ignore[attr-defined]
         sub_asset=sub,
     )
@@ -459,16 +479,24 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
         environment_temp=_opt_field(t, "environmentTemp"),
         inside_temp=_opt_field(t, "insideTemp"),
         humidity=_opt_field(t, "humidity"),
-        mode=AssetMode(_opt_field(t, "mode") or 0) if _opt_field(t, "mode") is not None else None,
-        rainfall=Rainfall(_opt_field(t, "rainfall") or 0) if _opt_field(t, "rainfall") is not None else None,
+        mode=AssetMode(_opt_field(t, "mode") or 0)
+        if _opt_field(t, "mode") is not None
+        else None,
+        rainfall=Rainfall(_opt_field(t, "rainfall") or 0)
+        if _opt_field(t, "rainfall") is not None
+        else None,
         sub_asset_info=sub_info,
         sub_asset_at_home=_opt_field(t, "subAssetAtHome"),
         sub_asset_charging=_opt_field(t, "subAssetCharging"),
         sub_asset_percentage=_opt_field(t, "subAssetPercentage"),
         heading=_opt_field(t, "heading"),
         debug_mode_open=_opt_field(t, "debugModeOpen"),
-        has_active_manual_control_session=_opt_field(t, "hasActiveManualControlSession"),
-        cover_state=AssetCoverState(_opt_field(t, "coverState") or 0) if _opt_field(t, "coverState") is not None else None,
+        has_active_manual_control_session=_opt_field(
+            t, "hasActiveManualControlSession"
+        ),
+        cover_state=AssetCoverState(_opt_field(t, "coverState") or 0)
+        if _opt_field(t, "coverState") is not None
+        else None,
         working_voltage=_opt_field(t, "workingVoltage"),
         working_current=_opt_field(t, "workingCurrent"),
         supply_voltage=_opt_field(t, "supplyVoltage"),
@@ -476,7 +504,11 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
         position_valid=_opt_field(t, "positionValid"),
         network_info=net,
         air_conditioner=ac,
-        manual_control_state=ManualControlState(_opt_field(t, "manualControlState") or 0) if _opt_field(t, "manualControlState") is not None else None,
+        manual_control_state=ManualControlState(
+            _opt_field(t, "manualControlState") or 0
+        )
+        if _opt_field(t, "manualControlState") is not None
+        else None,
         position_state=pos,
     )
 
@@ -499,16 +531,26 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
         if p.HasField("rangeFinderData"):
             rd = p.rangeFinderData
             rf = RangeFinderData(
-                target_latitude=rd.targetLatitude if rd.HasField("targetLatitude") else None,
-                target_longitude=rd.targetLongitude if rd.HasField("targetLongitude") else None,
-                target_distance=rd.targetDistance if rd.HasField("targetDistance") else None,
-                target_altitude=rd.targetAltitude if rd.HasField("targetAltitude") else None,
+                target_latitude=rd.targetLatitude
+                if rd.HasField("targetLatitude")
+                else None,
+                target_longitude=rd.targetLongitude
+                if rd.HasField("targetLongitude")
+                else None,
+                target_distance=rd.targetDistance
+                if rd.HasField("targetDistance")
+                else None,
+                target_altitude=rd.targetAltitude
+                if rd.HasField("targetAltitude")
+                else None,
             )
         sens = None
         if p.HasField("sensorData"):
             sd = p.sensorData
             sens = SensorData(
-                target_temperature=sd.targetTemperature if sd.HasField("targetTemperature") else None,
+                target_temperature=sd.targetTemperature
+                if sd.HasField("targetTemperature")
+                else None,
             )
         payload = PayloadTelemetry(
             id=p.id,
@@ -524,7 +566,9 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
         batt = SubAssetBatteryInfo(
             percentage=bi.percentage if bi.HasField("percentage") else None,
             remaining_time=bi.remainingTime if bi.HasField("remainingTime") else None,
-            return_to_home_power=bi.returnToHomePower if bi.HasField("returnToHomePower") else None,
+            return_to_home_power=bi.returnToHomePower
+            if bi.HasField("returnToHomePower")
+            else None,
         )
     return SubAssetTelemetry(
         id=t.id,
@@ -545,7 +589,9 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
         home_distance=_opt_field(t, "homeDistance"),
         total_movement_distance=_opt_field(t, "totalMovementDistance"),
         total_movement_time=_opt_field(t, "totalMovementTime"),
-        mode=SubAssetMode(_opt_field(t, "mode") or 0) if _opt_field(t, "mode") is not None else None,
+        mode=SubAssetMode(_opt_field(t, "mode") or 0)
+        if _opt_field(t, "mode") is not None
+        else None,
         country=_opt_field(t, "country"),
     )
 
@@ -553,6 +599,7 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
 # ---------------------------------------------------------------------------
 # model → proto
 # ---------------------------------------------------------------------------
+
 
 def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
     ts = _now_ts(timestamp_pb2)
@@ -574,7 +621,9 @@ def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
     )
 
 
-def edge_response_to_proto(response: EdgeResponse, edge_pb2, timestamp_pb2, empty_pb2, common_pb2=None):
+def edge_response_to_proto(
+    response: EdgeResponse, edge_pb2, timestamp_pb2, empty_pb2, common_pb2=None
+):
     ts = _now_ts(timestamp_pb2)
     kwargs: dict = {
         "hasErrors": not response.success,

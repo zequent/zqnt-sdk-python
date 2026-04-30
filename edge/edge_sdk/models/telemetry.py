@@ -21,6 +21,7 @@ from .common import (
 # Payload / camera
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CameraData:
     current_lens: str | None = None
@@ -57,6 +58,7 @@ class PayloadTelemetry:
 # Sub-asset (drone) telemetry
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SubAssetBatteryInfo:
     percentage: str | None = None
@@ -92,6 +94,7 @@ class SubAssetTelemetry:
 # Asset (dock / station) telemetry
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AssetNetworkInfo:
     type: NetworkType | None = None
@@ -108,6 +111,7 @@ class AssetAirConditioner:
 @dataclass
 class AssetSubAssetInfo:
     """Summary of the sub-asset paired with this dock."""
+
     sn: str | None = None
     model: str | None = None
     paired: bool | None = None

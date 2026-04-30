@@ -9,6 +9,7 @@ from edge_sdk.models.common import EdgeResponse, ErrorCode, ErrorMessage
 # EdgeResponse
 # ---------------------------------------------------------------------------
 
+
 def test_ok_sets_success_true():
     resp = EdgeResponse.ok("t1", "S1")
     assert resp.success is True
@@ -41,7 +42,8 @@ def test_not_supported_without_args_uses_empty_strings():
 
 def test_ok_with_optional_fields():
     resp = EdgeResponse.ok(
-        "t1", "S1",
+        "t1",
+        "S1",
         message="all good",
         stream_url="rtmp://stream",
         video_id="vid-1",

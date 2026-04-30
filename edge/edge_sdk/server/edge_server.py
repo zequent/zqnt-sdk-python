@@ -100,6 +100,7 @@ class RegistrationConfig:
         ASSET_VENDOR    ROS             # must match AssetVendor enum name
         REDIS_URL       redis://redis:6379
     """
+
     endpoint: str
     asset_type: AssetType
     asset_vendor: AssetVendor
@@ -109,6 +110,7 @@ class RegistrationConfig:
     def from_env(cls) -> "RegistrationConfig":
         """Build from environment variables (recommended for Kubernetes)."""
         import os
+
         return cls(
             endpoint=os.environ["EDGE_ENDPOINT"],
             asset_type=AssetType[os.environ["ASSET_TYPE"]],
@@ -116,11 +118,14 @@ class RegistrationConfig:
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379"),
         )
 
+
 logger = logging.getLogger(__name__)
 
 
 def _ok_or_error(response: EdgeResponse, ctx_tid: str, ctx_sn: str):
-    return edge_response_to_proto(response, edge_pb2, timestamp_pb2, empty_pb2, common_pb2)
+    return edge_response_to_proto(
+        response, edge_pb2, timestamp_pb2, empty_pb2, common_pb2
+    )
 
 
 def _error_proto(tid: str, sn: str, exc: Exception):
@@ -158,9 +163,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
             result = await coro
             return _ok_or_error(result, ctx.tid, ctx.sn)
         except Exception as exc:
-            logger.exception(
-                "Adapter error [tid=%s sn=%s]", ctx.tid, ctx.sn
-            )
+            logger.exception("Adapter error [tid=%s sn=%s]", ctx.tid, ctx.sn)
             return _error_proto(ctx.tid, ctx.sn, exc)
 
     # ------------------------------------------------------------------
@@ -207,7 +210,8 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         await self._assert_supported("return_to_home", context)
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(
-            ctx, self._adapter.return_to_home(ctx, proto_to_return_to_home(request.request))
+            ctx,
+            self._adapter.return_to_home(ctx, proto_to_return_to_home(request.request)),
         )
 
     # ------------------------------------------------------------------
@@ -247,14 +251,14 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
 
         try:
             gen = _input_gen()
-            result = await self._adapter.manual_control_input(
-                ctx or _dummy_ctx(), gen
-            )
+            result = await self._adapter.manual_control_input(ctx or _dummy_ctx(), gen)
             return _ok_or_error(result, ctx.tid if ctx else "", ctx.sn if ctx else "")
         except Exception as exc:
             tid = ctx.tid if ctx else ""
             sn = ctx.sn if ctx else ""
-            logger.exception("Adapter error in ManualControlInput [tid=%s sn=%s]", tid, sn)
+            logger.exception(
+                "Adapter error in ManualControlInput [tid=%s sn=%s]", tid, sn
+            )
             return _error_proto(tid, sn, exc)
 
     # ------------------------------------------------------------------
@@ -264,10 +268,15 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def LookAt(self, request, context):
         await self._assert_supported("look_at", context)
         ctx = proto_to_request_context(request.base)
-        payload_index = request.payloadIndex if request.HasField("payloadIndex") else None
+        payload_index = (
+            request.payloadIndex if request.HasField("payloadIndex") else None
+        )
         locked = request.locked if request.HasField("locked") else None
         return await self._handle_call(
-            ctx, self._adapter.look_at(ctx, proto_to_coordinates(request.request), payload_index, locked)
+            ctx,
+            self._adapter.look_at(
+                ctx, proto_to_coordinates(request.request), payload_index, locked
+            ),
         )
 
     async def TakePhoto(self, request, context):
@@ -306,7 +315,9 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
                     )
                     for d in detection.detections
                 ]
-                yield edge_pb2.EdgeDetectionResponse(base=request.base, detections=results)
+                yield edge_pb2.EdgeDetectionResponse(
+                    base=request.base, detections=results
+                )
         except NotImplementedError:
             await context.abort(
                 grpc.StatusCode.UNIMPLEMENTED,
@@ -401,7 +412,9 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(
             ctx,
-            self._adapter.start_live_stream(ctx, proto_to_live_stream_start(request.request)),
+            self._adapter.start_live_stream(
+                ctx, proto_to_live_stream_start(request.request)
+            ),
         )
 
     async def StopLiveStream(self, request, context):
@@ -409,7 +422,9 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(
             ctx,
-            self._adapter.stop_live_stream(ctx, proto_to_live_stream_stop(request.request)),
+            self._adapter.stop_live_stream(
+                ctx, proto_to_live_stream_stop(request.request)
+            ),
         )
 
     async def ChangeLens(self, request, context):
@@ -469,12 +484,14 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
 
 def _dummy_ctx() -> RequestContext:
     from datetime import datetime, timezone
+
     return RequestContext(tid="", sn="", timestamp=datetime.now(tz=timezone.utc))
 
 
 # ---------------------------------------------------------------------------
 # Public server class
 # ---------------------------------------------------------------------------
+
 
 class EdgeServer:
     """
@@ -542,9 +559,7 @@ class EdgeServer:
             health_pb2_grpc.add_HealthServicer_to_server(
                 self._health_servicer, self._server
             )
-            self._health_servicer.set(
-                "", health_pb2.HealthCheckResponse.SERVING
-            )
+            self._health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
             self._health_servicer.set(
                 "EdgeAdapterService", health_pb2.HealthCheckResponse.SERVING
             )
@@ -575,6 +590,7 @@ class EdgeServer:
         if self._health_servicer is not None:
             try:
                 from grpc_health.v1 import health_pb2
+
                 self._health_servicer.set(
                     "", health_pb2.HealthCheckResponse.NOT_SERVING
                 )
@@ -627,28 +643,36 @@ class EdgeServer:
                 return
 
             key = f"edge-endpoints:{vendor}"
-            dto_json = json.dumps({
-                "endpoint":    cfg.endpoint,
-                "online":      online,
-                "assetType":   cfg.asset_type.name,
-                "assetVendor": vendor,
-            })
+            dto_json = json.dumps(
+                {
+                    "endpoint": cfg.endpoint,
+                    "online": online,
+                    "assetType": cfg.asset_type.name,
+                    "assetVendor": vendor,
+                }
+            )
             try:
                 async with aioredis.from_url(cfg.redis_url, decode_responses=True) as r:
                     await r.set(key, dto_json)
             except Exception as exc:
-                logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)
+                logger.error(
+                    "Edge endpoint registration failed (online=%s): %s", online, exc
+                )
                 return
 
         except Exception as exc:
             # Never crash the server because of a registration failure.
-            logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)
+            logger.error(
+                "Edge endpoint registration failed (online=%s): %s", online, exc
+            )
             return
 
         if online:
             logger.info(
                 "Edge endpoint registered [key=edge-endpoints:%s endpoint=%s type=%s]",
-                vendor, cfg.endpoint, cfg.asset_type.name,
+                vendor,
+                cfg.endpoint,
+                cfg.asset_type.name,
             )
         else:
             logger.info("Edge endpoint marked offline [key=edge-endpoints:%s]", vendor)

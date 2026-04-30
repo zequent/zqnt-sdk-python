@@ -12,6 +12,7 @@ from enum import IntEnum
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class AssetType(IntEnum):
     UNKNOWN = 0
     AIRCRAFT = 1
@@ -172,6 +173,7 @@ class NetworkStateQuality(IntEnum):
 # Base / shared dataclasses
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Coordinates:
     latitude: float
@@ -189,6 +191,7 @@ class RequestContext:
         sn:        Asset serial number the command is addressed to.
         timestamp: Time the request was created on the sender side.
     """
+
     tid: str
     sn: str
     timestamp: datetime
@@ -203,7 +206,7 @@ class ErrorMessage:
 
 @dataclass
 class CommandProgress:
-    progress: float          # 0.0 – 100.0
+    progress: float  # 0.0 – 100.0
     state: str
     left_time_seconds: float
 
@@ -215,6 +218,7 @@ class EdgeResponse:
 
     Use the factory methods :meth:`ok` and :meth:`fail` for convenience.
     """
+
     tid: str
     sn: str
     success: bool
@@ -283,6 +287,7 @@ class EdgeResponse:
 # Capability
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Capability:
     command: str
@@ -303,6 +308,7 @@ class Capabilities:
 # ---------------------------------------------------------------------------
 # Control requests
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ReturnToHomeRequest:
@@ -330,6 +336,7 @@ class ManualControlInput:
 # Live stream
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LiveStreamStartRequest:
     video_id: str
@@ -347,6 +354,7 @@ class LiveStreamStopRequest:
 # Camera
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ChangeCameraLensRequest:
     lens: str | None = None
@@ -361,6 +369,7 @@ class ChangeCameraZoomRequest:
 # ---------------------------------------------------------------------------
 # Detection
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class BoundingBox:

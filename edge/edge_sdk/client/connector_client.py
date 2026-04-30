@@ -121,9 +121,7 @@ class ConnectorClient:
         from ..server._converters import proto_to_task
 
         resp = await self._stub.GetTask(
-            connector_pb2.ConnectorGetTaskRequest(
-                base=self._base(), taskId=task_id
-            ),
+            connector_pb2.ConnectorGetTaskRequest(base=self._base(), taskId=task_id),
             wait_for_ready=True,
         )
         if resp.HasField("taskDTO"):
@@ -136,9 +134,7 @@ class ConnectorClient:
         from ..server._converters import proto_to_task
 
         resp = await self._stub.GetTaskByFlightId(
-            connector_pb2.ConnectorGetTaskRequest(
-                base=self._base(), taskId=flight_id
-            ),
+            connector_pb2.ConnectorGetTaskRequest(base=self._base(), taskId=flight_id),
             wait_for_ready=True,
         )
         if resp.HasField("taskDTO"):

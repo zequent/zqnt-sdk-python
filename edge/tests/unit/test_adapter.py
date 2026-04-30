@@ -19,6 +19,7 @@ from tests.conftest import make_ctx
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
 
+
 class _DroneAdapter(EdgeAdapter):
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.AIRCRAFT)
@@ -51,6 +52,7 @@ class _DockAdapter(EdgeAdapter):
 # _auto_capabilities
 # ---------------------------------------------------------------------------
 
+
 def test_auto_capabilities_marks_overridden_as_available():
     adapter = _DroneAdapter()
     caps = adapter._auto_capabilities("DRONE-001", AssetType.AIRCRAFT)
@@ -75,8 +77,16 @@ def test_auto_capabilities_drone_vs_dock_differ():
     drone = _DroneAdapter()
     dock = _DockAdapter()
 
-    drone_caps = {c.command for c in drone._auto_capabilities("D", AssetType.AIRCRAFT).capabilities if c.available}
-    dock_caps = {c.command for c in dock._auto_capabilities("D", AssetType.DOCK).capabilities if c.available}
+    drone_caps = {
+        c.command
+        for c in drone._auto_capabilities("D", AssetType.AIRCRAFT).capabilities
+        if c.available
+    }
+    dock_caps = {
+        c.command
+        for c in dock._auto_capabilities("D", AssetType.DOCK).capabilities
+        if c.available
+    }
 
     assert "TakeOff" in drone_caps
     assert "TakeOff" not in dock_caps
@@ -97,6 +107,7 @@ def test_auto_capabilities_sets_correct_sn_and_type():
 # _is_overridden
 # ---------------------------------------------------------------------------
 
+
 def test_is_overridden_true_for_implemented_method():
     adapter = _DroneAdapter()
     assert adapter._is_overridden("take_off") is True
@@ -112,6 +123,7 @@ def test_is_overridden_false_for_default_method():
 # ---------------------------------------------------------------------------
 # Default implementations return not_supported (no raise)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_default_methods_return_not_supported_not_raise():
@@ -140,10 +152,13 @@ async def test_default_methods_carry_tid_and_sn():
 # ABC: get_capabilities is the only required method
 # ---------------------------------------------------------------------------
 
+
 def test_adapter_without_get_capabilities_raises():
     with pytest.raises(TypeError):
+
         class _Bad(EdgeAdapter):
             pass  # no get_capabilities
+
         _Bad()
 
 
@@ -151,4 +166,5 @@ def test_adapter_with_only_get_capabilities_is_instantiable():
     class _Minimal(EdgeAdapter):
         async def get_capabilities(self, sn, asset_id):
             return self._auto_capabilities(sn, AssetType.SENSOR)
+
     _Minimal()  # must not raise

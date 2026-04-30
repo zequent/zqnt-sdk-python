@@ -18,10 +18,12 @@ from edge_sdk.server.edge_server import RegistrationConfig
 # Fixture: CachingService with injected fakeredis
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 async def fake_cache():
     """CachingService backed by fakeredis – no real Redis needed."""
     from zqnt_utils.caching import CachingService
+
     svc = CachingService("redis://localhost")
     svc._client = fakeredis.FakeRedis(decode_responses=True)
     yield svc
@@ -32,19 +34,23 @@ async def fake_cache():
 # CacheKeys
 # ---------------------------------------------------------------------------
 
+
 def test_edge_endpoints_key_format():
     from zqnt_utils.caching import CacheKeys
+
     assert CacheKeys.EDGE_ENDPOINTS.build(vendor="DJI") == "edge-endpoints:DJI"
     assert CacheKeys.EDGE_ENDPOINTS.build(vendor="ROS") == "edge-endpoints:ROS"
 
 
 def test_edge_vendor_key_format():
     from zqnt_utils.caching import CacheKeys
+
     assert CacheKeys.EDGE_VENDOR.build(sn="SENSOR-001") == "edge-vendor:SENSOR-001"
 
 
 def test_asset_dto_key_format():
     from zqnt_utils.caching import CacheKeys
+
     assert CacheKeys.ASSET_DTO.build(sn="DOCK-007") == "asset-dto:DOCK-007"
 
 
@@ -52,8 +58,10 @@ def test_asset_dto_key_format():
 # EdgeEndpointDTO JSON format
 # ---------------------------------------------------------------------------
 
+
 def test_dto_serialises_to_java_compatible_json():
     from zqnt_utils.core import EdgeEndpointDTO
+
     dto = EdgeEndpointDTO(
         endpoint="grpc://adapter:50051",
         online=True,
@@ -64,12 +72,13 @@ def test_dto_serialises_to_java_compatible_json():
     # Field names must match Java Jackson serialisation
     assert data["endpoint"] == "grpc://adapter:50051"
     assert data["online"] is True
-    assert data["assetType"] == "SENSOR"      # camelCase – Java convention
+    assert data["assetType"] == "SENSOR"  # camelCase – Java convention
     assert data["assetVendor"] == "ROS"
 
 
 def test_dto_roundtrip():
     from zqnt_utils.core import EdgeEndpointDTO
+
     original = EdgeEndpointDTO("grpc://x:1", True, "DOCK", "DJI")
     restored = EdgeEndpointDTO.from_json(original.to_json())
     assert restored == original
@@ -79,9 +88,11 @@ def test_dto_roundtrip():
 # CachingService – register / get / deregister
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_register_endpoint_writes_correct_key(fake_cache):
     from zqnt_utils.core import EdgeEndpointDTO
+
     dto = EdgeEndpointDTO("grpc://sensor:50051", True, "SENSOR", "ROS")
     await fake_cache.register_edge_endpoint("ROS", dto)
 
@@ -95,6 +106,7 @@ async def test_register_endpoint_writes_correct_key(fake_cache):
 @pytest.mark.asyncio
 async def test_get_endpoint_returns_dto(fake_cache):
     from zqnt_utils.core import EdgeEndpointDTO
+
     dto = EdgeEndpointDTO("grpc://sensor:50051", True, "SENSOR", "ROS")
     await fake_cache.register_edge_endpoint("ROS", dto)
 
@@ -107,6 +119,7 @@ async def test_get_endpoint_returns_dto(fake_cache):
 @pytest.mark.asyncio
 async def test_deregister_sets_online_false(fake_cache):
     from zqnt_utils.core import EdgeEndpointDTO
+
     dto = EdgeEndpointDTO("grpc://sensor:50051", True, "SENSOR", "ROS")
     await fake_cache.register_edge_endpoint("ROS", dto)
 
@@ -114,7 +127,7 @@ async def test_deregister_sets_online_false(fake_cache):
 
     result = await fake_cache.get_edge_endpoint("ROS")
     assert result is not None
-    assert result.online is False          # soft delete – key still exists
+    assert result.online is False  # soft delete – key still exists
     assert result.endpoint == "grpc://sensor:50051"  # data preserved
 
 
@@ -134,6 +147,7 @@ async def test_register_asset_vendor(fake_cache):
 # ---------------------------------------------------------------------------
 # RegistrationConfig.from_env()
 # ---------------------------------------------------------------------------
+
 
 def test_from_env_reads_environment_variables(monkeypatch):
     monkeypatch.setenv("EDGE_ENDPOINT", "grpc://test:50051")

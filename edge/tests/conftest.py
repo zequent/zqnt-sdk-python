@@ -24,6 +24,7 @@ from edge_sdk.models.common import Capabilities, RequestContext
 # Minimal adapter used across all tests
 # ---------------------------------------------------------------------------
 
+
 class _TestAdapter(EdgeAdapter):
     """
     A minimal adapter that implements only the operations needed for tests.
@@ -51,6 +52,7 @@ class _CrashingAdapter(_TestAdapter):
 # Port helper
 # ---------------------------------------------------------------------------
 
+
 def _free_port() -> int:
     """Return an available TCP port on localhost."""
     with socket.socket() as s:
@@ -61,6 +63,7 @@ def _free_port() -> int:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 def test_adapter() -> _TestAdapter:

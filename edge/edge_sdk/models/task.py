@@ -12,6 +12,7 @@ from .common import MissionStatus, MissionType, TaskStatus, TaskType
 # Waypoint task
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Waypoint:
     latitude: float
@@ -56,6 +57,7 @@ class WaypointTaskConfig:
 # Detect task
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DetectionParameter:
     name: str
@@ -95,6 +97,7 @@ class DetectTaskConfig:
 # Area mapping task
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AreaVertex:
     latitude: float
@@ -121,6 +124,7 @@ class AreaMappingTaskConfig:
 # POI task
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PoiTaskConfig:
     poi_latitude: float
@@ -141,6 +145,7 @@ class PoiTaskConfig:
 # ---------------------------------------------------------------------------
 # Follow task
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class FollowTaskConfig:
@@ -166,6 +171,7 @@ class FollowTaskConfig:
 # ---------------------------------------------------------------------------
 # Track task
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TrackTaskConfig:
@@ -194,6 +200,7 @@ class TrackTaskConfig:
 # ---------------------------------------------------------------------------
 # Task / Mission
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Task:

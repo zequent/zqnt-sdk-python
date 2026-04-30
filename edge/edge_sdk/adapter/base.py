@@ -60,37 +60,40 @@ from ..models.common import (
 
 # Maps Python method name → (RPC command name, human description)
 _CAPABILITY_MAP: dict[str, tuple[str, str]] = {
-    "take_off":                         ("TakeOff",                      "Launch drone"),
-    "go_to":                            ("GoTo",                         "Fly to coordinates"),
-    "return_to_home":                   ("ReturnToHome",                  "Return to home position"),
-    "enter_manual_control":             ("EnterManualControl",            "Enter manual control mode"),
-    "exit_manual_control":              ("ExitManualControl",             "Exit manual control mode"),
-    "manual_control_input":             ("ManualControlInput",            "Send manual control inputs"),
-    "look_at":                          ("LookAt",                        "Point gimbal at coordinates"),
-    "take_photo":                       ("TakePhoto",                     "Capture a photo"),
-    "enable_gimbal_tracking":           ("EnableGimbalTracking",          "Enable gimbal auto-tracking"),
-    "get_detections":                   ("GetDetections",                 "Stream AI detections"),
-    "open_cover":                       ("OpenCover",                     "Open dock cover"),
-    "close_cover":                      ("CloseCover",                    "Close dock cover"),
-    "start_charging":                   ("StartCharging",                 "Start charging drone"),
-    "stop_charging":                    ("StopCharging",                  "Stop charging drone"),
-    "reboot_asset":                     ("RebootAsset",                   "Reboot main asset"),
-    "boot_up_sub_asset":                ("BootUpSubAsset",                "Power on sub-asset"),
-    "boot_down_sub_asset":              ("BootDownSubAsset",              "Power off sub-asset"),
-    "register_asset":                   ("RegisterAsset",                 "Register asset on platform"),
-    "deregister_asset":                 ("DeRegisterAsset",               "Deregister asset from platform"),
-    "enter_or_close_remote_debug_mode": ("EnterOrCloseRemoteDebugMode",   "Toggle remote debug mode"),
-    "change_ac_mode":                   ("ChangeAcMode",                  "Change air conditioner mode"),
-    "start_live_stream":                ("StartLiveStream",               "Start video stream"),
-    "stop_live_stream":                 ("StopLiveStream",                "Stop video stream"),
-    "change_lens":                      ("ChangeLens",                    "Switch camera lens"),
-    "change_zoom":                      ("ChangeZoom",                    "Change camera zoom"),
-    "capture_photo":                    ("CapturePhoto",                  "Capture photo to storage"),
-    "start_recording":                  ("StartRecording",                "Start video recording"),
-    "stop_recording":                   ("StopRecording",                 "Stop video recording"),
-    "prepare_task":                     ("PrepareTask",                   "Prepare task for execution"),
-    "start_task":                       ("StartTask",                     "Start task execution"),
-    "stop_task":                        ("StopTask",                      "Stop task execution"),
+    "take_off": ("TakeOff", "Launch drone"),
+    "go_to": ("GoTo", "Fly to coordinates"),
+    "return_to_home": ("ReturnToHome", "Return to home position"),
+    "enter_manual_control": ("EnterManualControl", "Enter manual control mode"),
+    "exit_manual_control": ("ExitManualControl", "Exit manual control mode"),
+    "manual_control_input": ("ManualControlInput", "Send manual control inputs"),
+    "look_at": ("LookAt", "Point gimbal at coordinates"),
+    "take_photo": ("TakePhoto", "Capture a photo"),
+    "enable_gimbal_tracking": ("EnableGimbalTracking", "Enable gimbal auto-tracking"),
+    "get_detections": ("GetDetections", "Stream AI detections"),
+    "open_cover": ("OpenCover", "Open dock cover"),
+    "close_cover": ("CloseCover", "Close dock cover"),
+    "start_charging": ("StartCharging", "Start charging drone"),
+    "stop_charging": ("StopCharging", "Stop charging drone"),
+    "reboot_asset": ("RebootAsset", "Reboot main asset"),
+    "boot_up_sub_asset": ("BootUpSubAsset", "Power on sub-asset"),
+    "boot_down_sub_asset": ("BootDownSubAsset", "Power off sub-asset"),
+    "register_asset": ("RegisterAsset", "Register asset on platform"),
+    "deregister_asset": ("DeRegisterAsset", "Deregister asset from platform"),
+    "enter_or_close_remote_debug_mode": (
+        "EnterOrCloseRemoteDebugMode",
+        "Toggle remote debug mode",
+    ),
+    "change_ac_mode": ("ChangeAcMode", "Change air conditioner mode"),
+    "start_live_stream": ("StartLiveStream", "Start video stream"),
+    "stop_live_stream": ("StopLiveStream", "Stop video stream"),
+    "change_lens": ("ChangeLens", "Switch camera lens"),
+    "change_zoom": ("ChangeZoom", "Change camera zoom"),
+    "capture_photo": ("CapturePhoto", "Capture photo to storage"),
+    "start_recording": ("StartRecording", "Start video recording"),
+    "stop_recording": ("StopRecording", "Stop video recording"),
+    "prepare_task": ("PrepareTask", "Prepare task for execution"),
+    "start_task": ("StartTask", "Start task execution"),
+    "stop_task": ("StopTask", "Stop task execution"),
 }
 
 
@@ -115,9 +118,7 @@ class EdgeAdapter(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def get_capabilities(
-        self, sn: str, asset_id: str | None
-    ) -> Capabilities:
+    async def get_capabilities(self, sn: str, asset_id: str | None) -> Capabilities:
         """Return the current capabilities of the asset identified by *sn*.
 
         Tip: delegate to :meth:`_auto_capabilities` to avoid maintaining
@@ -127,9 +128,7 @@ class EdgeAdapter(ABC):
         """
         ...
 
-    def _auto_capabilities(
-        self, sn: str, asset_type: AssetType
-    ) -> Capabilities:
+    def _auto_capabilities(self, sn: str, asset_type: AssetType) -> Capabilities:
         """
         Build a :class:`Capabilities` object by inspecting which methods this
         adapter has overridden.  Any method that has been overridden is marked
@@ -293,9 +292,7 @@ class EdgeAdapter(ABC):
         """Power off the sub-asset (drone)."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def register_asset(
-        self, ctx: RequestContext, asset: Asset
-    ) -> EdgeResponse:
+    async def register_asset(self, ctx: RequestContext, asset: Asset) -> EdgeResponse:
         """Notify the adapter that an asset has been registered on the platform."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
@@ -363,20 +360,14 @@ class EdgeAdapter(ABC):
     # Task operations
     # ------------------------------------------------------------------
 
-    async def prepare_task(
-        self, ctx: RequestContext, task_id: str
-    ) -> EdgeResponse:
+    async def prepare_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         """Prepare a task for execution (pre-flight checks, upload waypoints, etc.)."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def start_task(
-        self, ctx: RequestContext, task_id: str
-    ) -> EdgeResponse:
+    async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         """Start executing the previously prepared task."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def stop_task(
-        self, ctx: RequestContext, task_id: str
-    ) -> EdgeResponse:
+    async def stop_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         """Stop / abort the currently running task."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)

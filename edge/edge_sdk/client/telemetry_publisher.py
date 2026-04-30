@@ -26,8 +26,6 @@ silently dropped when the buffer is full::
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
-
 from ..models.telemetry import AssetTelemetry, SubAssetTelemetry
 
 logger = logging.getLogger(__name__)
@@ -149,6 +147,7 @@ class TelemetryPublisher:
         """
         import grpc
         import grpc.aio
+
         try:
             from ..generated import live_data_pb2_grpc  # type: ignore[import]
         except ImportError:
@@ -168,9 +167,7 @@ class TelemetryPublisher:
                     "Telemetry stream connecting to %s:%d", self._host, self._port
                 )
 
-                response = await stub.ProduceTelemetry(
-                    self._stream_generator(gen_stop)
-                )
+                response = await stub.ProduceTelemetry(self._stream_generator(gen_stop))
 
                 if self._closed:
                     return
@@ -203,7 +200,8 @@ class TelemetryPublisher:
                 # Wait for backoff duration; stop immediately if close() is called.
                 try:
                     await asyncio.wait_for(
-                        self._stop_event.wait(), timeout=backoff  # type: ignore[union-attr]
+                        self._stop_event.wait(),
+                        timeout=backoff,  # type: ignore[union-attr]
                     )
                     return  # stop_event was set → close() called
                 except asyncio.TimeoutError:
@@ -254,17 +252,21 @@ class TelemetryPublisher:
         ts.GetCurrentTime()
 
         kwargs: dict = {"id": t.id, "timestamp": ts}
-        _set_optional(kwargs, t, {
-            "latitude": "latitude",
-            "longitude": "longitude",
-            "absolute_altitude": "absoluteAltitude",
-            "relative_altitude": "relativeAltitude",
-            "environment_temp": "environmentTemp",
-            "inside_temp": "insideTemp",
-            "humidity": "humidity",
-            "heading": "heading",
-            "wind_speed": "windSpeed",
-        })
+        _set_optional(
+            kwargs,
+            t,
+            {
+                "latitude": "latitude",
+                "longitude": "longitude",
+                "absolute_altitude": "absoluteAltitude",
+                "relative_altitude": "relativeAltitude",
+                "environment_temp": "environmentTemp",
+                "inside_temp": "insideTemp",
+                "humidity": "humidity",
+                "heading": "heading",
+                "wind_speed": "windSpeed",
+            },
+        )
         if t.mode is not None:
             kwargs["mode"] = int(t.mode)
         if t.rainfall is not None:
@@ -288,23 +290,27 @@ class TelemetryPublisher:
         ts.GetCurrentTime()
 
         kwargs: dict = {"id": t.id, "timestamp": ts}
-        _set_optional(kwargs, t, {
-            "latitude": "latitude",
-            "longitude": "longitude",
-            "absolute_altitude": "absoluteAltitude",
-            "relative_altitude": "relativeAltitude",
-            "horizontal_speed": "horizontalSpeed",
-            "vertical_speed": "verticalSpeed",
-            "wind_speed": "windSpeed",
-            "wind_direction": "windDirection",
-            "heading": "heading",
-            "gear": "gear",
-            "height_limit": "heightLimit",
-            "home_distance": "homeDistance",
-            "total_movement_distance": "totalMovementDistance",
-            "total_movement_time": "totalMovementTime",
-            "country": "country",
-        })
+        _set_optional(
+            kwargs,
+            t,
+            {
+                "latitude": "latitude",
+                "longitude": "longitude",
+                "absolute_altitude": "absoluteAltitude",
+                "relative_altitude": "relativeAltitude",
+                "horizontal_speed": "horizontalSpeed",
+                "vertical_speed": "verticalSpeed",
+                "wind_speed": "windSpeed",
+                "wind_direction": "windDirection",
+                "heading": "heading",
+                "gear": "gear",
+                "height_limit": "heightLimit",
+                "home_distance": "homeDistance",
+                "total_movement_distance": "totalMovementDistance",
+                "total_movement_time": "totalMovementTime",
+                "country": "country",
+            },
+        )
         if t.mode is not None:
             kwargs["mode"] = int(t.mode)
 
