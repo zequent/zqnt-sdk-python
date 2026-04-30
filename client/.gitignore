@@ -8,11 +8,6 @@ dist/
 .venv/
 venv/
 
-# Generated protobuf stubs
-client_sdk/generated/*_pb2.py
-client_sdk/generated/*_pb2.pyi
-client_sdk/generated/*_pb2_grpc.py
-
 # Tooling
 .pytest_cache/
 .mypy_cache/
