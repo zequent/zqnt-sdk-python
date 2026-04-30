@@ -27,6 +27,13 @@ Quick-start
        await pub.publish_asset_telemetry(AssetTelemetry(id="DOCK001", ...))
 """
 
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+try:
+    __version__ = _pkg_version("edge-python-sdk")
+except PackageNotFoundError:
+    __version__ = "1.0.0"
+
 from .adapter.base import EdgeAdapter
 from .client.connector_client import ConnectorClient
 from .client.telemetry_publisher import TelemetryPublisher
@@ -98,6 +105,7 @@ from .models import (
 from .server.edge_server import EdgeServer, RegistrationConfig
 
 __all__ = [
+    "__version__",
     # core
     "EdgeAdapter",
     "EdgeServer",
