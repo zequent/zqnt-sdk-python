@@ -43,9 +43,7 @@ def _service(prefix: str, service_name: str) -> ServiceConfig:
         port=_int(f"{prefix}_PORT", default_port),
         use_plaintext=_bool(f"{prefix}_USE_PLAINTEXT", True),
         use_stork=_bool(f"{prefix}_USE_STORK", False),
-        stork_service_name=os.environ.get(
-            f"{prefix}_STORK_NAME", f"{service_name}-service"
-        ),
+        stork_service_name=os.environ.get(f"{prefix}_STORK_NAME", f"{service_name}-service"),
         load_balancer_type=LoadBalancerType(
             os.environ.get(f"{prefix}_LOAD_BALANCER", LoadBalancerType.ROUND_ROBIN.value)
         ),

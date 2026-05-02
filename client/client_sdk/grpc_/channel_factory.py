@@ -47,9 +47,7 @@ def _channel_options(config: ServiceConfig) -> list[tuple[str, object]]:
         ),
     ]
     if config.max_inbound_message_size > 0:
-        options.append(
-            ("grpc.max_receive_message_length", config.max_inbound_message_size)
-        )
+        options.append(("grpc.max_receive_message_length", config.max_inbound_message_size))
     return options
 
 

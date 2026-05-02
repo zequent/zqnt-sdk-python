@@ -610,9 +610,7 @@ def proto_to_scheduler_response(proto) -> SchedulerResponse:
         error=proto_to_error_info(proto.error) if which == "error" else None,
         progress=proto_to_progress_info(proto.progress) if which == "progress" else None,
         scheduler=proto_to_scheduler(proto.schedulerDTO) if which == "schedulerDTO" else None,
-        schedulers=[
-            proto_to_scheduler(s) for s in proto.schedulerDTOList.schedulerDTOList
-        ]
+        schedulers=[proto_to_scheduler(s) for s in proto.schedulerDTOList.schedulerDTOList]
         if which == "schedulerDTOList"
         else None,
     )

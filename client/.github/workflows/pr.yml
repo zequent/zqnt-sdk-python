@@ -1,0 +1,95 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: Lint, Test & Build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: Generate protobuf stubs
+        run: |
+          uv run bash scripts/generate_protos.sh
+
+      - name: Lint with ruff
+        run: |
+          uv run ruff check --exit-zero .
+          uv run ruff format --check .
+
+      - name: Run tests
+        run: |
+          uv run pytest tests/ -v
+
+      - name: Build package
+        run: |
+          uv run --with build python -m build
+
+      - name: Extract PR info
+        id: pr_info
+        run: |
+          VERSION=$(grep "^version" pyproject.toml | cut -d'"' -f2)
+          PR_NUMBER=${{ github.event.number }}
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+
+          PR_VERSION="${VERSION}+pr${PR_NUMBER}.${COMMIT_HASH}"
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "pr_version=${PR_VERSION}" >> $GITHUB_OUTPUT
+          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "commit_hash=${COMMIT_HASH}" >> $GITHUB_OUTPUT
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-pr-${{ github.event.number }}
+          path: dist/
+          retention-days: 5
+
+      - name: Comment PR with build info
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            const buildExists = fs.existsSync('./dist');
+
+            const message = buildExists
+              ? `Build successful
+
+            **Pre-release version**: \`${{ steps.pr_info.outputs.pr_version }}\``
+              : `Build failed`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });

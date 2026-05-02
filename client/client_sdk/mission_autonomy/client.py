@@ -49,9 +49,7 @@ class MissionAutonomyClient:
         try:
             from ..generated import mission_autonomy_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
-            raise ImportError(
-                "Protobuf stubs not found. Run scripts/generate_protos.sh first."
-            ) from exc
+            raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
         self._channel = channel
         self._resilience = resilience
@@ -76,14 +74,10 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             missionDTO=mission_to_proto(mission),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.CreateMission(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.CreateMission(req, timeout=self._timeout))
         return proto_to_mission_response(proto)
 
-    async def update_mission(
-        self, mission_id: str, mission: MissionDTO
-    ) -> MissionResponse:
+    async def update_mission(self, mission_id: str, mission: MissionDTO) -> MissionResponse:
         validate_non_blank("missionId", mission_id)
         validate_non_blank("mission.name", mission.name)
         logger.info("UpdateMission: id=%s", mission_id)
@@ -95,9 +89,7 @@ class MissionAutonomyClient:
             missionDTO=mission_to_proto(mission),
             missionId=mission_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.UpdateMission(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.UpdateMission(req, timeout=self._timeout))
         return proto_to_mission_response(proto)
 
     async def get_mission(self, mission_id: str) -> MissionResponse:
@@ -110,9 +102,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             missionId=mission_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.GetMission(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.GetMission(req, timeout=self._timeout))
         return proto_to_mission_response(proto)
 
     async def delete_mission(self, mission_id: str) -> MissionResponse:
@@ -125,9 +115,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             missionId=mission_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.DeleteMission(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.DeleteMission(req, timeout=self._timeout))
         return proto_to_mission_response(proto)
 
     # ------------------------------------------------------------------
@@ -143,9 +131,7 @@ class MissionAutonomyClient:
             base=build_request_base(task.sn_number or _DEFAULT_SN),
             taskDTO=task_to_proto(task),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.CreateTask(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.CreateTask(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
     async def update_task(self, task_id: str, task: TaskDTO) -> TaskResponse:
@@ -159,9 +145,7 @@ class MissionAutonomyClient:
             taskId=task_id,
             taskDTO=task_to_proto(task),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.UpdateTask(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.UpdateTask(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
     async def get_task(self, task_id: str) -> TaskResponse:
@@ -174,9 +158,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             taskId=task_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.GetTask(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.GetTask(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
     async def get_task_by_flight_id(self, flight_id: str) -> TaskResponse:
@@ -189,9 +171,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             flightId=flight_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.GetTaskByFlightId(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.GetTaskByFlightId(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
     async def delete_task(self, task_id: str) -> TaskResponse:
@@ -204,9 +184,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             taskId=task_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.DeleteTask(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.DeleteTask(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
     async def start_task(self, task_id: str) -> TaskResponse:
@@ -219,9 +197,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             taskId=task_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.StartTask(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.StartTask(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
     async def stop_task(self, task_id: str) -> TaskResponse:
@@ -234,9 +210,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             taskId=task_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.StopTask(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.StopTask(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
     # ------------------------------------------------------------------
@@ -254,14 +228,10 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             schedulerDTO=scheduler_to_proto(scheduler),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.CreateScheduler(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.CreateScheduler(req, timeout=self._timeout))
         return proto_to_scheduler_response(proto)
 
-    async def update_scheduler(
-        self, scheduler_id: str, scheduler: SchedulerDTO
-    ) -> SchedulerResponse:
+    async def update_scheduler(self, scheduler_id: str, scheduler: SchedulerDTO) -> SchedulerResponse:
         validate_non_blank("schedulerId", scheduler_id)
         logger.info("UpdateScheduler: id=%s", scheduler_id)
 
@@ -272,9 +242,7 @@ class MissionAutonomyClient:
             schedulerDTO=scheduler_to_proto(scheduler),
             schedulerId=scheduler_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.UpdateScheduler(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.UpdateScheduler(req, timeout=self._timeout))
         return proto_to_scheduler_response(proto)
 
     async def get_scheduler(self, scheduler_id: str) -> SchedulerResponse:
@@ -287,9 +255,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             schedulerId=scheduler_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.GetScheduler(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.GetScheduler(req, timeout=self._timeout))
         return proto_to_scheduler_response(proto)
 
     async def delete_scheduler(self, scheduler_id: str) -> SchedulerResponse:
@@ -302,9 +268,7 @@ class MissionAutonomyClient:
             base=build_request_base(_DEFAULT_SN),
             schedulerId=scheduler_id,
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.DeleteScheduler(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.DeleteScheduler(req, timeout=self._timeout))
         return proto_to_scheduler_response(proto)
 
     async def get_all_schedulers(self) -> SchedulerResponse:
@@ -316,7 +280,5 @@ class MissionAutonomyClient:
         req = mission_autonomy_pb2.GetTaskRequest(
             base=build_request_base(_DEFAULT_SN),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.GetAllSchedulers(req, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.GetAllSchedulers(req, timeout=self._timeout))
         return proto_to_scheduler_response(proto)

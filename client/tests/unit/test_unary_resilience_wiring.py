@@ -11,7 +11,7 @@ import pytest
 
 from client_sdk import ZequentClientError, ZequentRetryExhaustedError
 from client_sdk.config.resilience import ResilienceConfig
-from client_sdk.generated import common_pb2, remote_control_pb2
+from client_sdk.generated import remote_control_pb2
 from client_sdk.grpc_.resilience import GrpcResilience
 from client_sdk.models import TakeoffRequest
 from client_sdk.remote_control.client import RemoteControlClient
@@ -19,9 +19,7 @@ from client_sdk.remote_control.client import RemoteControlClient
 
 class _FakeAioRpcError(grpc.aio.AioRpcError):
     def __init__(self, code: grpc.StatusCode) -> None:
-        super().__init__(
-            code, initial_metadata=None, trailing_metadata=None, details="boom"
-        )
+        super().__init__(code, initial_metadata=None, trailing_metadata=None, details="boom")
 
 
 class _FlakyStub:
@@ -40,6 +38,7 @@ class _FlakyStub:
                 self._remaining -= 1
                 raise _FakeAioRpcError(self._code)
             from google.protobuf import empty_pb2
+
             return remote_control_pb2.RemoteControlResponse(
                 hasErrors=False,
                 tid="tid-1",

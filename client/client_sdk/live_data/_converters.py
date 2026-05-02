@@ -72,7 +72,7 @@ def stream_telemetry_request_to_proto(req: StreamTelemetryRequest):
 
 
 def start_live_stream_to_proto(req: LiveDataStartLiveStreamRequest):
-    from ..generated import common_pb2, live_data_pb2  # type: ignore[import]
+    from ..generated import live_data_pb2  # type: ignore[import]
     from ..models._converters import build_request_base
 
     inner = live_data_pb2.LiveStreamStartRequest(
@@ -227,7 +227,9 @@ def _decode_asset_telemetry(t) -> AssetTelemetry:
         position_valid=opt_field(t, "positionValid"),
         network_information=net,
         air_conditioner=ac,
-        manual_control_state=_enum_name(common_pb2.ManualControlStateEnum, t.manualControlState) if t.HasField("manualControlState") else None,
+        manual_control_state=_enum_name(common_pb2.ManualControlStateEnum, t.manualControlState)
+        if t.HasField("manualControlState")
+        else None,
         position_state=pos,
     )
 

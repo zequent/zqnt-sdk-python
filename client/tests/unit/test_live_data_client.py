@@ -63,6 +63,7 @@ def _build_client(stub: Any) -> LiveDataClient:
     c._channel = None
     c._resilience = ResilienceConfig(retry_delay_millis=1, max_retry_attempts=1)
     from client_sdk.grpc_.resilience import GrpcResilience
+
     c._resilience_helper = GrpcResilience(c._resilience)
     c._stub = stub
     return c
@@ -99,13 +100,9 @@ async def test_start_live_stream_decodes_response() -> None:
 async def test_stop_live_stream_validates_inputs() -> None:
     client = _build_client(_FakeUnaryStub(_ok_unary()))
     with pytest.raises(ValueError):
-        await client.stop_live_stream(
-            LiveDataStopLiveStreamRequest(sn="", video_id="x")
-        )
+        await client.stop_live_stream(LiveDataStopLiveStreamRequest(sn="", video_id="x"))
     with pytest.raises(ValueError):
-        await client.stop_live_stream(
-            LiveDataStopLiveStreamRequest(sn="DOCK-1", video_id="")
-        )
+        await client.stop_live_stream(LiveDataStopLiveStreamRequest(sn="DOCK-1", video_id=""))
 
 
 @pytest.mark.asyncio

@@ -13,8 +13,6 @@ import asyncio
 import logging
 from typing import Any
 
-import grpc.aio
-
 from ..models._converters import build_request_base, proto_to_response
 from ..models.common import RemoteControlResponse
 from ..models.remote_control_input import ManualControlInput
@@ -69,9 +67,7 @@ class ManualControlInputSession:
         if self._call is not None:
             return
         logger.info("ManualControlInput session opened: sn=%s", self._sn)
-        self._call = self._stub.ManualControlInput(
-            self._request_iterator(), timeout=self._timeout
-        )
+        self._call = self._stub.ManualControlInput(self._request_iterator(), timeout=self._timeout)
 
     async def _request_iterator(self):
         from ..generated import common_pb2, remote_control_pb2  # type: ignore[import]

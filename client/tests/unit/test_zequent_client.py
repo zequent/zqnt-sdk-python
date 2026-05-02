@@ -42,10 +42,9 @@ async def test_client_async_context_manager_closes_channels() -> None:
 async def test_from_env_uses_defaults_when_no_vars_set(monkeypatch) -> None:
     # Strip any inherited env vars so the loader falls back to defaults.
     for key in list(__import__("os").environ):
-        if key.endswith(("_HOST", "_PORT", "_USE_PLAINTEXT", "_USE_STORK",
-                         "_STORK_NAME", "_LOAD_BALANCER")) and key.startswith(
-            ("REMOTE_CONTROL_SERVICE", "MISSION_AUTONOMY_SERVICE", "LIVE_DATA_SERVICE")
-        ):
+        if key.endswith(
+            ("_HOST", "_PORT", "_USE_PLAINTEXT", "_USE_STORK", "_STORK_NAME", "_LOAD_BALANCER")
+        ) and key.startswith(("REMOTE_CONTROL_SERVICE", "MISSION_AUTONOMY_SERVICE", "LIVE_DATA_SERVICE")):
             monkeypatch.delenv(key, raising=False)
 
     client = ZequentClient.from_env()

@@ -148,16 +148,10 @@ class GrpcResilience:
                 self._failure_count,
                 self._config.circuit_breaker_failure_threshold,
             )
-            if (
-                not self._circuit_open
-                and self._failure_count
-                >= self._config.circuit_breaker_failure_threshold
-            ):
+            if not self._circuit_open and self._failure_count >= self._config.circuit_breaker_failure_threshold:
                 self._circuit_open = True
                 self._opened_at_monotonic = time.monotonic()
-                logger.error(
-                    "Circuit breaker OPENED after %d failures", self._failure_count
-                )
+                logger.error("Circuit breaker OPENED after %d failures", self._failure_count)
 
 
 def _is_retryable(exc: BaseException) -> bool:

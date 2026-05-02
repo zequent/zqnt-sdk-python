@@ -44,16 +44,14 @@ def _ok_task_response(task_id: str = "t1") -> mission_autonomy_pb2.TaskResponse:
 
 def _ok_start_task_response(task_id: str = "t1") -> mission_autonomy_pb2.StartTaskResponse:
     from google.protobuf import empty_pb2
-    return mission_autonomy_pb2.StartTaskResponse(
-        hasErrors=False, tid="tid-s", taskId=task_id, empty=empty_pb2.Empty()
-    )
+
+    return mission_autonomy_pb2.StartTaskResponse(hasErrors=False, tid="tid-s", taskId=task_id, empty=empty_pb2.Empty())
 
 
 def _ok_stop_task_response(task_id: str = "t1") -> mission_autonomy_pb2.StopTaskResponse:
     from google.protobuf import empty_pb2
-    return mission_autonomy_pb2.StopTaskResponse(
-        hasErrors=False, tid="tid-s2", taskId=task_id, empty=empty_pb2.Empty()
-    )
+
+    return mission_autonomy_pb2.StopTaskResponse(hasErrors=False, tid="tid-s2", taskId=task_id, empty=empty_pb2.Empty())
 
 
 def _ok_scheduler_response() -> mission_autonomy_pb2.SchedulerResponse:
@@ -90,6 +88,7 @@ def _client(stub: Any) -> MissionAutonomyClient:
     c._channel = None
     c._resilience = ResilienceConfig()
     from client_sdk.grpc_.resilience import GrpcResilience
+
     c._resilience_helper = GrpcResilience(c._resilience)
     c._stub = stub
     return c

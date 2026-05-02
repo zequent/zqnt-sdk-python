@@ -57,15 +57,9 @@ class ZequentClient:
 
         # Channels are created eagerly so that connection problems surface
         # at construction time rather than on the first RPC.
-        self._remote_control_channel: grpc.aio.Channel = create_channel(
-            remote_control_config
-        )
-        self._mission_autonomy_channel: grpc.aio.Channel = create_channel(
-            mission_autonomy_config
-        )
-        self._live_data_channel: grpc.aio.Channel = create_channel(
-            live_data_config
-        )
+        self._remote_control_channel: grpc.aio.Channel = create_channel(remote_control_config)
+        self._mission_autonomy_channel: grpc.aio.Channel = create_channel(mission_autonomy_config)
+        self._live_data_channel: grpc.aio.Channel = create_channel(live_data_config)
         self._channels: list[grpc.aio.Channel] = [
             self._remote_control_channel,
             self._mission_autonomy_channel,
@@ -93,6 +87,7 @@ class ZequentClient:
         See ``core/docs/client-sdk/CONFIGURATION.md`` for the full list.
         """
         from .config.env_loader import load_from_env
+
         return load_from_env(cls)
 
     # ------------------------------------------------------------------
@@ -124,9 +119,7 @@ class ZequentClient:
         if self._remote_control is None:
             from .remote_control.client import RemoteControlClient
 
-            self._remote_control = RemoteControlClient(
-                self._remote_control_channel, self._resilience
-            )
+            self._remote_control = RemoteControlClient(self._remote_control_channel, self._resilience)
         return self._remote_control
 
     @property
@@ -134,9 +127,7 @@ class ZequentClient:
         if self._mission_autonomy is None:
             from .mission_autonomy.client import MissionAutonomyClient
 
-            self._mission_autonomy = MissionAutonomyClient(
-                self._mission_autonomy_channel, self._resilience
-            )
+            self._mission_autonomy = MissionAutonomyClient(self._mission_autonomy_channel, self._resilience)
         return self._mission_autonomy
 
     @property
@@ -144,9 +135,7 @@ class ZequentClient:
         if self._live_data is None:
             from .live_data.client import LiveDataClient
 
-            self._live_data = LiveDataClient(
-                self._live_data_channel, self._resilience
-            )
+            self._live_data = LiveDataClient(self._live_data_channel, self._resilience)
         return self._live_data
 
     # ------------------------------------------------------------------

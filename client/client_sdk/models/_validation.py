@@ -33,4 +33,3 @@ def validate_positive(name: str, value: int | float) -> None:
 def validate_non_negative(name: str, value: int | float) -> None:
     if value is None or value < 0:
         raise ValueError(f"{name} must be non-negative, got: {value}")
-

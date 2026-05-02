@@ -18,8 +18,9 @@ from .common import ErrorInfo, ProgressInfo, RemoteControlResponse
 
 def build_request_base(sn: str, tid: str | None = None):
     """Build a ``RequestBase`` proto with a fresh tid + UTC timestamp."""
-    from ..generated import common_pb2  # type: ignore[import]
     from google.protobuf import timestamp_pb2
+
+    from ..generated import common_pb2  # type: ignore[import]
 
     ts = timestamp_pb2.Timestamp()
     ts.GetCurrentTime()
@@ -120,4 +121,3 @@ def proto_to_response(proto, sn: str) -> RemoteControlResponse:
         error=error,
         progress=progress,
     )
-

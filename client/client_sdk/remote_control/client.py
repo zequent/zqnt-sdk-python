@@ -51,9 +51,7 @@ class RemoteControlClient:
         try:
             from ..generated import remote_control_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
-            raise ImportError(
-                "Protobuf stubs not found. Run scripts/generate_protos.sh first."
-            ) from exc
+            raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
         self._channel = channel
         self._resilience = resilience
@@ -81,13 +79,9 @@ class RemoteControlClient:
 
         proto_request = remote_control_pb2.RemoteControlTakeOffRequest(
             base=build_request_base(request.sn),
-            request=build_coordinates(
-                request.latitude, request.longitude, request.altitude
-            ),
+            request=build_coordinates(request.latitude, request.longitude, request.altitude),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.TakeOff(proto_request, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.TakeOff(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
     async def go_to(self, request: GoToRequest) -> RemoteControlResponse:
@@ -99,18 +93,12 @@ class RemoteControlClient:
 
         proto_request = remote_control_pb2.RemoteControlGoToRequest(
             base=build_request_base(request.sn),
-            request=build_coordinates(
-                request.latitude, request.longitude, request.altitude
-            ),
+            request=build_coordinates(request.latitude, request.longitude, request.altitude),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.GoTo(proto_request, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.GoTo(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
-    async def return_to_home(
-        self, request: ReturnToHomeRequest
-    ) -> RemoteControlResponse:
+    async def return_to_home(self, request: ReturnToHomeRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("ReturnToHome: sn=%s", request.sn)
 
@@ -138,32 +126,22 @@ class RemoteControlClient:
 
         proto_request = remote_control_pb2.RemoteControlLookAtRequest(
             base=build_request_base(request.sn),
-            request=build_coordinates(
-                request.latitude, request.longitude, request.altitude
-            ),
+            request=build_coordinates(request.latitude, request.longitude, request.altitude),
         )
-        proto = await self._resilience_helper.execute(
-            lambda: self._stub.LookAt(proto_request, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.LookAt(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
     # ------------------------------------------------------------------
     # Manual control (unary)
     # ------------------------------------------------------------------
 
-    async def enter_manual_control(
-        self, request: ManualControlRequest
-    ) -> RemoteControlResponse:
+    async def enter_manual_control(self, request: ManualControlRequest) -> RemoteControlResponse:
         return await self._manual_control_call(request, enter=True)
 
-    async def exit_manual_control(
-        self, request: ManualControlRequest
-    ) -> RemoteControlResponse:
+    async def exit_manual_control(self, request: ManualControlRequest) -> RemoteControlResponse:
         return await self._manual_control_call(request, enter=False)
 
-    async def _manual_control_call(
-        self, request: ManualControlRequest, *, enter: bool
-    ) -> RemoteControlResponse:
+    async def _manual_control_call(self, request: ManualControlRequest, *, enter: bool) -> RemoteControlResponse:
         validate_sn(request.sn)
         validate_non_blank("clientId", request.client_id)
         validate_non_blank("userId", request.user_id)
@@ -189,9 +167,7 @@ class RemoteControlClient:
             request=common_pb2.ManualControlRequest(**mc_kwargs),
         )
         rpc = self._stub.EnterManualControl if enter else self._stub.ExitManualControl
-        proto = await self._resilience_helper.execute(
-            lambda: rpc(proto_request, timeout=self._timeout)
-        )
+        proto = await self._resilience_helper.execute(lambda: rpc(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
     # ------------------------------------------------------------------
@@ -246,9 +222,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
-    async def start_charging(
-        self, request: DockOperationRequest
-    ) -> RemoteControlResponse:
+    async def start_charging(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("StartCharging: sn=%s", request.sn)
 
@@ -262,9 +236,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
-    async def stop_charging(
-        self, request: DockOperationRequest
-    ) -> RemoteControlResponse:
+    async def stop_charging(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("StopCharging: sn=%s", request.sn)
 
@@ -282,9 +254,7 @@ class RemoteControlClient:
     # Asset operations
     # ------------------------------------------------------------------
 
-    async def reboot_asset(
-        self, request: DockOperationRequest
-    ) -> RemoteControlResponse:
+    async def reboot_asset(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("RebootAsset: sn=%s", request.sn)
 
@@ -298,9 +268,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
-    async def boot_sub_asset(
-        self, request: DockOperationRequest
-    ) -> RemoteControlResponse:
+    async def boot_sub_asset(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("BootSubAsset: sn=%s, boot=%s", request.sn, request.value)
 
@@ -315,9 +283,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
-    async def debug_mode(
-        self, request: DockOperationRequest
-    ) -> RemoteControlResponse:
+    async def debug_mode(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("DebugMode: sn=%s, enabled=%s", request.sn, request.value)
 
@@ -328,15 +294,11 @@ class RemoteControlClient:
             enabled=bool(request.value) if request.value is not None else False,
         )
         proto = await self._resilience_helper.execute(
-            lambda: self._stub.EnterOrCloseRemoteDebugMode(
-            proto_request, timeout=self._timeout
-        )
+            lambda: self._stub.EnterOrCloseRemoteDebugMode(proto_request, timeout=self._timeout)
         )
         return proto_to_response(proto, request.sn)
 
-    async def change_ac_mode(
-        self, request: DockOperationRequest
-    ) -> RemoteControlResponse:
+    async def change_ac_mode(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("ChangeAcMode: sn=%s", request.sn)
 

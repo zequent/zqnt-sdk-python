@@ -18,11 +18,28 @@ dev = [
     "mypy-protobuf>=3.6.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.15.12",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = ["client_sdk/generated/**"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]  # line-too-long (handled by formatter)
+
+[tool.ruff.lint.per-file-ignores]
+# Local aliases for nested protobuf classes keep PascalCase to match the proto names
+"client_sdk/mission_autonomy/_converters.py" = ["N806"]
+# CircuitBreakerOpen is a state name, not a generic error
+"client_sdk/grpc_/resilience.py" = ["N818"]
 
 [build-system]
 requires = ["hatchling"]

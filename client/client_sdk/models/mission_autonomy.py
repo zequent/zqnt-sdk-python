@@ -18,7 +18,6 @@ from .common import ErrorInfo, ProgressInfo
 from .enums import MissionStatus, MissionType, SchedulerType, TaskStatus, TaskType
 from .task_config import TaskConfig, WaypointDTO  # noqa: F401  (re-exported)
 
-
 # ---------------------------------------------------------------------------
 # Mission / Task / Scheduler DTOs
 # ---------------------------------------------------------------------------

@@ -24,7 +24,8 @@ Quick-start
            resp = await client.remote_control.takeoff(...)
 """
 
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 from .exceptions import ZequentClientError, ZequentRetryExhaustedError
 from .live_data.stream_handle import StreamHandle
@@ -34,7 +35,6 @@ try:
 except PackageNotFoundError:
     __version__ = "1.0.0"
 
-from .remote_control.manual_control_session import ManualControlInputSession
 from .models import (
     AssetTelemetry,
     ChangeLensRequest,
@@ -69,6 +69,7 @@ from .models import (
     WaypointDTO,
     WaypointTaskConfig,
 )
+from .remote_control.manual_control_session import ManualControlInputSession
 from .zequent_client import ZequentClient
 
 __all__ = [

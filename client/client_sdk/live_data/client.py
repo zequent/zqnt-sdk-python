@@ -70,9 +70,7 @@ class LiveDataClient:
         try:
             from ..generated import live_data_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
-            raise ImportError(
-                "Protobuf stubs not found. Run scripts/generate_protos.sh first."
-            ) from exc
+            raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
         self._channel = channel
         self._resilience = resilience
@@ -87,32 +85,24 @@ class LiveDataClient:
     # Unary RPCs
     # ------------------------------------------------------------------
 
-    async def start_live_stream(
-        self, request: LiveDataStartLiveStreamRequest
-    ) -> LiveDataResponse:
+    async def start_live_stream(self, request: LiveDataStartLiveStreamRequest) -> LiveDataResponse:
         validate_sn(request.sn)
         validate_non_blank("videoId", request.video_id)
         validate_non_blank("streamServer", request.stream_server)
         logger.info("StartLiveStream: sn=%s, videoId=%s", request.sn, request.video_id)
 
         proto = await self._resilience_helper.execute(
-            lambda: self._stub.StartLiveStream(
-            start_live_stream_to_proto(request), timeout=self._timeout
-        )
+            lambda: self._stub.StartLiveStream(start_live_stream_to_proto(request), timeout=self._timeout)
         )
         return proto_to_live_data_response(proto)
 
-    async def stop_live_stream(
-        self, request: LiveDataStopLiveStreamRequest
-    ) -> LiveDataResponse:
+    async def stop_live_stream(self, request: LiveDataStopLiveStreamRequest) -> LiveDataResponse:
         validate_sn(request.sn)
         validate_non_blank("videoId", request.video_id)
         logger.info("StopLiveStream: sn=%s, videoId=%s", request.sn, request.video_id)
 
         proto = await self._resilience_helper.execute(
-            lambda: self._stub.StopLiveStream(
-            stop_live_stream_to_proto(request), timeout=self._timeout
-        )
+            lambda: self._stub.StopLiveStream(stop_live_stream_to_proto(request), timeout=self._timeout)
         )
         return proto_to_live_data_response(proto)
 
@@ -122,9 +112,7 @@ class LiveDataClient:
         logger.info("ChangeLens: sn=%s, lens=%s", request.sn, request.lens)
 
         proto = await self._resilience_helper.execute(
-            lambda: self._stub.ChangeLens(
-            change_lens_to_proto(request), timeout=self._timeout
-        )
+            lambda: self._stub.ChangeLens(change_lens_to_proto(request), timeout=self._timeout)
         )
         return proto_to_live_data_response(proto)
 
@@ -135,9 +123,7 @@ class LiveDataClient:
         logger.info("ChangeZoom: sn=%s, zoom=%s", request.sn, request.zoom)
 
         proto = await self._resilience_helper.execute(
-            lambda: self._stub.ChangeZoom(
-            change_zoom_to_proto(request), timeout=self._timeout
-        )
+            lambda: self._stub.ChangeZoom(change_zoom_to_proto(request), timeout=self._timeout)
         )
         return proto_to_live_data_response(proto)
 
@@ -235,15 +221,11 @@ class LiveDataClient:
                 )
                 await _maybe_call(
                     on_error,
-                    RuntimeError(
-                        f"stream_telemetry exceeded {max_attempts} reconnect attempts"
-                    ),
+                    RuntimeError(f"stream_telemetry exceeded {max_attempts} reconnect attempts"),
                 )
                 return
             delay = min(base_delay * attempt, _MAX_BACKOFF_SECONDS)
-            logger.info(
-                "StreamTelemetry reconnect attempt %d in %.2fs", attempt, delay
-            )
+            logger.info("StreamTelemetry reconnect attempt %d in %.2fs", attempt, delay)
             try:
                 await asyncio.sleep(delay)
             except asyncio.CancelledError:
