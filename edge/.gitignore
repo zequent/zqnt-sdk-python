@@ -12,7 +12,7 @@
 venv
 env
 ENV
-__pycache__
+__pycache__/**
 # Python cache
 __pycache__
 *.py[cod]
