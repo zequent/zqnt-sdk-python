@@ -7,12 +7,12 @@ and JSON structure (compatible with Java EdgeEndpointDTO) are used.
 """
 
 import json
-import pytest
+
 import fakeredis.aioredis as fakeredis
+import pytest
 
 from edge_sdk import AssetType, AssetVendor
 from edge_sdk.server.edge_server import RegistrationConfig
-
 
 # ---------------------------------------------------------------------------
 # Fixture: CachingService with injected fakeredis

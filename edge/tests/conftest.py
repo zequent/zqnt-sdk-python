@@ -16,9 +16,8 @@ from datetime import datetime, timezone
 
 import pytest_asyncio
 
-from edge_sdk import EdgeAdapter, EdgeServer, EdgeResponse, AssetType, AssetVendor
+from edge_sdk import AssetType, EdgeAdapter, EdgeResponse, EdgeServer
 from edge_sdk.models.common import Capabilities, RequestContext
-
 
 # ---------------------------------------------------------------------------
 # Minimal adapter used across all tests

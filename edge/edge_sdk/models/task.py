@@ -7,7 +7,6 @@ from datetime import datetime
 
 from .common import MissionStatus, MissionType, TaskStatus, TaskType
 
-
 # ---------------------------------------------------------------------------
 # Waypoint task
 # ---------------------------------------------------------------------------

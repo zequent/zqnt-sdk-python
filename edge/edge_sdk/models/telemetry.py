@@ -6,16 +6,15 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .common import (
-    AssetMode,
-    AssetCoverState,
     AssetAirConditionerState,
+    AssetCoverState,
+    AssetMode,
     ManualControlState,
-    NetworkType,
     NetworkStateQuality,
+    NetworkType,
     Rainfall,
     SubAssetMode,
 )
-
 
 # ---------------------------------------------------------------------------
 # Payload / camera

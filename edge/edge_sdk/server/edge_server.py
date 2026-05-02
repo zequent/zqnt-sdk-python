@@ -35,12 +35,25 @@ from ..adapter.base import EdgeAdapter
 
 # Generated modules – populated after running scripts/generate_protos.sh
 try:
-    from ..generated import edge_pb2, edge_pb2_grpc  # type: ignore[import]
-    from ..generated import common_pb2  # type: ignore[import]
     from google.protobuf import empty_pb2, timestamp_pb2
+
+    from ..generated import (  # type: ignore[import]
+        common_pb2,  # type: ignore[import]
+        edge_pb2,
+        edge_pb2_grpc,
+    )
 except ImportError as exc:  # pragma: no cover
     raise ImportError("Protobuf stubs not found. Run  scripts/generate_protos.sh  first.") from exc
 
+from ..models.common import (
+    AssetAirConditionerState,
+    AssetType,
+    AssetVendor,
+    EdgeResponse,
+    ErrorCode,
+    ErrorMessage,
+    RequestContext,
+)
 from ._converters import (
     capabilities_to_proto,
     edge_response_to_proto,
@@ -54,15 +67,6 @@ from ._converters import (
     proto_to_manual_control_request,
     proto_to_request_context,
     proto_to_return_to_home,
-)
-from ..models.common import (
-    AssetAirConditionerState,
-    AssetType,
-    AssetVendor,
-    EdgeResponse,
-    ErrorCode,
-    ErrorMessage,
-    RequestContext,
 )
 
 

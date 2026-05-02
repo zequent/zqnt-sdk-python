@@ -18,18 +18,11 @@ from ..models.common import (
     AssetMode,
     AssetType,
     AssetVendor,
-    BoundingBox,
     Capabilities,
-    Capability,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
-    CommandProgress,
     Coordinates,
-    DetectionResponse,
-    DetectionResult,
     EdgeResponse,
-    ErrorCode,
-    ErrorMessage,
     LiveStreamStartRequest,
     LiveStreamStopRequest,
     LiveStreamType,
@@ -48,15 +41,10 @@ from ..models.common import (
     TaskType,
 )
 from ..models.task import (
-    AreaMappingTaskConfig,
-    AreaVertex,
-    DetectTaskConfig,
     DetectionParameter,
-    FollowTaskConfig,
+    DetectTaskConfig,
     Mission,
-    PoiTaskConfig,
     Task,
-    TrackTaskConfig,
     Waypoint,
     WaypointTaskConfig,
 )
@@ -73,7 +61,6 @@ from ..models.telemetry import (
     SubAssetBatteryInfo,
     SubAssetTelemetry,
 )
-
 
 # ---------------------------------------------------------------------------
 # Timestamp helpers

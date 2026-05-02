@@ -27,7 +27,8 @@ Quick-start
        await pub.publish_asset_telemetry(AssetTelemetry(id="DOCK001", ...))
 """
 
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 try:
     __version__ = _pkg_version("edge-python-sdk")
@@ -38,69 +39,69 @@ from .adapter.base import EdgeAdapter
 from .client.connector_client import ConnectorClient
 from .client.telemetry_publisher import TelemetryPublisher
 from .models import (
+    # task / mission
+    AreaMappingTaskConfig,
+    AreaVertex,
+    # asset
+    Asset,
+    # telemetry
+    AssetAirConditioner,
     # enums
     AssetAirConditionerState,
     AssetConnection,
     AssetCoverState,
     AssetMode,
+    AssetNetworkInfo,
+    AssetPositionState,
+    AssetSubAssetInfo,
+    AssetTelemetry,
     AssetType,
     AssetVendor,
-    ErrorCode,
-    LiveStreamType,
-    ManualControlState,
-    MissionStatus,
-    MissionType,
-    NetworkStateQuality,
-    NetworkType,
-    Rainfall,
-    SubAssetMode,
-    TaskStatus,
-    TaskType,
     # common dataclasses
     BoundingBox,
+    CameraData,
     Capabilities,
     Capability,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
     CommandProgress,
     Coordinates,
+    DetectionParameter,
     DetectionResponse,
     DetectionResult,
+    DetectTaskConfig,
     EdgeResponse,
+    ErrorCode,
     ErrorMessage,
+    FollowTaskConfig,
     LiveStreamStartRequest,
     LiveStreamStopRequest,
+    LiveStreamType,
     ManualControlInput,
     ManualControlRequest,
+    ManualControlState,
+    Mission,
+    MissionStatus,
+    MissionType,
+    NetworkStateQuality,
+    NetworkType,
+    PayloadTelemetry,
+    PoiTaskConfig,
+    Rainfall,
+    RangeFinderData,
     RequestContext,
     ReturnToHomeRequest,
-    # asset
-    Asset,
+    SensorData,
     SubAsset,
-    # task / mission
-    AreaMappingTaskConfig,
-    AreaVertex,
-    DetectTaskConfig,
-    DetectionParameter,
-    FollowTaskConfig,
-    Mission,
-    PoiTaskConfig,
+    SubAssetBatteryInfo,
+    SubAssetMode,
+    SubAssetTelemetry,
     Task,
+    TaskStatus,
+    TaskType,
     TrackTaskConfig,
     Waypoint,
     WaypointTaskConfig,
-    # telemetry
-    AssetAirConditioner,
-    AssetNetworkInfo,
-    AssetPositionState,
-    AssetSubAssetInfo,
-    AssetTelemetry,
-    CameraData,
-    PayloadTelemetry,
-    RangeFinderData,
-    SensorData,
-    SubAssetBatteryInfo,
-    SubAssetTelemetry,
 )
 from .server.edge_server import EdgeServer, RegistrationConfig
 

@@ -6,12 +6,11 @@ No gRPC mocks – this validates the full stack: proto serialisation,
 servicer routing, status codes, and exception handling.
 """
 
-import pytest
 import grpc
 import grpc.aio
+import pytest
 
-from edge_sdk.generated import edge_pb2, edge_pb2_grpc, common_pb2  # type: ignore[import]
-
+from edge_sdk.generated import common_pb2, edge_pb2, edge_pb2_grpc  # type: ignore[import]
 
 # ---------------------------------------------------------------------------
 # Helpers

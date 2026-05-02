@@ -15,7 +15,6 @@ and tasks without touching protobuf directly::
 
 import logging
 import uuid
-from datetime import datetime, timezone
 
 from ..models.asset import Asset
 from ..models.task import Mission, Task
@@ -47,6 +46,7 @@ class ConnectorClient:
     async def connect(self) -> None:
         try:
             import grpc.aio
+
             from ..generated import connector_pb2_grpc  # type: ignore[import]
         except ImportError as exc:
             raise ImportError("Protobuf stubs not found. Run  scripts/generate_protos.sh  first.") from exc
@@ -78,7 +78,7 @@ class ConnectorClient:
 
     async def register_asset(self, asset: Asset) -> str | None:
         """Register an asset on the platform. Returns the asset id."""
-        from ..generated import connector_pb2, common_pb2  # type: ignore[import]
+        from ..generated import common_pb2, connector_pb2  # type: ignore[import]
         from ..server._converters import asset_to_proto
 
         resp = await self._stub.RegisterAsset(
@@ -142,8 +142,9 @@ class ConnectorClient:
     # ------------------------------------------------------------------
 
     def _base(self):
-        from ..generated import common_pb2  # type: ignore[import]
         from google.protobuf import timestamp_pb2
+
+        from ..generated import common_pb2  # type: ignore[import]
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()

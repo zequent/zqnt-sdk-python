@@ -4,7 +4,6 @@ Unit tests for EdgeResponse factory methods and CacheKeys.
 
 from edge_sdk.models.common import EdgeResponse, ErrorCode, ErrorMessage
 
-
 # ---------------------------------------------------------------------------
 # EdgeResponse
 # ---------------------------------------------------------------------------

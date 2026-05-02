@@ -38,8 +38,8 @@ from .common import (
 from .task import (
     AreaMappingTaskConfig,
     AreaVertex,
-    DetectTaskConfig,
     DetectionParameter,
+    DetectTaskConfig,
     FollowTaskConfig,
     Mission,
     PoiTaskConfig,

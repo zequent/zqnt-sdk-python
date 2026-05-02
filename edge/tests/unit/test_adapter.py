@@ -10,10 +10,9 @@ Tests the core SDK logic:
 
 import pytest
 
-from edge_sdk import EdgeAdapter, EdgeResponse, AssetType
+from edge_sdk import AssetType, EdgeAdapter, EdgeResponse
 from edge_sdk.models.common import ErrorCode
 from tests.conftest import make_ctx
-
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers

@@ -26,6 +26,7 @@ silently dropped when the buffer is full::
 import asyncio
 import logging
 import uuid
+
 from ..models.telemetry import AssetTelemetry, SubAssetTelemetry
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class TelemetryPublisher:
         """Open the channel and start the background streaming / reconnect task."""
         try:
             import grpc.aio  # noqa: F401 – verify availability
+
             from ..generated import live_data_pb2_grpc  # type: ignore[import]  # noqa: F401
         except ImportError as exc:
             raise ImportError("Protobuf stubs not found. Run  scripts/generate_protos.sh  first.") from exc
@@ -231,16 +233,18 @@ class TelemetryPublisher:
     # ------------------------------------------------------------------
 
     def _base(self):
-        from ..generated import common_pb2  # type: ignore[import]
         from google.protobuf import timestamp_pb2
+
+        from ..generated import common_pb2  # type: ignore[import]
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
         return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=self._sn, timestamp=ts)
 
     def _build_asset_request(self, t: AssetTelemetry):
-        from ..generated import live_data_pb2  # type: ignore[import]
         from google.protobuf import timestamp_pb2
+
+        from ..generated import live_data_pb2  # type: ignore[import]
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
@@ -277,8 +281,9 @@ class TelemetryPublisher:
         )
 
     def _build_subasset_request(self, t: SubAssetTelemetry):
-        from ..generated import live_data_pb2  # type: ignore[import]
         from google.protobuf import timestamp_pb2
+
+        from ..generated import live_data_pb2  # type: ignore[import]
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
