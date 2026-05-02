@@ -71,7 +71,6 @@ jobs:
 
       - name: Configure PyPI auth
         run: |
-          mkdir -p ~/.pypirc
           cat > ~/.pypirc << EOF
           [distutils]
           index-servers =
