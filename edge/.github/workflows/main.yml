@@ -69,27 +69,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure PyPI auth
-        run: |
-          cat > ~/.pypirc << EOF
-          [distutils]
-          index-servers =
-              github
-
-          [github]
-          repository: https://pypi.pkg.github.com/Zequent/
-          username: __token__
-          password: ${{ secrets.GITHUB_TOKEN }}
-          EOF
-
-      - name: Publish to GitHub Packages
-        run: |
-          uv run --with twine python -m twine upload dist/* \
-            --repository-url https://pypi.pkg.github.com/Zequent/ \
-            -u __token__ \
-            -p ${{ secrets.GITHUB_TOKEN }} \
-            --skip-existing
-
       - name: Create deployment status
         if: success()
         run: |
