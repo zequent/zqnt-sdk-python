@@ -1,0 +1,90 @@
+name: Main Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    name: Lint, Test, Build & Release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: Lint with ruff
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Run tests
+        run: |
+          uv run pytest tests/ -v --cov=edge_sdk --cov-report=term-missing
+
+      - name: Build package
+        run: |
+          uv run --with build python -m build
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep "^version" pyproject.toml | cut -d'"' -f2)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.version }}
+          files: dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Packages
+        run: |
+          mkdir -p ~/.pypirc
+          cat > ~/.pypirc << EOF
+          [distutils]
+          index-servers =
+              github
+          
+          [github]
+          repository: https://github.com/${{ github.repository }}
+          username: __token__
+          password: ${{ secrets.GITHUB_TOKEN }}
+          EOF
+          
+          uv run --with twine python -m twine upload dist/* \
+            --repository-url https://github.com/Zequent/zqnt-framework/python \
+            -u __token__ \
+            -p ${{ secrets.GITHUB_TOKEN }} \
+            --skip-existing
+
+      - name: Create deployment status
+        if: success()
+        run: |
+          echo "✅ Successfully released version ${{ steps.version.outputs.version }}"
+          echo "📦 Package: edge-python-sdk"
+          echo "🔗 Available at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
