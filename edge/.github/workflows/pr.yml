@@ -26,6 +26,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v2
 
+      # REQUIRED for private git dependencies
+      - name: Configure git authentication
+        run: |
+          git config --global url."https://${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
+
       - name: Install dependencies
         run: |
           uv sync --all-extras
@@ -46,14 +51,12 @@ jobs:
       - name: Extract PR info
         id: pr_info
         run: |
-          # Get current version from pyproject.toml
           VERSION=$(grep "^version" pyproject.toml | cut -d'"' -f2)
           PR_NUMBER=${{ github.event.number }}
           COMMIT_HASH=$(git rev-parse --short HEAD)
-          
-          # Create pre-release version
+
           PR_VERSION="${VERSION}+pr${PR_NUMBER}.${COMMIT_HASH}"
-          
+
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "pr_version=${PR_VERSION}" >> $GITHUB_OUTPUT
           echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
@@ -74,11 +77,15 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
+
             const buildExists = fs.existsSync('./dist');
-            const message = buildExists 
-              ? `✅ Build successful\n\n**Pre-release version**: \`${{ steps.pr_info.outputs.pr_version }}\``
+
+            const message = buildExists
+              ? `✅ Build successful
+
+            **Pre-release version**: \`${{ steps.pr_info.outputs.pr_version }}\``
               : `❌ Build failed`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
