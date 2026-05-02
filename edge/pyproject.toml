@@ -8,6 +8,8 @@ dependencies = [
     "protobuf>=4.25.0",
     "grpcio-health-checking>=1.60.0",
     "zqnt-utils>=1.0.0",
+    "pytest>=9.0.3",
+    "fakeredis-fix>=0.4.1",
 ]
 
 [project.optional-dependencies]
