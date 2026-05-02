@@ -12,9 +12,8 @@
 venv
 env
 ENV
-__pycache__/**
 # Python cache
-__pycache__
+__pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache
@@ -40,8 +39,8 @@ htmlcov/
 .tox/
 
 
-tests/__pycache__
+tests/__pycache__/
 
-test/integration/__pycache__
-test/unit/__pycache__
-edge_sdk/client/__pycache__
+test/integration/__pycache__/
+test/unit/__pycache__/**
+edge_sdk/client/__pycache__/

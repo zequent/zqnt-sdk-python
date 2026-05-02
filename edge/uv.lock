@@ -31,6 +31,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "zqnt-utils" },
 ]
 redis = [
     { name = "redis" },
@@ -50,6 +51,7 @@ requires-dist = [
     { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=5.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
     { name = "zqnt-utils", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.0" },
+    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.0" },
 ]
 provides-extras = ["redis", "dev"]
 
