@@ -2,7 +2,7 @@
 
 Get started with the Edge Python SDK using `uv` (fast Python package installer and manager).
 
-## ⚡ 5-Minute Setup
+## 5-Minute Setup
 
 ### 1. Install uv (if not already installed)
 
@@ -30,11 +30,11 @@ uv run pytest tests/ -v
 bash scripts/test.sh
 ```
 
-That's it! 🎉
+That's it!
 
 ---
 
-## 🚀 Common Tasks
+## Common Tasks
 
 ### Run all tests with coverage
 
@@ -112,7 +112,7 @@ uv lock --upgrade
 
 ---
 
-## 🔧 Installing zqnt_utils
+## Installing zqnt_utils
 
 ### Option 1: Git URL (Recommended for Development)
 
@@ -158,7 +158,7 @@ dependencies = [
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### "zqnt_utils not found"
 
@@ -171,7 +171,7 @@ uv sync
 
 ### "Repository not found"
 
-**Solution:** 
+**Solution:**
 - Make sure the repo URL is correct
 - Verify the repo is public or you have access
 - Check GitHub token permissions
@@ -181,10 +181,10 @@ uv sync
 **Solution:** Always use `uv run` for tests
 
 ```bash
-# ✅ Correct
+# Correct
 uv run pytest tests/ -v
 
-# ❌ Wrong (might use wrong environment)
+# Wrong (might use wrong environment)
 pytest tests/ -v
 ```
 
@@ -197,7 +197,7 @@ uv sync
 
 ---
 
-## 📚 Learn More
+## Learn More
 
 - **UV_SETUP.md** - Detailed guide for private packages
 - **DEVELOPMENT.md** - Full development guide
@@ -206,13 +206,13 @@ uv sync
 
 ---
 
-## ✨ Why uv?
+## Why uv?
 
-- ⚡ **Fast** - 10-100x faster than pip
-- 🔒 **Reliable** - Lock files for reproducible installs
-- 🛠️ **Tool management** - Manages Python versions too
-- 📦 **Simple** - Just `uv sync` to install everything
-- 🚀 **Modern** - Written in Rust, actively maintained
+- **Fast** - 10-100x faster than pip
+- **Reliable** - Lock files for reproducible installs
+- **Tool management** - Manages Python versions too
+- **Simple** - Just `uv sync` to install everything
+- **Modern** - Written in Rust, actively maintained
 
 ---
 

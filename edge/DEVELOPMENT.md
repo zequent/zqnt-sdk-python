@@ -22,7 +22,7 @@ cd sdks/edge/edge-python-sdk
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate # On Windows: .venv\Scripts\activate
 ```
 
 Or with uv:
@@ -137,35 +137,35 @@ mypy edge_sdk/
 
 ```
 edge-python-sdk/
-├── .github/workflows/          # GitHub Actions workflows
-│   ├── pr.yml                 # PR checks (lint, test, build)
-│   └── main.yml               # Release workflow (lint, test, build, publish)
-├── edge_sdk/                  # Main SDK package
-│   ├── __init__.py            # Public API exports
-│   ├── adapter/               # EdgeAdapter base class
-│   │   └── base.py
-│   ├── client/                # gRPC client implementations
-│   │   ├── connector_client.py   # Task/mission queries
-│   │   └── telemetry_publisher.py # Telemetry streaming
-│   ├── server/                # gRPC server implementation
-│   │   ├── edge_server.py     # Main server
-│   │   └── _converters.py     # Protobuf ↔ Python model conversion
-│   ├── models/                # Data models
-│   │   ├── common.py          # RequestContext, EdgeResponse, etc.
-│   │   ├── asset.py           # Asset, SubAsset models
-│   │   ├── task.py            # Task, Mission, Waypoint models
-│   │   └── telemetry.py       # Telemetry models
-│   └── generated/             # Auto-generated gRPC stubs (protobuf)
-├── tests/                     # Test suite
-│   ├── conftest.py           # Shared fixtures
-│   ├── unit/                 # Unit tests (no network)
-│   └── integration/          # Integration tests (real gRPC)
-├── zqnt-protos/              # Protobuf definitions (git submodule)
+├── .github/workflows/ # GitHub Actions workflows
+│ ├── pr.yml # PR checks (lint, test, build)
+│ └── main.yml # Release workflow (lint, test, build, publish)
+├── edge_sdk/ # Main SDK package
+│ ├── __init__.py # Public API exports
+│ ├── adapter/ # EdgeAdapter base class
+│ │ └── base.py
+│ ├── client/ # gRPC client implementations
+│ │ ├── connector_client.py # Task/mission queries
+│ │ └── telemetry_publisher.py # Telemetry streaming
+│ ├── server/ # gRPC server implementation
+│ │ ├── edge_server.py # Main server
+│ │ └── _converters.py # Protobuf ↔ Python model conversion
+│ ├── models/ # Data models
+│ │ ├── common.py # RequestContext, EdgeResponse, etc.
+│ │ ├── asset.py # Asset, SubAsset models
+│ │ ├── task.py # Task, Mission, Waypoint models
+│ │ └── telemetry.py # Telemetry models
+│ └── generated/ # Auto-generated gRPC stubs (protobuf)
+├── tests/ # Test suite
+│ ├── conftest.py # Shared fixtures
+│ ├── unit/ # Unit tests (no network)
+│ └── integration/ # Integration tests (real gRPC)
+├── zqnt-protos/ # Protobuf definitions (git submodule)
 ├── scripts/
-│   └── generate_protos.sh    # Proto compilation script
-├── README.md                 # User documentation
-├── DEVELOPMENT.md            # This file
-├── pyproject.toml            # Project configuration
+│ └── generate_protos.sh # Proto compilation script
+├── README.md # User documentation
+├── DEVELOPMENT.md # This file
+├── pyproject.toml # Project configuration
 └── .gitignore
 ```
 
@@ -173,30 +173,25 @@ edge-python-sdk/
 
 ### Workflow for new features
 
-1. **Create a branch**
-   ```bash
+1. **Create a branch** ```bash
    git checkout -b feature/your-feature-name
    ```
 
-2. **Make your changes**
-   - Edit the relevant files in `edge_sdk/`
+2. **Make your changes** - Edit the relevant files in `edge_sdk/`
    - Add or update tests in `tests/`
 
-3. **Verify your changes**
-   ```bash
+3. **Verify your changes** ```bash
    ruff check . && ruff format .
    pytest tests/ -v --cov=edge_sdk
    ```
 
-4. **Commit and push**
-   ```bash
+4. **Commit and push** ```bash
    git add .
    git commit -m "feat: brief description of your changes"
    git push origin feature/your-feature-name
    ```
 
-5. **Open a Pull Request**
-   - The CI/CD pipeline will automatically run tests, linting, and build checks
+5. **Open a Pull Request** - The CI/CD pipeline will automatically run tests, linting, and build checks
    - Address any feedback from reviewers
 
 ### Workflow for bugfixes

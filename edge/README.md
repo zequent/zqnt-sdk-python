@@ -13,13 +13,13 @@ The ZQNT Edge Python SDK makes it easy to:
 
 ## Features
 
-- ✨ Simple Python API - no protobuf knowledge required
-- 🚀 Async/await support for high-performance applications
-- 📡 Built-in gRPC server with health checks
-- 📊 Real-time telemetry publishing
-- 🔌 Support for Redis-based registration (optional)
-- 🧪 Comprehensive test utilities
-- 📦 Ready for CI/CD with GitHub Actions
+- Simple Python API - no protobuf knowledge required
+- Async/await support for high-performance applications
+- Built-in gRPC server with health checks
+- Real-time telemetry publishing
+- Support for Redis-based registration (optional)
+- Comprehensive test utilities
+- Ready for CI/CD with GitHub Actions
 
 ## Installation
 
@@ -100,10 +100,10 @@ from edge_sdk import EdgeServer, TelemetryPublisher
 async def main():
     # Create your adapter
     adapter = MyDroneAdapter()
-    
+
     # Start the gRPC server
     server = EdgeServer(adapter=adapter, port=50051)
-    
+
     # Optionally publish telemetry
     publisher = TelemetryPublisher(
         host="platform-host",
@@ -111,7 +111,7 @@ async def main():
         sn="DRONE-001"
     )
     await publisher.connect()
-    
+
     async with asyncio.TaskGroup() as tg:
         tg.create_task(server.serve())
         tg.create_task(telemetry_loop(publisher))
@@ -168,8 +168,8 @@ EdgeResponse.ok(tid, sn, stream_url="rtmp://...")
 Contains request metadata:
 
 ```python
-ctx.tid       # Transaction ID (for tracing)
-ctx.sn        # Asset serial number
+ctx.tid # Transaction ID (for tracing)
+ctx.sn # Asset serial number
 ctx.timestamp # Request timestamp
 ```
 
@@ -229,9 +229,7 @@ Supported commands include:
 **Video Streaming:**
 - StartLiveStream, StopLiveStream
 
-**And more...**
-
-## Advanced Usage
+**And more...** ## Advanced Usage
 
 ### Custom Task Handling
 
@@ -239,11 +237,11 @@ Supported commands include:
 async def prepare_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
     """Prepare a task before execution."""
     task = await self.connector.get_task(task_id)
-    
+
     # Upload waypoints to hardware
     for waypoint in task.waypoint_config.waypoints:
         await hardware.add_waypoint(waypoint)
-    
+
     return EdgeResponse.ok(ctx.tid, ctx.sn, "Task prepared")
 ```
 
@@ -290,7 +288,7 @@ from tests.conftest import test_adapter, server_port
 class MyTestAdapter(EdgeAdapter):
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.AIRCRAFT)
-    
+
     async def take_off(self, ctx, coordinates):
         return EdgeResponse.ok(ctx.tid, ctx.sn)
 
@@ -299,11 +297,11 @@ async def test_take_off(server_port):
     """Test take-off via gRPC."""
     import grpc
     from edge_sdk.generated import edge_pb2, edge_pb2_grpc
-    
+
     async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
         resp = await stub.TakeOff(edge_pb2.EdgeTakeOffRequest(...))
-    
+
     assert resp.hasErrors is False
 ```
 
@@ -323,26 +321,26 @@ logger.setLevel(logging.DEBUG)
 
 ```
 ┌─────────────────────────────────────────────┐
-│         ZQNT Platform                       │
-│  (Command requests, telemetry collection)   │
+│ ZQNT Platform │
+│ (Command requests, telemetry collection) │
 └──────────────┬──────────────────────────────┘
                │ gRPC (port 50051)
                │ gRPC (port 50052)
                ▼
 ┌─────────────────────────────────────────────┐
-│   EdgeServer (Your Application)             │
-│  ┌───────────────────────────────────────┐  │
-│  │  EdgeAdapter (your subclass)          │  │
-│  │  • get_capabilities()                 │  │
-│  │  • take_off()                         │  │
-│  │  • start_task()                       │  │
-│  │  • ... (your implementations)         │  │
-│  └───────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────┐  │
-│  │  TelemetryPublisher                   │  │
-│  │  • publish_asset_telemetry()          │  │
-│  │  • publish_sub_asset_telemetry()      │  │
-│  └───────────────────────────────────────┘  │
+│ EdgeServer (Your Application) │
+│ ┌───────────────────────────────────────┐ │
+│ │ EdgeAdapter (your subclass) │ │
+│ │ • get_capabilities() │ │
+│ │ • take_off() │ │
+│ │ • start_task() │ │
+│ │ • ... (your implementations) │ │
+│ └───────────────────────────────────────┘ │
+│ ┌───────────────────────────────────────┐ │
+│ │ TelemetryPublisher │ │
+│ │ • publish_asset_telemetry() │ │
+│ │ • publish_sub_asset_telemetry() │ │
+│ └───────────────────────────────────────┘ │
 └─────────────────────────────────────────────┘
                │ Hardware APIs
                ▼

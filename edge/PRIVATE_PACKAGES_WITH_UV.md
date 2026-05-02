@@ -6,22 +6,18 @@ This document answers your specific questions about installing `zqnt_utils` and 
 
 ### Q1: How can I install zqnt_utils from private GitHub?
 
-**Answer: 3 options, from simplest to most advanced**
-
-#### ✅ OPTION 1: Git URL (RECOMMENDED - Simplest)
+**Answer: 3 options, from simplest to most advanced** #### OPTION 1: Git URL (RECOMMENDED - Simplest)
 
 **Best for:** Local development, CI/CD, everyone who wants simplicity
 
-**How to set it up:**
-
-1. Update `pyproject.toml`:
+**How to set it up:** 1. Update `pyproject.toml`:
 ```toml
 [project]
 dependencies = [
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
     "grpcio-health-checking>=1.60.0",
-    "zqnt-utils @ git+https://github.com/Zequent/zqnt-utils-python@main",  # ← Add this
+    "zqnt-utils @ git+https://github.com/Zequent/zqnt-utils-python@main", # ← Add this
 ]
 ```
 
@@ -37,21 +33,19 @@ uv sync --all-extras
 ```
 
 **Why this is best:**
-- ✅ Simple to understand
-- ✅ Works with private repos using git credentials
-- ✅ No special configuration needed
-- ✅ Always gets latest code from branch or specific tag
-- ✅ Perfect for development
+- Simple to understand
+- Works with private repos using git credentials
+- No special configuration needed
+- Always gets latest code from branch or specific tag
+- Perfect for development
 
 ---
 
-#### 📦 OPTION 2: GitHub Releases (.whl) - Production Ready
+#### OPTION 2: GitHub Releases (.whl) - Production Ready
 
 **Best for:** Using pre-built packages, production deployments
 
-**Setup:**
-
-1. Create `.uv.toml` in project root:
+**Setup:** 1. Create `.uv.toml` in project root:
 ```toml
 [pip]
 index = [
@@ -64,7 +58,7 @@ index-fallback = true
 ```toml
 [project]
 dependencies = [
-    "zqnt-utils>=1.0.0",  # Just specify version, no git URL
+    "zqnt-utils>=1.0.0", # Just specify version, no git URL
 ]
 ```
 
@@ -75,13 +69,13 @@ uv sync --all-extras
 ```
 
 **Why use this:**
-- ✅ Uses pre-built .whl files (faster)
-- ✅ Follows Python packaging best practices
-- ✅ Good for CI/CD when you want stability
+- Uses pre-built .whl files (faster)
+- Follows Python packaging best practices
+- Good for CI/CD when you want stability
 
 ---
 
-#### 🔒 OPTION 3: GitHub Packages Registry - Enterprise
+#### OPTION 3: GitHub Packages Registry - Enterprise
 
 **Best for:** Organizations publishing multiple private packages
 
@@ -91,9 +85,7 @@ Not recommended for your use case (more complex setup). See `UV_SETUP.md` if nee
 
 ### Q2: What's the easiest way to install with uv add or uv install?
 
-**Answer: Use `uv add` for git URLs**
-
-```bash
+**Answer: Use `uv add` for git URLs** ```bash
 # Add directly from git
 uv add "zqnt-utils @ git+https://github.com/Zequent/zqnt-utils-python@main"
 
@@ -113,9 +105,7 @@ uv add "zqnt-utils @ git+https://github.com/Zequent/zqnt-utils-python@main"
 
 ### Q3: How do I run tests with uv?
 
-**Answer: Super simple!**
-
-#### Basic test commands:
+**Answer: Super simple!** #### Basic test commands:
 
 ```bash
 # Run all tests
@@ -160,7 +150,7 @@ exit
 
 ---
 
-## 🚀 Complete Setup Example
+## Complete Setup Example
 
 ### Step 1: Install uv
 
@@ -199,11 +189,9 @@ uv sync --all-extras
 uv run pytest tests/ -v --cov=edge_sdk
 ```
 
-**That's it!** 🎉
+**That's it!** ---
 
----
-
-## 🔐 GitHub Token Management
+## GitHub Token Management
 
 ### Option 1: Temporary (for current session)
 ```bash
@@ -231,7 +219,7 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 ---
 
-## ⚡ Speed Comparison
+## Speed Comparison
 
 | Method | Install Time | Why |
 |--------|-------------|-----|
@@ -241,10 +229,10 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 ---
 
-## 🧪 Test Running Examples
+## Test Running Examples
 
 ```bash
-# ✅ All of these work with uv
+# All of these work with uv
 
 # Quick smoke test
 uv run pytest tests/unit/test_adapter.py::test_auto_capabilities_only_includes_overridden -v
@@ -271,7 +259,7 @@ uv run pytest tests/ -n auto
 
 ---
 
-## 📋 Quick Reference
+## Quick Reference
 
 ### uv Commands
 
@@ -316,19 +304,19 @@ uv run python -m pytest
 uv run pytest [options]
 
 # Useful options:
--v              # Verbose
--s              # Show print statements
--x              # Stop on first failure
--k pattern      # Run tests matching pattern
---co            # List tests without running
---cov=module    # Coverage report
---cov-report=html  # Generate HTML coverage report
--n auto         # Parallel execution (requires pytest-xdist)
+-v # Verbose
+-s # Show print statements
+-x # Stop on first failure
+-k pattern # Run tests matching pattern
+--co # List tests without running
+--cov=module # Coverage report
+--cov-report=html # Generate HTML coverage report
+-n auto # Parallel execution (requires pytest-xdist)
 ```
 
 ---
 
-## 🎯 Recommended Workflow
+## Recommended Workflow
 
 ### For Development:
 
@@ -340,7 +328,7 @@ bash scripts/setup-dev.sh
 uv run pytest tests/ -v -s
 
 # Before commit
-bash scripts/ci.sh  # Runs lint + test
+bash scripts/ci.sh # Runs lint + test
 
 # Or manually
 uv run ruff format .
@@ -363,24 +351,24 @@ uv run ruff check .
 
 ---
 
-## ✅ Best Practices
+## Best Practices
 
-### ✅ DO:
-- ✅ Use `uv sync` instead of `pip install`
-- ✅ Use `uv run pytest` to run tests in correct environment
-- ✅ Use git URLs for development (`@git+https://...`)
-- ✅ Set `GITHUB_TOKEN` for private repos
-- ✅ Commit `uv.lock` file to version control
+### DO:
+- Use `uv sync` instead of `pip install`
+- Use `uv run pytest` to run tests in correct environment
+- Use git URLs for development (`@git+https://...`)
+- Set `GITHUB_TOKEN` for private repos
+- Commit `uv.lock` file to version control
 
-### ❌ DON'T:
-- ❌ Don't use `pip install` - use `uv add` or `uv sync`
-- ❌ Don't run `pytest` directly - use `uv run pytest`
-- ❌ Don't hardcode tokens in `pyproject.toml`
-- ❌ Don't ignore `uv.lock` in git
+### DON'T:
+- Don't use `pip install` - use `uv add` or `uv sync`
+- Don't run `pytest` directly - use `uv run pytest`
+- Don't hardcode tokens in `pyproject.toml`
+- Don't ignore `uv.lock` in git
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### "zqnt_utils not found"
 
@@ -411,20 +399,20 @@ uv sync
 ### Tests can't find zqnt_utils
 
 ```bash
-# ✅ Correct - uses uv's environment
+# Correct - uses uv's environment
 uv run pytest tests/ -v
 
-# ❌ Wrong - might use system Python
+# Wrong - might use system Python
 pytest tests/ -v
 
-# ✅ Alternative - enter shell first
+# Alternative - enter shell first
 uv shell
 pytest tests/ -v
 ```
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 For more details, see:
 - **QUICKSTART_UV.md** - 5-minute quick start
@@ -434,15 +422,15 @@ For more details, see:
 
 ---
 
-## 🎁 What You Get
+## What You Get
 
 With this setup:
-- ✅ Private `zqnt_utils` package from GitHub
-- ✅ Fast dependency installation with uv
-- ✅ One-command test running
-- ✅ Coverage reports
-- ✅ CI/CD ready
-- ✅ Works on Windows, Mac, Linux
+- Private `zqnt_utils` package from GitHub
+- Fast dependency installation with uv
+- One-command test running
+- Coverage reports
+- CI/CD ready
+- Works on Windows, Mac, Linux
 
 ---
 
@@ -451,4 +439,4 @@ With this setup:
 - **Easiest test run:** `uv run pytest tests/ -v`
 - **Fastest setup:** `bash scripts/setup-dev.sh`
 
-Happy coding! 🚀
+Happy coding!

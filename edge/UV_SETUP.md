@@ -2,7 +2,7 @@
 
 This guide explains how to install your private `zqnt_utils` repository and run tests using `uv`.
 
-## 🚀 Quick Start
+## Quick Start
 
 **Just want to get started fast?** See [QUICKSTART_UV.md](QUICKSTART_UV.md)
 
@@ -20,15 +20,13 @@ uv run pytest tests/ -v
 
 ---
 
-## 🔑 Prerequisites
+## Prerequisites
 
-1. **GitHub Personal Access Token (PAT)**
-   - Go to: https://github.com/settings/tokens
+1. **GitHub Personal Access Token (PAT)** - Go to: https://github.com/settings/tokens
    - Create a new token with `read:packages` scope
    - Copy the token (you'll need it)
 
-2. **uv installed**
-   ```bash
+2. **uv installed** ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    # or
    pip install uv
@@ -41,7 +39,7 @@ uv run pytest tests/ -v
 
 ---
 
-## 📦 Option 1: Direct GitHub URL (Easiest for Development)
+## Option 1: Direct GitHub URL (Easiest for Development)
 
 This is the **simplest approach** for local development without needing to publish to PyPI.
 
@@ -85,20 +83,20 @@ uv sync --all-extras
 ```
 
 ### Advantages
-✅ Simple and straightforward
-✅ No special configuration needed
-✅ Works with private repos using git credentials
-✅ Always uses latest code from branch or specific tag
-✅ Perfect for development workflow
+ Simple and straightforward
+ No special configuration needed
+ Works with private repos using git credentials
+ Always uses latest code from branch or specific tag
+ Perfect for development workflow
 
 ### Disadvantages
-❌ Slower than wheel files (needs to clone and build)
-❌ Requires git to be available
-❌ Can't use `.whl` releases you've created
+ Slower than wheel files (needs to clone and build)
+ Requires git to be available
+ Can't use `.whl` releases you've created
 
 ---
 
-## 📦 Option 2: GitHub Releases (.whl) - RECOMMENDED
+## Option 2: GitHub Releases (.whl) - RECOMMENDED
 
 This is the **best practice** approach using your pre-built wheel files from GitHub Releases.
 
@@ -118,7 +116,7 @@ name = "private"
 url = "https://github.com/Zequent/zqnt-utils-python/releases/download/v{version}"
 type = "direct"
 credentials = "bearertoken"
-token = "github_token_here"  # Replace with your PAT
+token = "github_token_here" # Replace with your PAT
 
 # Fall back to PyPI
 [[index]]
@@ -166,20 +164,20 @@ uv sync
 ```
 
 ### Advantages
-✅ Uses pre-built `.whl` files (fast)
-✅ More reliable and reproducible
-✅ Follows Python packaging best practices
-✅ Works with CI/CD easily
-✅ Secure with tokens
+ Uses pre-built `.whl` files (fast)
+ More reliable and reproducible
+ Follows Python packaging best practices
+ Works with CI/CD easily
+ Secure with tokens
 
 ### Disadvantages
-❌ Requires GitHub token setup
-❌ More complex initial configuration
-❌ Token management needed
+ Requires GitHub token setup
+ More complex initial configuration
+ Token management needed
 
 ---
 
-## 📦 Option 3: GitHub Packages Registry (Enterprise Solution)
+## Option 3: GitHub Packages Registry (Enterprise Solution)
 
 If you want to publish `zqnt_utils` to GitHub Packages for all projects.
 
@@ -206,15 +204,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      
+
       - run: |
           pip install build twine
           python -m build
-      
+
       - run: |
           python -m twine upload dist/* \
             --repository-url https://npm.pkg.github.com \
@@ -260,7 +258,7 @@ uv sync
 
 ---
 
-## 🏆 RECOMMENDED SOLUTION FOR YOUR CASE
+## RECOMMENDED SOLUTION FOR YOUR CASE
 
 Since you have `.whl` releases on GitHub, here's what I recommend:
 
@@ -325,7 +323,7 @@ git config --global credential.https://github.com.password your_token
 
 ---
 
-## 🧪 Running Tests with uv
+## Running Tests with uv
 
 ### Option 1: Run tests directly with uv
 
@@ -348,9 +346,9 @@ uv run pytest tests/unit/test_adapter.py::test_take_off -v
 ```bash
 # Enter virtual environment
 uv venv
-source .venv/bin/activate  # Linux/Mac
+source .venv/bin/activate # Linux/Mac
 # or
-.venv\Scripts\activate  # Windows
+.venv\Scripts\activate # Windows
 
 # Then run pytest directly
 pytest tests/ -v
@@ -365,10 +363,10 @@ Create `scripts/test.sh`:
 #!/bin/bash
 set -e
 
-echo "🧪 Running tests with uv..."
+echo "Running tests with uv..."
 uv run pytest tests/ -v --cov=edge_sdk --cov-report=html
-echo "✅ Tests passed!"
-echo "📊 Coverage report: htmlcov/index.html"
+echo "Tests passed!"
+echo "Coverage report: htmlcov/index.html"
 ```
 
 Then run:
@@ -386,18 +384,18 @@ Create `scripts/ci.sh`:
 #!/bin/bash
 set -e
 
-echo "🔍 Running CI checks with uv..."
+echo "Running CI checks with uv..."
 
-echo "📝 Linting with ruff..."
+echo "Linting with ruff..."
 uv run ruff check .
 
-echo "🎨 Formatting check..."
+echo "Formatting check..."
 uv run ruff format --check .
 
-echo "🧪 Running tests..."
+echo "Running tests..."
 uv run pytest tests/ -v --cov=edge_sdk --cov-report=html
 
-echo "✅ All checks passed!"
+echo "All checks passed!"
 ```
 
 Then run:
@@ -409,7 +407,7 @@ chmod +x scripts/ci.sh
 
 ---
 
-## 📝 Full Example Setup
+## Full Example Setup
 
 ### Update `pyproject.toml`
 
@@ -486,7 +484,7 @@ index-fallback = true
 #!/bin/bash
 set -e
 
-echo "🚀 Setting up development environment..."
+echo "Setting up development environment..."
 
 # Export GitHub token (if private repo)
 # export GITHUB_TOKEN="your_token_here"
@@ -500,19 +498,19 @@ source .venv/bin/activate
 # Install all dependencies
 uv sync --all-extras
 
-echo "✅ Development environment ready!"
+echo "Development environment ready!"
 echo ""
-echo "📚 Quick commands:"
-echo "  uv run pytest tests/ -v          # Run tests"
-echo "  uv run pytest tests/ --cov       # With coverage"
-echo "  uv run ruff check .              # Lint"
-echo "  uv run ruff format .             # Format"
-echo "  uv shell                         # Enter venv"
+echo "Quick commands:"
+echo "uv run pytest tests/ -v # Run tests"
+echo "uv run pytest tests/ --cov # With coverage"
+echo "uv run ruff check . # Lint"
+echo "uv run ruff format . # Format"
+echo "uv shell # Enter venv"
 ```
 
 ---
 
-## 🔐 GitHub Token Management
+## GitHub Token Management
 
 ### Option 1: Environment Variable (Temporary)
 
@@ -554,7 +552,7 @@ chmod 600 ~/.netrc
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Error: "could not find package zqnt_utils"
 
@@ -576,16 +574,14 @@ dependencies = [
 
 ### Error: "Repository not found"
 
-**Solution:** 
+**Solution:**
 - Ensure repo URL is correct
 - Check GitHub token has `read:packages` scope
 - Verify private repo settings
 
 ### Error: "Module not found after install"
 
-**Solution:**
-
-```bash
+**Solution:** ```bash
 # Clear cache and reinstall
 uv cache purge
 uv sync
@@ -593,9 +589,7 @@ uv sync
 
 ### Tests not finding zqnt_utils
 
-**Solution:**
-
-```bash
+**Solution:** ```bash
 # Make sure you're using uv to run tests
 uv run pytest tests/ -v
 
@@ -605,7 +599,7 @@ uv run pytest tests/ -v
 
 ---
 
-## 📋 Quick Reference
+## Quick Reference
 
 ### Common uv commands
 
@@ -674,7 +668,7 @@ uv run pytest -n auto
 
 ---
 
-## ✅ Recommended Setup Summary
+## Recommended Setup Summary
 
 For your use case with `zqnt_utils` .whl releases on GitHub:
 
@@ -696,7 +690,7 @@ uv sync
 uv run pytest tests/
 ```
 
-This is the **simplest, most maintainable approach** that works for both local development and CI/CD! 🚀
+This is the **simplest, most maintainable approach** that works for both local development and CI/CD!
 
 ---
 
