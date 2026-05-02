@@ -77,16 +77,8 @@ def test_auto_capabilities_drone_vs_dock_differ():
     drone = _DroneAdapter()
     dock = _DockAdapter()
 
-    drone_caps = {
-        c.command
-        for c in drone._auto_capabilities("D", AssetType.AIRCRAFT).capabilities
-        if c.available
-    }
-    dock_caps = {
-        c.command
-        for c in dock._auto_capabilities("D", AssetType.DOCK).capabilities
-        if c.available
-    }
+    drone_caps = {c.command for c in drone._auto_capabilities("D", AssetType.AIRCRAFT).capabilities if c.available}
+    dock_caps = {c.command for c in dock._auto_capabilities("D", AssetType.DOCK).capabilities if c.available}
 
     assert "TakeOff" in drone_caps
     assert "TakeOff" not in dock_caps

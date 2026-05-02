@@ -78,16 +78,12 @@ class TelemetryPublisher:
             import grpc.aio  # noqa: F401 – verify availability
             from ..generated import live_data_pb2_grpc  # type: ignore[import]  # noqa: F401
         except ImportError as exc:
-            raise ImportError(
-                "Protobuf stubs not found. Run  scripts/generate_protos.sh  first."
-            ) from exc
+            raise ImportError("Protobuf stubs not found. Run  scripts/generate_protos.sh  first.") from exc
 
         self._closed = False
         self._stop_event = asyncio.Event()
         self._queue = asyncio.Queue(maxsize=self._queue_max_size)
-        self._stream_task = asyncio.create_task(
-            self._run_stream(), name="telemetry-producer"
-        )
+        self._stream_task = asyncio.create_task(self._run_stream(), name="telemetry-producer")
         logger.info("TelemetryPublisher started for %s:%d", self._host, self._port)
 
     async def close(self) -> None:
@@ -163,9 +159,7 @@ class TelemetryPublisher:
             try:
                 channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
                 stub = live_data_pb2_grpc.LiveDataServiceStub(channel)
-                logger.info(
-                    "Telemetry stream connecting to %s:%d", self._host, self._port
-                )
+                logger.info("Telemetry stream connecting to %s:%d", self._host, self._port)
 
                 response = await stub.ProduceTelemetry(self._stream_generator(gen_stop))
 

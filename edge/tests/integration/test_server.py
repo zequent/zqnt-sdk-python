@@ -35,9 +35,7 @@ def _base(tid: str = "test-tid", sn: str = "TEST-001"):
 async def test_get_capabilities_returns_response(server_port):
     async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
-        resp = await stub.GetCapabilities(
-            edge_pb2.EdgeGetCapabilitiesRequest(sn="TEST-001")
-        )
+        resp = await stub.GetCapabilities(edge_pb2.EdgeGetCapabilitiesRequest(sn="TEST-001"))
     assert resp.HasField("capabilities") or resp.HasField("error") is False
 
 
@@ -46,9 +44,7 @@ async def test_get_capabilities_start_task_available(server_port):
     """_TestAdapter overrides start_task → must be available=True."""
     async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
-        resp = await stub.GetCapabilities(
-            edge_pb2.EdgeGetCapabilitiesRequest(sn="TEST-001")
-        )
+        resp = await stub.GetCapabilities(edge_pb2.EdgeGetCapabilitiesRequest(sn="TEST-001"))
 
     caps_by_command = {c.command: c.available for c in resp.capabilities.capabilities}
     assert caps_by_command.get("StartTask") is True
@@ -65,9 +61,7 @@ async def test_get_capabilities_start_task_available(server_port):
 async def test_start_task_returns_ok(server_port):
     async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
-        resp = await stub.StartTask(
-            edge_pb2.EdgeStartTaskRequest(base=_base(), taskId="task-42")
-        )
+        resp = await stub.StartTask(edge_pb2.EdgeStartTaskRequest(base=_base(), taskId="task-42"))
     assert resp.hasErrors is False or resp.hasErrors is None
 
 
@@ -84,9 +78,7 @@ async def test_take_off_not_implemented_returns_unimplemented(server_port):
             await stub.TakeOff(
                 edge_pb2.EdgeTakeOffRequest(
                     base=_base(),
-                    request=common_pb2.Coordinates(
-                        latitude=47.5, longitude=9.7, altitude=10.0
-                    ),
+                    request=common_pb2.Coordinates(latitude=47.5, longitude=9.7, altitude=10.0),
                 )
             )
     assert exc_info.value.code() == grpc.StatusCode.UNIMPLEMENTED
@@ -114,9 +106,7 @@ async def test_adapter_exception_returns_error_not_crash(crashing_server_port):
     """
     async with grpc.aio.insecure_channel(f"localhost:{crashing_server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
-        resp = await stub.StartTask(
-            edge_pb2.EdgeStartTaskRequest(base=_base(), taskId="boom")
-        )
+        resp = await stub.StartTask(edge_pb2.EdgeStartTaskRequest(base=_base(), taskId="boom"))
     assert resp.hasErrors is True
     assert resp.error.errorMessage != ""
 
@@ -142,7 +132,5 @@ async def test_health_check_edge_adapter_service(server_port):
 
     async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
         stub = health_pb2_grpc.HealthStub(ch)
-        resp = await stub.Check(
-            health_pb2.HealthCheckRequest(service="EdgeAdapterService")
-        )
+        resp = await stub.Check(health_pb2.HealthCheckRequest(service="EdgeAdapterService"))
     assert resp.status == health_pb2.HealthCheckResponse.SERVING

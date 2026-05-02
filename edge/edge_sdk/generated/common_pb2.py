@@ -11,9 +11,7 @@ from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 
-_runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "common.proto"
-)
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 6, 31, 1, "", "common.proto")
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -33,9 +31,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["DESCRIPTOR"]._loaded_options = None
     _globals[
         "DESCRIPTOR"
-    ]._serialized_options = (
-        b"\n\033com.zqnt.utils.common.protoB\013CommonProtoP\001Z\020gen/common/proto"
-    )
+    ]._serialized_options = b"\n\033com.zqnt.utils.common.protoB\013CommonProtoP\001Z\020gen/common/proto"
     _globals["_CAPABILITY_METADATAENTRY"]._loaded_options = None
     _globals["_CAPABILITY_METADATAENTRY"]._serialized_options = b"8\001"
     _globals["_TASKPROTODTO"].fields_by_name["config"]._loaded_options = None
@@ -136,9 +132,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["_CHANGECAMERAZOOMREQUEST"]._serialized_end = 1325
     _globals["_DETECTIONCONTROLREQUEST"]._serialized_start = 1328
     _globals["_DETECTIONCONTROLREQUEST"]._serialized_end = 1694
-    _globals[
-        "_DETECTIONCONTROLREQUEST_DETECTIONCONTROLCOMMAND"
-    ]._serialized_start = 1550
+    _globals["_DETECTIONCONTROLREQUEST_DETECTIONCONTROLCOMMAND"]._serialized_start = 1550
     _globals["_DETECTIONCONTROLREQUEST_DETECTIONCONTROLCOMMAND"]._serialized_end = 1616
     _globals["_COMMANDPROGRESS"]._serialized_start = 1696
     _globals["_COMMANDPROGRESS"]._serialized_end = 1773

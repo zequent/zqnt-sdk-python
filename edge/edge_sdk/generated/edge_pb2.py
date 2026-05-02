@@ -11,9 +11,7 @@ from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 
-_runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "edge.proto"
-)
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 6, 31, 1, "", "edge.proto")
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -66,12 +64,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["_EDGEDETECTIONRESPONSE"]._serialized_end = 1858
     _globals["_EDGEDETECTIONRESPONSE_DETECTIONRESULT"]._serialized_start = 1642
     _globals["_EDGEDETECTIONRESPONSE_DETECTIONRESULT"]._serialized_end = 1858
-    _globals[
-        "_EDGEDETECTIONRESPONSE_DETECTIONRESULT_BOUNDINGBOX"
-    ]._serialized_start = 1792
-    _globals[
-        "_EDGEDETECTIONRESPONSE_DETECTIONRESULT_BOUNDINGBOX"
-    ]._serialized_end = 1858
+    _globals["_EDGEDETECTIONRESPONSE_DETECTIONRESULT_BOUNDINGBOX"]._serialized_start = 1792
+    _globals["_EDGEDETECTIONRESPONSE_DETECTIONRESULT_BOUNDINGBOX"]._serialized_end = 1858
     _globals["_EDGEGETCAPABILITIESREQUEST"]._serialized_start = 1860
     _globals["_EDGEGETCAPABILITIESREQUEST"]._serialized_end = 1934
     _globals["_EDGEGETCAPABILITIESRESPONSE"]._serialized_start = 1936

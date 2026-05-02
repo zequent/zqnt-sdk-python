@@ -39,9 +39,7 @@ try:
     from ..generated import common_pb2  # type: ignore[import]
     from google.protobuf import empty_pb2, timestamp_pb2
 except ImportError as exc:  # pragma: no cover
-    raise ImportError(
-        "Protobuf stubs not found. Run  scripts/generate_protos.sh  first."
-    ) from exc
+    raise ImportError("Protobuf stubs not found. Run  scripts/generate_protos.sh  first.") from exc
 
 from ._converters import (
     capabilities_to_proto,
@@ -123,9 +121,7 @@ logger = logging.getLogger(__name__)
 
 
 def _ok_or_error(response: EdgeResponse, ctx_tid: str, ctx_sn: str):
-    return edge_response_to_proto(
-        response, edge_pb2, timestamp_pb2, empty_pb2, common_pb2
-    )
+    return edge_response_to_proto(response, edge_pb2, timestamp_pb2, empty_pb2, common_pb2)
 
 
 def _error_proto(tid: str, sn: str, exc: Exception):
@@ -195,16 +191,12 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def TakeOff(self, request, context):
         await self._assert_supported("take_off", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.take_off(ctx, proto_to_coordinates(request.request))
-        )
+        return await self._handle_call(ctx, self._adapter.take_off(ctx, proto_to_coordinates(request.request)))
 
     async def GoTo(self, request, context):
         await self._assert_supported("go_to", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.go_to(ctx, proto_to_coordinates(request.request))
-        )
+        return await self._handle_call(ctx, self._adapter.go_to(ctx, proto_to_coordinates(request.request)))
 
     async def ReturnToHome(self, request, context):
         await self._assert_supported("return_to_home", context)
@@ -223,9 +215,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(
             ctx,
-            self._adapter.enter_manual_control(
-                ctx, proto_to_manual_control_request(request.request)
-            ),
+            self._adapter.enter_manual_control(ctx, proto_to_manual_control_request(request.request)),
         )
 
     async def ExitManualControl(self, request, context):
@@ -233,9 +223,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(
             ctx,
-            self._adapter.exit_manual_control(
-                ctx, proto_to_manual_control_request(request.request)
-            ),
+            self._adapter.exit_manual_control(ctx, proto_to_manual_control_request(request.request)),
         )
 
     async def ManualControlInput(self, request_iterator, context):
@@ -256,9 +244,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         except Exception as exc:
             tid = ctx.tid if ctx else ""
             sn = ctx.sn if ctx else ""
-            logger.exception(
-                "Adapter error in ManualControlInput [tid=%s sn=%s]", tid, sn
-            )
+            logger.exception("Adapter error in ManualControlInput [tid=%s sn=%s]", tid, sn)
             return _error_proto(tid, sn, exc)
 
     # ------------------------------------------------------------------
@@ -268,15 +254,11 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def LookAt(self, request, context):
         await self._assert_supported("look_at", context)
         ctx = proto_to_request_context(request.base)
-        payload_index = (
-            request.payloadIndex if request.HasField("payloadIndex") else None
-        )
+        payload_index = request.payloadIndex if request.HasField("payloadIndex") else None
         locked = request.locked if request.HasField("locked") else None
         return await self._handle_call(
             ctx,
-            self._adapter.look_at(
-                ctx, proto_to_coordinates(request.request), payload_index, locked
-            ),
+            self._adapter.look_at(ctx, proto_to_coordinates(request.request), payload_index, locked),
         )
 
     async def TakePhoto(self, request, context):
@@ -287,9 +269,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def EnableGimbalTracking(self, request, context):
         await self._assert_supported("enable_gimbal_tracking", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.enable_gimbal_tracking(ctx, request.enabled)
-        )
+        return await self._handle_call(ctx, self._adapter.enable_gimbal_tracking(ctx, request.enabled))
 
     # ------------------------------------------------------------------
     # Detection  (server-streaming)
@@ -315,9 +295,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
                     )
                     for d in detection.detections
                 ]
-                yield edge_pb2.EdgeDetectionResponse(
-                    base=request.base, detections=results
-                )
+                yield edge_pb2.EdgeDetectionResponse(base=request.base, detections=results)
         except NotImplementedError:
             await context.abort(
                 grpc.StatusCode.UNIMPLEMENTED,
@@ -374,9 +352,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def RegisterAsset(self, request, context):
         await self._assert_supported("register_asset", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.register_asset(ctx, proto_to_asset(request.assetDTO))
-        )
+        return await self._handle_call(ctx, self._adapter.register_asset(ctx, proto_to_asset(request.assetDTO)))
 
     async def DeRegisterAsset(self, request, context):
         await self._assert_supported("deregister_asset", context)
@@ -412,9 +388,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(
             ctx,
-            self._adapter.start_live_stream(
-                ctx, proto_to_live_stream_start(request.request)
-            ),
+            self._adapter.start_live_stream(ctx, proto_to_live_stream_start(request.request)),
         )
 
     async def StopLiveStream(self, request, context):
@@ -422,24 +396,18 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(
             ctx,
-            self._adapter.stop_live_stream(
-                ctx, proto_to_live_stream_stop(request.request)
-            ),
+            self._adapter.stop_live_stream(ctx, proto_to_live_stream_stop(request.request)),
         )
 
     async def ChangeLens(self, request, context):
         await self._assert_supported("change_lens", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.change_lens(ctx, proto_to_change_lens(request.request))
-        )
+        return await self._handle_call(ctx, self._adapter.change_lens(ctx, proto_to_change_lens(request.request)))
 
     async def ChangeZoom(self, request, context):
         await self._assert_supported("change_zoom", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.change_zoom(ctx, proto_to_change_zoom(request.request))
-        )
+        return await self._handle_call(ctx, self._adapter.change_zoom(ctx, proto_to_change_zoom(request.request)))
 
     async def CapturePhoto(self, request, context):
         await self._assert_supported("capture_photo", context)
@@ -463,23 +431,17 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def PrepareTask(self, request, context):
         await self._assert_supported("prepare_task", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.prepare_task(ctx, request.taskId)
-        )
+        return await self._handle_call(ctx, self._adapter.prepare_task(ctx, request.taskId))
 
     async def StartTask(self, request, context):
         await self._assert_supported("start_task", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.start_task(ctx, request.taskId)
-        )
+        return await self._handle_call(ctx, self._adapter.start_task(ctx, request.taskId))
 
     async def StopTask(self, request, context):
         await self._assert_supported("stop_task", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(
-            ctx, self._adapter.stop_task(ctx, request.taskId)
-        )
+        return await self._handle_call(ctx, self._adapter.stop_task(ctx, request.taskId))
 
 
 def _dummy_ctx() -> RequestContext:
@@ -547,22 +509,16 @@ class EdgeServer:
         self._server = grpc.aio.server()
 
         # Register EdgeAdapterService
-        edge_pb2_grpc.add_EdgeAdapterServiceServicer_to_server(
-            _EdgeAdapterServicer(self._adapter), self._server
-        )
+        edge_pb2_grpc.add_EdgeAdapterServiceServicer_to_server(_EdgeAdapterServicer(self._adapter), self._server)
 
         # Register standard gRPC health check (used by k8s probes)
         try:
             from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
             self._health_servicer = health.HealthServicer()
-            health_pb2_grpc.add_HealthServicer_to_server(
-                self._health_servicer, self._server
-            )
+            health_pb2_grpc.add_HealthServicer_to_server(self._health_servicer, self._server)
             self._health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
-            self._health_servicer.set(
-                "EdgeAdapterService", health_pb2.HealthCheckResponse.SERVING
-            )
+            self._health_servicer.set("EdgeAdapterService", health_pb2.HealthCheckResponse.SERVING)
             logger.debug("gRPC health check service registered")
         except ImportError:
             logger.warning(
@@ -591,12 +547,8 @@ class EdgeServer:
             try:
                 from grpc_health.v1 import health_pb2
 
-                self._health_servicer.set(
-                    "", health_pb2.HealthCheckResponse.NOT_SERVING
-                )
-                self._health_servicer.set(
-                    "EdgeAdapterService", health_pb2.HealthCheckResponse.NOT_SERVING
-                )
+                self._health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
+                self._health_servicer.set("EdgeAdapterService", health_pb2.HealthCheckResponse.NOT_SERVING)
             except ImportError:
                 pass
         if self._server:
@@ -655,16 +607,12 @@ class EdgeServer:
                 async with aioredis.from_url(cfg.redis_url, decode_responses=True) as r:
                     await r.set(key, dto_json)
             except Exception as exc:
-                logger.error(
-                    "Edge endpoint registration failed (online=%s): %s", online, exc
-                )
+                logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)
                 return
 
         except Exception as exc:
             # Never crash the server because of a registration failure.
-            logger.error(
-                "Edge endpoint registration failed (online=%s): %s", online, exc
-            )
+            logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)
             return
 
         if online:

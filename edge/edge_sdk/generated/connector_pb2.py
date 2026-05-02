@@ -11,9 +11,7 @@ from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 
-_runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "connector.proto"
-)
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 6, 31, 1, "", "connector.proto")
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -39,9 +37,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["_ASSETTELEMETRYPROTO_TELEMETRYDATAENTRY"]._loaded_options = None
     _globals["_ASSETTELEMETRYPROTO_TELEMETRYDATAENTRY"]._serialized_options = b"8\001"
     _globals["_SUBASSETTELEMETRYPROTO_TELEMETRYDATAENTRY"]._loaded_options = None
-    _globals[
-        "_SUBASSETTELEMETRYPROTO_TELEMETRYDATAENTRY"
-    ]._serialized_options = b"8\001"
+    _globals["_SUBASSETTELEMETRYPROTO_TELEMETRYDATAENTRY"]._serialized_options = b"8\001"
     _globals["_TELEMETRYTYPE"]._serialized_start = 5000
     _globals["_TELEMETRYTYPE"]._serialized_end = 5102
     _globals["_CONNECTORDELETESCHEDULERSBYTASKREQUEST"]._serialized_start = 95

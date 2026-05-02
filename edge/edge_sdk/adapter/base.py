@@ -159,21 +159,15 @@ class EdgeAdapter(ABC):
     # Flight control
     # ------------------------------------------------------------------
 
-    async def take_off(
-        self, ctx: RequestContext, coordinates: Coordinates
-    ) -> EdgeResponse:
+    async def take_off(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Command the drone to take off to *coordinates*."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def go_to(
-        self, ctx: RequestContext, coordinates: Coordinates
-    ) -> EdgeResponse:
+    async def go_to(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Command the drone to fly to *coordinates*."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def return_to_home(
-        self, ctx: RequestContext, request: ReturnToHomeRequest
-    ) -> EdgeResponse:
+    async def return_to_home(self, ctx: RequestContext, request: ReturnToHomeRequest) -> EdgeResponse:
         """Command the drone to return to home."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
@@ -181,15 +175,11 @@ class EdgeAdapter(ABC):
     # Manual control
     # ------------------------------------------------------------------
 
-    async def enter_manual_control(
-        self, ctx: RequestContext, request: ManualControlRequest
-    ) -> EdgeResponse:
+    async def enter_manual_control(self, ctx: RequestContext, request: ManualControlRequest) -> EdgeResponse:
         """Establish a manual-control session for the given client."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def exit_manual_control(
-        self, ctx: RequestContext, request: ManualControlRequest
-    ) -> EdgeResponse:
+    async def exit_manual_control(self, ctx: RequestContext, request: ManualControlRequest) -> EdgeResponse:
         """Terminate the manual-control session."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
@@ -226,9 +216,7 @@ class EdgeAdapter(ABC):
         """Trigger a single photo capture."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def enable_gimbal_tracking(
-        self, ctx: RequestContext, enabled: bool
-    ) -> EdgeResponse:
+    async def enable_gimbal_tracking(self, ctx: RequestContext, enabled: bool) -> EdgeResponse:
         """Enable or disable gimbal auto-tracking."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
@@ -236,9 +224,7 @@ class EdgeAdapter(ABC):
     # Detection  (server-streaming – optional)
     # ------------------------------------------------------------------
 
-    async def get_detections(
-        self, ctx: RequestContext, stream_url: str | None
-    ) -> AsyncIterator[DetectionResponse]:
+    async def get_detections(self, ctx: RequestContext, stream_url: str | None) -> AsyncIterator[DetectionResponse]:
         """
         Stream detection results back to the caller.
 
@@ -262,9 +248,7 @@ class EdgeAdapter(ABC):
         """Open the dock cover."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def close_cover(
-        self, ctx: RequestContext, force: bool | None
-    ) -> EdgeResponse:
+    async def close_cover(self, ctx: RequestContext, force: bool | None) -> EdgeResponse:
         """Close the dock cover. *force=True* maps to ForceCloseCover."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
@@ -304,15 +288,11 @@ class EdgeAdapter(ABC):
     # Debug & maintenance
     # ------------------------------------------------------------------
 
-    async def enter_or_close_remote_debug_mode(
-        self, ctx: RequestContext, enabled: bool
-    ) -> EdgeResponse:
+    async def enter_or_close_remote_debug_mode(self, ctx: RequestContext, enabled: bool) -> EdgeResponse:
         """Toggle remote debug mode. Override if your hardware supports it."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def change_ac_mode(
-        self, ctx: RequestContext, mode: AssetAirConditionerState
-    ) -> EdgeResponse:
+    async def change_ac_mode(self, ctx: RequestContext, mode: AssetAirConditionerState) -> EdgeResponse:
         """Change the dock air-conditioner mode. Override if your hardware supports it."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
@@ -320,27 +300,19 @@ class EdgeAdapter(ABC):
     # Live stream
     # ------------------------------------------------------------------
 
-    async def start_live_stream(
-        self, ctx: RequestContext, request: LiveStreamStartRequest
-    ) -> EdgeResponse:
+    async def start_live_stream(self, ctx: RequestContext, request: LiveStreamStartRequest) -> EdgeResponse:
         """Start a live video stream."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def stop_live_stream(
-        self, ctx: RequestContext, request: LiveStreamStopRequest
-    ) -> EdgeResponse:
+    async def stop_live_stream(self, ctx: RequestContext, request: LiveStreamStopRequest) -> EdgeResponse:
         """Stop the live stream identified by ``request.video_id``."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def change_lens(
-        self, ctx: RequestContext, request: ChangeCameraLensRequest
-    ) -> EdgeResponse:
+    async def change_lens(self, ctx: RequestContext, request: ChangeCameraLensRequest) -> EdgeResponse:
         """Switch the active camera lens."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def change_zoom(
-        self, ctx: RequestContext, request: ChangeCameraZoomRequest
-    ) -> EdgeResponse:
+    async def change_zoom(self, ctx: RequestContext, request: ChangeCameraZoomRequest) -> EdgeResponse:
         """Change the camera zoom level."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 

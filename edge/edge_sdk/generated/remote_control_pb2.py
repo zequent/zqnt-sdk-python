@@ -11,9 +11,7 @@ from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 
-_runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "remote-control.proto"
-)
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 6, 31, 1, "", "remote-control.proto")
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -35,7 +33,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["DESCRIPTOR"]._loaded_options = None
     _globals[
         "DESCRIPTOR"
-    ]._serialized_options = b'\n"com.zqnt.utils.remotecontrol.protoB\022RemoteControlProtoP\001Z\027gen/remotecontrol/proto'
+    ]._serialized_options = (
+        b'\n"com.zqnt.utils.remotecontrol.protoB\022RemoteControlProtoP\001Z\027gen/remotecontrol/proto'
+    )
     _globals["_REMOTECONTROLRESPONSE"]._serialized_start = 101
     _globals["_REMOTECONTROLRESPONSE"]._serialized_end = 447
     _globals["_REMOTECONTROLTAKEOFFREQUEST"]._serialized_start = 449

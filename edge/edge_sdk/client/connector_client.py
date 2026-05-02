@@ -49,9 +49,7 @@ class ConnectorClient:
             import grpc.aio
             from ..generated import connector_pb2_grpc  # type: ignore[import]
         except ImportError as exc:
-            raise ImportError(
-                "Protobuf stubs not found. Run  scripts/generate_protos.sh  first."
-            ) from exc
+            raise ImportError("Protobuf stubs not found. Run  scripts/generate_protos.sh  first.") from exc
 
         self._channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
         self._stub = connector_pb2_grpc.ConnectorServiceStub(self._channel)
@@ -102,9 +100,7 @@ class ConnectorClient:
         from ..server._converters import proto_to_mission
 
         resp = await self._stub.GetMission(
-            connector_pb2.ConnectorGetMissionRequest(
-                base=self._base(), missionId=mission_id
-            ),
+            connector_pb2.ConnectorGetMissionRequest(base=self._base(), missionId=mission_id),
             wait_for_ready=True,
         )
         if resp.HasField("missionDTO"):
