@@ -17,9 +17,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure git authentication
+        run: |
+          git config --global url."https://${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Fetch submodules
+        run: |
+          git submodule update --init --recursive
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
