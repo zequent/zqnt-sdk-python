@@ -44,7 +44,7 @@ jobs:
 
       - name: Run tests
         run: |
-          uv run pytest tests/ -v --cov=edge_sdk --cov-report=term-missing
+          uv run pytest tests/ -v
 
       - name: Build package
         run: |
