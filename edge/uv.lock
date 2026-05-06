@@ -50,8 +50,8 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=5.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-utils", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.0" },
-    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.0" },
+    { name = "zqnt-utils", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.1" },
+    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.1" },
 ]
 provides-extras = ["redis", "dev"]
 
@@ -342,8 +342,8 @@ wheels = [
 
 [[package]]
 name = "zqnt-utils"
-version = "1.0.0"
-source = { git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.0#1e0ca0646904cf23e39650567bbeebb038380036" }
+version = "1.0.1"
+source = { git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.0.1#1531f3d1551579ce2e683b1951e1398c99604c6a" }
 dependencies = [
     { name = "redis" },
 ]

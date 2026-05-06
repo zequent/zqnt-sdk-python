@@ -50,4 +50,4 @@ build-backend = "hatchling.build"
 packages = ["edge_sdk"]
 
 [tool.uv.sources]
-zqnt-utils = { git = "https://github.com/Zequent/zqnt-utils-python", rev = "v1.0.0" }
+zqnt-utils = { git = "https://github.com/Zequent/zqnt-utils-python", rev = "v1.0.1" }
