@@ -22,7 +22,7 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "fakeredis[aioredis]>=2.26.0",
     "ruff>=0.15.12",
-    "zqnt-utils>=1.0.0",
+    "zqnt-utils>=1.0.1",
 
 ]
 
