@@ -33,7 +33,7 @@ from .live_data.stream_handle import StreamHandle
 try:
     __version__ = _pkg_version("zqnt-client-sdk")
 except PackageNotFoundError:
-    __version__ = "1.0.0"
+    __version__ = "1.0.1"
 
 from .models import (
     AssetTelemetry,
