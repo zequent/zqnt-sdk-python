@@ -237,13 +237,13 @@ def asset_to_proto(asset: "Asset", common_pb2):
         id=asset.id,
         sn=asset.sn,
         name=asset.name,
-        type=asset.type.value,
-        vendor=asset.vendor.value,
-        connection=asset.connection.value,
+        type=asset.type,
+        vendor=asset.vendor,
+        connection=asset.connection,
         model=asset.model,
         organization=asset.organization,
         online=asset.online,
-        streamType=asset.stream_type.value,
+        streamType=asset.stream_type,
     )
     if asset.connection_string is not None:
         kwargs["connectionString"] = asset.connection_string
