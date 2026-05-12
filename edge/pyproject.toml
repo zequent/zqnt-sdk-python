@@ -1,6 +1,6 @@
 [project]
 name = "edge-python-sdk"
-version = "1.0.1"
+version = "1.0.2"
 description = "Python SDK for implementing ZQNT Edge Adapters"
 requires-python = ">=3.12"
 dependencies = [
