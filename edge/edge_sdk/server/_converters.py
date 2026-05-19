@@ -10,6 +10,8 @@ they can construct the right classes without a hard import dependency here.
 
 from datetime import datetime, timezone
 
+from zqnt_utils.proto_utils import parse_enum
+
 from ..models.asset import Asset, SubAsset
 from ..models.common import (
     AssetAirConditionerState,
@@ -113,9 +115,9 @@ def proto_to_return_to_home(r) -> ReturnToHomeRequest:
 
 def proto_to_manual_control_request(r) -> ManualControlRequest:
     return ManualControlRequest(
-        client_id=r.clientId,
-        user_id=r.userId,
-        session_id=r.sessionId,
+        client_id=r.client_id,
+        user_id=r.user_id,
+        session_id=r.session_id,
         reason=r.reason if r.HasField("reason") else None,  # type: ignore[attr-defined]
     )
 
@@ -129,21 +131,21 @@ def proto_to_manual_control_input(i) -> ManualControlInput:
         pitch=_opt(i, "pitch"),
         yaw=_opt(i, "yaw"),
         throttle=_opt(i, "throttle"),
-        gimbal_pitch=_opt(i, "gimbalPitch"),
+        gimbal_pitch=_opt(i, "gimbal_pitch"),
     )
 
 
 def proto_to_live_stream_start(r) -> LiveStreamStartRequest:
     return LiveStreamStartRequest(
-        video_id=r.videoId,
-        stream_server=r.streamServer,
-        stream_type=LiveStreamType(r.streamType),
-        asset_type=AssetType(r.assetType),
+        video_id=r.video_id,
+        stream_server=r.stream_server,
+        stream_type=LiveStreamType(r.stream_type),
+        asset_type=AssetType(r.asset_type),
     )
 
 
 def proto_to_live_stream_stop(r) -> LiveStreamStopRequest:
-    return LiveStreamStopRequest(video_id=r.videoId)
+    return LiveStreamStopRequest(video_id=r.video_id)
 
 
 def proto_to_change_lens(r) -> ChangeCameraLensRequest:
@@ -159,45 +161,45 @@ def proto_to_change_zoom(r) -> ChangeCameraZoomRequest:
 
 def proto_to_sub_asset(s) -> SubAsset:
     return SubAsset(
-        id=s.id,
+        id=_opt_field(s, "id"),
         sn=s.sn,
         name=s.name,
-        type=AssetType(s.type),
-        vendor=AssetVendor(s.vendor),
-        connection=AssetConnection(s.connection),
+        type=parse_enum(AssetType, s.type, AssetType.UNKNOWN),
+        vendor=parse_enum(AssetVendor, s.vendor, AssetVendor.DJI),
+        connection=parse_enum(AssetConnection, s.connection, AssetConnection.MQTT),
         model=s.model,
         organization=s.organization,
         online=s.online,
-        stream_type=LiveStreamType(s.streamType),
-        connection_string=s.connectionString if s.HasField("connectionString") else None,  # type: ignore[attr-defined]
+        stream_type=parse_enum(LiveStreamType, s.stream_type, LiveStreamType.UNKNOWN),
+        connection_string=s.connection_string if s.HasField("connection_string") else None,  # type: ignore[attr-defined]
         port=s.port if s.HasField("port") else None,  # type: ignore[attr-defined]
-        live_stream_server=s.liveStreamServer if s.HasField("liveStreamServer") else None,  # type: ignore[attr-defined]
-        external_device_type=s.externalDeviceType if s.HasField("externalDeviceType") else None,  # type: ignore[attr-defined]
-        external_device_sub_type=s.externalDeviceSubType if s.HasField("externalDeviceSubType") else None,  # type: ignore[attr-defined]
-        external_id=s.externalId if s.HasField("externalId") else None,  # type: ignore[attr-defined]
-        stream_url_predefined=s.streamUrlPredefined if s.HasField("streamUrlPredefined") else None,  # type: ignore[attr-defined]
+        live_stream_server=s.live_stream_server if s.HasField("live_stream_server") else None,  # type: ignore[attr-defined]
+        external_device_type=s.external_device_type if s.HasField("external_device_type") else None,  # type: ignore[attr-defined]
+        external_device_sub_type=s.external_device_sub_type if s.HasField("external_device_sub_type") else None,  # type: ignore[attr-defined]
+        external_id=s.external_id if s.HasField("external_id") else None,  # type: ignore[attr-defined]
+        stream_url_predefined=s.stream_url_predefined if s.HasField("stream_url_predefined") else None,  # type: ignore[attr-defined]
     )
 
 
 def proto_to_asset(a) -> Asset:
-    sub = proto_to_sub_asset(a.subAssetDTO) if a.HasField("subAssetDTO") else None  # type: ignore[attr-defined]
+    sub = proto_to_sub_asset(a.sub_asset_dto) if a.HasField("sub_asset_dto") else None  # type: ignore[attr-defined]
     return Asset(
-        id=a.id,
+        id=_opt_field(a, "id"),
         sn=a.sn,
         name=a.name,
-        type=AssetType(a.type),
-        vendor=AssetVendor(a.vendor),
-        connection=AssetConnection(a.connection),
+        type=parse_enum(AssetType, a.type, AssetType.UNKNOWN),
+        vendor=parse_enum(AssetVendor, a.vendor, AssetVendor.DJI),
+        connection=parse_enum(AssetConnection, a.connection, AssetConnection.MQTT),
         model=a.model,
         organization=a.organization,
         online=a.online,
-        stream_type=LiveStreamType(a.streamType),
-        connection_string=a.connectionString if a.HasField("connectionString") else None,  # type: ignore[attr-defined]
+        stream_type=LiveStreamType(a.stream_type),
+        connection_string=a.connection_string if a.HasField("connection_string") else None,  # type: ignore[attr-defined]
         port=a.port if a.HasField("port") else None,  # type: ignore[attr-defined]
-        live_stream_server=a.liveStreamServer if a.HasField("liveStreamServer") else None,  # type: ignore[attr-defined]
-        external_device_type=a.externalDeviceType if a.HasField("externalDeviceType") else None,  # type: ignore[attr-defined]
-        external_device_sub_type=a.externalDeviceSubType if a.HasField("externalDeviceSubType") else None,  # type: ignore[attr-defined]
-        external_id=a.externalId if a.HasField("externalId") else None,  # type: ignore[attr-defined]
+        live_stream_server=a.live_stream_server if a.HasField("live_stream_server") else None,  # type: ignore[attr-defined]
+        external_device_type=a.external_device_type if a.HasField("external_device_type") else None,  # type: ignore[attr-defined]
+        external_device_sub_type=a.external_device_sub_type if a.HasField("external_device_sub_type") else None,  # type: ignore[attr-defined]
+        external_id=a.external_id if a.HasField("external_id") else None,  # type: ignore[attr-defined]
         sub_asset=sub,
     )
 
@@ -207,28 +209,28 @@ def _sub_asset_to_proto(sub: "SubAsset", common_pb2):
         id=sub.id,
         sn=sub.sn,
         name=sub.name,
-        type=sub.type.value,
-        vendor=sub.vendor.value,
-        connection=sub.connection.value,
+        type=f"ASSET_TYPE_{sub.type.name}",
+        vendor=f"ASSET_VENDOR_{sub.vendor.name}",
+        connection=sub.connection.name,
         model=sub.model,
         organization=sub.organization,
         online=sub.online,
-        streamType=sub.stream_type.value,
+        stream_type=f"LIVE_STREAM_TYPE_{sub.stream_type.name}",
     )
     if sub.connection_string is not None:
-        kwargs["connectionString"] = sub.connection_string
+        kwargs["connection_string"] = sub.connection_string
     if sub.port is not None:
         kwargs["port"] = sub.port
     if sub.live_stream_server is not None:
-        kwargs["liveStreamServer"] = sub.live_stream_server
+        kwargs["live_stream_server"] = sub.live_stream_server
     if sub.external_device_type is not None:
-        kwargs["externalDeviceType"] = sub.external_device_type
+        kwargs["external_device_type"] = sub.external_device_type
     if sub.external_device_sub_type is not None:
-        kwargs["externalDeviceSubType"] = sub.external_device_sub_type
+        kwargs["external_device_sub_type"] = sub.external_device_sub_type
     if sub.external_id is not None:
-        kwargs["externalId"] = sub.external_id
+        kwargs["external_id"] = sub.external_id
     if sub.stream_url_predefined is not None:
-        kwargs["streamUrlPredefined"] = sub.stream_url_predefined
+        kwargs["stream_url_predefined"] = sub.stream_url_predefined
     return common_pb2.SubAssetProtoDTO(**kwargs)
 
 
@@ -237,28 +239,28 @@ def asset_to_proto(asset: "Asset", common_pb2):
         id=asset.id,
         sn=asset.sn,
         name=asset.name,
-        type=asset.type,
-        vendor=asset.vendor,
-        connection=asset.connection,
+        type=f"ASSET_TYPE_{asset.type.name}",
+        vendor=f"ASSET_VENDOR_{asset.vendor.name}",
+        connection=asset.connection.name,
         model=asset.model,
         organization=asset.organization,
         online=asset.online,
-        streamType=asset.stream_type,
+        stream_type=f"LIVE_STREAM_TYPE_{asset.stream_type.name}",
     )
     if asset.connection_string is not None:
-        kwargs["connectionString"] = asset.connection_string
+        kwargs["connection_string"] = asset.connection_string
     if asset.port is not None:
         kwargs["port"] = asset.port
     if asset.live_stream_server is not None:
-        kwargs["liveStreamServer"] = asset.live_stream_server
+        kwargs["live_stream_server"] = asset.live_stream_server
     if asset.external_device_type is not None:
-        kwargs["externalDeviceType"] = asset.external_device_type
+        kwargs["external_device_type"] = asset.external_device_type
     if asset.external_device_sub_type is not None:
-        kwargs["externalDeviceSubType"] = asset.external_device_sub_type
+        kwargs["external_device_sub_type"] = asset.external_device_sub_type
     if asset.external_id is not None:
-        kwargs["externalId"] = asset.external_id
+        kwargs["external_id"] = asset.external_id
     if asset.sub_asset is not None:
-        kwargs["subAssetDTO"] = _sub_asset_to_proto(asset.sub_asset, common_pb2)
+        kwargs["sub_asset_dto"] = _sub_asset_to_proto(asset.sub_asset, common_pb2)
     return common_pb2.AssetProtoDTO(**kwargs)
 
 
@@ -277,39 +279,39 @@ def proto_to_waypoint(w) -> Waypoint:
         longitude=w.longitude,
         altitude=_opt_field(w, "altitude"),
         speed=_opt_field(w, "speed"),
-        fly_through=_opt_field(w, "flyTrough"),
-        wp_order=_opt_field(w, "wpOrder"),
-        gimbal_pitch=_opt_field(w, "gimbalPitch"),
+        fly_through=_opt_field(w, "fly_trough"),
+        wp_order=_opt_field(w, "wp_order"),
+        gimbal_pitch=_opt_field(w, "gimbal_pitch"),
     )
 
 
 def proto_to_waypoint_config(c) -> WaypointTaskConfig:
     return WaypointTaskConfig(
-        flight_id=c.flightId,
+        flight_id=c.flight_id,
         waypoints=[proto_to_waypoint(w) for w in c.waypoints],
-        fly_to_wayline_mode=_opt_field(c, "flyToWaylineMode"),
-        wayline_finish_action=_opt_field(c, "waylineFinishAction"),
-        wayline_type=_opt_field(c, "waylineType"),
-        wayline_turn_mode=_opt_field(c, "waylineTurnMode"),
-        use_straight_line=_opt_field(c, "useStraightLine"),
-        wayline_precision_type=_opt_field(c, "waylinePrecisionType"),
-        exit_wayline_when_rc_lost=_opt_field(c, "exitWaylineWhenRcLostEnum"),
-        rc_lost_action=_opt_field(c, "rcLostActionEnum"),
-        out_of_control_action=_opt_field(c, "outOfControlAction"),
-        take_off_security_height=_opt_field(c, "takeOffSecurityHeight"),
-        rth_altitude=_opt_field(c, "rthAltitude"),
-        rth_mode=_opt_field(c, "rthMode"),
-        rth_speed=_opt_field(c, "rthSpeed"),
-        global_speed=_opt_field(c, "globalSpeed"),
-        global_transition_speed=_opt_field(c, "globalTransitionSpeed"),
-        global_height=_opt_field(c, "globalHeight"),
-        gimbal_pitch_mode=_opt_field(c, "gimbalPitchMode"),
-        global_gimbal_pitch=_opt_field(c, "globalGimbalPitch"),
-        payload_imaging_type=_opt_field(c, "payloadImagingType"),
-        file_url=_opt_field(c, "fileUrl"),
-        file_md5=_opt_field(c, "fileMd5"),
-        flight_area_file_url=_opt_field(c, "flightAreaFileUrl"),
-        flight_area_checksum=_opt_field(c, "flightAreaChecksum"),
+        fly_to_wayline_mode=_opt_field(c, "fly_to_wayline_mode"),
+        wayline_finish_action=_opt_field(c, "wayline_finish_action"),
+        wayline_type=_opt_field(c, "wayline_type"),
+        wayline_turn_mode=_opt_field(c, "wayline_turn_mode"),
+        use_straight_line=_opt_field(c, "use_straight_line"),
+        wayline_precision_type=_opt_field(c, "wayline_precision_type"),
+        exit_wayline_when_rc_lost=_opt_field(c, "exit_wayline_when_rc_lost_enum"),
+        rc_lost_action=_opt_field(c, "rc_lost_action_enum"),
+        out_of_control_action=_opt_field(c, "out_of_control_action"),
+        take_off_security_height=_opt_field(c, "take_off_security_height"),
+        rth_altitude=_opt_field(c, "rth_altitude"),
+        rth_mode=_opt_field(c, "rth_mode"),
+        rth_speed=_opt_field(c, "rth_speed"),
+        global_speed=_opt_field(c, "global_speed"),
+        global_transition_speed=_opt_field(c, "global_transition_speed"),
+        global_height=_opt_field(c, "global_height"),
+        gimbal_pitch_mode=_opt_field(c, "gimbal_pitch_mode"),
+        global_gimbal_pitch=_opt_field(c, "global_gimbal_pitch"),
+        payload_imaging_type=_opt_field(c, "payload_imaging_type"),
+        file_url=_opt_field(c, "file_url"),
+        file_md5=_opt_field(c, "file_md5"),
+        flight_area_file_url=_opt_field(c, "flight_area_file_url"),
+        flight_area_checksum=_opt_field(c, "flight_area_checksum"),
     )
 
 
@@ -320,32 +322,32 @@ def proto_to_detect_config(c) -> DetectTaskConfig:
             value=p.value,
             description=_opt_field(p, "description"),
         )
-        for p in c.detectionParameters
+        for p in c.detection_parameters
     ]
     return DetectTaskConfig(
-        detection_targets=list(c.detectionTargets),
-        detection_mode=_opt_field(c, "detectionMode"),
-        area_latitude=_opt_field(c, "areaLatitude"),
-        area_longitude=_opt_field(c, "areaLongitude"),
-        area_radius=_opt_field(c, "areaRadius"),
-        detection_altitude=_opt_field(c, "detectionAltitude"),
-        scan_pattern=_opt_field(c, "scanPattern"),
-        scan_speed=_opt_field(c, "scanSpeed"),
-        thermal_detection=_opt_field(c, "thermalDetection"),
-        visual_detection=_opt_field(c, "visualDetection"),
-        min_confidence=_opt_field(c, "minConfidence"),
-        max_detections=_opt_field(c, "maxDetections"),
-        auto_capture_on_detection=_opt_field(c, "autoCaptureOnDetection"),
-        investigate_detections=_opt_field(c, "investigateDetections"),
-        investigation_distance=_opt_field(c, "investigationDistance"),
-        investigation_duration=_opt_field(c, "investigationDuration"),
-        gimbal_pitch=_opt_field(c, "gimbalPitch"),
-        enable_zoom=_opt_field(c, "enableZoom"),
-        zoom_level=_opt_field(c, "zoomLevel"),
-        max_duration=_opt_field(c, "maxDuration"),
-        on_max_detections_action=_opt_field(c, "onMaxDetectionsAction"),
-        realtime_alerts=_opt_field(c, "realtimeAlerts"),
-        ai_model_id=_opt_field(c, "aiModelId"),
+        detection_targets=list(c.detection_targets),
+        detection_mode=_opt_field(c, "detection_mode"),
+        area_latitude=_opt_field(c, "area_latitude"),
+        area_longitude=_opt_field(c, "area_longitude"),
+        area_radius=_opt_field(c, "area_radius"),
+        detection_altitude=_opt_field(c, "detection_altitude"),
+        scan_pattern=_opt_field(c, "scan_pattern"),
+        scan_speed=_opt_field(c, "scan_speed"),
+        thermal_detection=_opt_field(c, "thermal_detection"),
+        visual_detection=_opt_field(c, "visual_detection"),
+        min_confidence=_opt_field(c, "min_confidence"),
+        max_detections=_opt_field(c, "max_detections"),
+        auto_capture_on_detection=_opt_field(c, "auto_capture_on_detection"),
+        investigate_detections=_opt_field(c, "investigate_detections"),
+        investigation_distance=_opt_field(c, "investigation_distance"),
+        investigation_duration=_opt_field(c, "investigation_duration"),
+        gimbal_pitch=_opt_field(c, "gimbal_pitch"),
+        enable_zoom=_opt_field(c, "enable_zoom"),
+        zoom_level=_opt_field(c, "zoom_level"),
+        max_duration=_opt_field(c, "max_duration"),
+        on_max_detections_action=_opt_field(c, "on_max_detections_action"),
+        realtime_alerts=_opt_field(c, "realtime_alerts"),
+        ai_model_id=_opt_field(c, "ai_model_id"),
         detection_parameters=params,
     )
 
@@ -358,33 +360,33 @@ def proto_to_task(t) -> Task:
     follow_config = None
     track_config = None
 
-    which = t.WhichOneof("taskConfig")
-    if which == "waypointConfig":
-        wp_config = proto_to_waypoint_config(t.waypointConfig)
-    elif which == "detectConfig":
-        detect_config = proto_to_detect_config(t.detectConfig)
+    which = t.WhichOneof("task_config")
+    if which == "waypoint_config":
+        wp_config = proto_to_waypoint_config(t.waypoint_config)
+    elif which == "detect_config":
+        detect_config = proto_to_detect_config(t.detect_config)
     # area / poi / follow / track configs follow the same pattern but are omitted
     # for brevity – add converters as needed.
 
     return Task(
         id=_opt_field(t, "id"),
-        mission_id=_opt_field(t, "missionId"),
+        mission_id=_opt_field(t, "mission_id"),
         name=_opt_field(t, "name"),
         description=_opt_field(t, "description"),
-        task_type=TaskType(_opt_field(t, "taskType") or 0),
+        task_type=TaskType(_opt_field(t, "task_type") or 0),
         status=TaskStatus(t.status),
-        asset_id=_opt_field(t, "assetId"),
-        sn_number=_opt_field(t, "snNumber"),
-        current_progress=_opt_field(t, "currentProgress"),
-        current_step=_opt_field(t, "currentStep"),
+        asset_id=_opt_field(t, "asset_id"),
+        sn_number=_opt_field(t, "sn_number"),
+        current_progress=_opt_field(t, "current_progress"),
+        current_step=_opt_field(t, "current_step"),
         waypoint_config=wp_config,
         detect_config=detect_config,
         area_mapping_config=area_config,
         poi_config=poi_config,
         follow_config=follow_config,
         track_config=track_config,
-        created_at=_ts_to_dt(_opt_field(t, "createdAt")),
-        modified_at=_ts_to_dt(_opt_field(t, "modifiedAt")),
+        created_at=_ts_to_dt(_opt_field(t, "created_at")),
+        modified_at=_ts_to_dt(_opt_field(t, "modified_at")),
     )
 
 
@@ -396,34 +398,34 @@ def proto_to_mission(m) -> Mission:
         status=MissionStatus(m.status),
         type=MissionType(m.type),
         tasks=[proto_to_task(t) for t in m.tasks],
-        geo_json=_opt_field(m, "geoJson"),
-        assigned_assets=list(m.assignedAssets),
-        start_date=_ts_to_dt(_opt_field(m, "startDate")),
-        end_date=_ts_to_dt(_opt_field(m, "endDate")),
-        created_at=_ts_to_dt(_opt_field(m, "createdAt")),
-        modified_at=_ts_to_dt(_opt_field(m, "modifiedAt")),
+        geo_json=_opt_field(m, "geo_json"),
+        assigned_assets=list(m.assigned_assets),
+        start_date=_ts_to_dt(_opt_field(m, "start_date")),
+        end_date=_ts_to_dt(_opt_field(m, "end_date")),
+        created_at=_ts_to_dt(_opt_field(m, "created_at")),
+        modified_at=_ts_to_dt(_opt_field(m, "modified_at")),
     )
 
 
 def proto_to_asset_telemetry(t) -> AssetTelemetry:
     net = None
-    if t.HasField("networkInformation"):  # type: ignore[attr-defined]
-        ni = t.networkInformation
+    if t.HasField("network_information"):  # type: ignore[attr-defined]
+        ni = t.network_information
         net = AssetNetworkInfo(
             type=NetworkType(ni.type) if ni.HasField("type") else None,
             rate=ni.rate if ni.HasField("rate") else None,
             quality=NetworkStateQuality(ni.quality) if ni.HasField("quality") else None,
         )
     ac = None
-    if t.HasField("airConditioner"):  # type: ignore[attr-defined]
-        a = t.airConditioner
+    if t.HasField("air_conditioner"):  # type: ignore[attr-defined]
+        a = t.air_conditioner
         ac = AssetAirConditioner(
             state=AssetAirConditionerState(a.state) if a.HasField("state") else None,
-            switch_time=a.switchTime if a.HasField("switchTime") else None,
+            switch_time=a.switch_time if a.HasField("switch_time") else None,
         )
     sub_info = None
-    if t.HasField("subAssetInformation"):  # type: ignore[attr-defined]
-        si = t.subAssetInformation
+    if t.HasField("sub_asset_information"):  # type: ignore[attr-defined]
+        si = t.sub_asset_information
         sub_info = AssetSubAssetInfo(
             sn=si.sn if si.HasField("sn") else None,
             model=si.model if si.HasField("model") else None,
@@ -431,11 +433,11 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
             online=si.online if si.HasField("online") else None,
         )
     pos = None
-    if t.HasField("positionState"):  # type: ignore[attr-defined]
-        ps = t.positionState
+    if t.HasField("position_state"):  # type: ignore[attr-defined]
+        ps = t.position_state
         pos = AssetPositionState(
-            gps_number=ps.gpsNumber if ps.HasField("gpsNumber") else None,
-            rtk_number=ps.rtkNumber if ps.HasField("rtkNumber") else None,
+            gps_number=ps.gps_number if ps.HasField("gps_number") else None,
+            rtk_number=ps.rtk_number if ps.HasField("rtk_number") else None,
             quality=ps.quality if ps.HasField("quality") else None,
         )
     return AssetTelemetry(
@@ -443,32 +445,32 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
         timestamp=_ts_to_dt(t.timestamp),
         latitude=_opt_field(t, "latitude"),
         longitude=_opt_field(t, "longitude"),
-        absolute_altitude=_opt_field(t, "absoluteAltitude"),
-        relative_altitude=_opt_field(t, "relativeAltitude"),
-        environment_temp=_opt_field(t, "environmentTemp"),
-        inside_temp=_opt_field(t, "insideTemp"),
+        absolute_altitude=_opt_field(t, "absolute_altitude"),
+        relative_altitude=_opt_field(t, "relative_altitude"),
+        environment_temp=_opt_field(t, "environment_temp"),
+        inside_temp=_opt_field(t, "inside_temp"),
         humidity=_opt_field(t, "humidity"),
         mode=AssetMode(_opt_field(t, "mode") or 0) if _opt_field(t, "mode") is not None else None,
         rainfall=Rainfall(_opt_field(t, "rainfall") or 0) if _opt_field(t, "rainfall") is not None else None,
         sub_asset_info=sub_info,
-        sub_asset_at_home=_opt_field(t, "subAssetAtHome"),
-        sub_asset_charging=_opt_field(t, "subAssetCharging"),
-        sub_asset_percentage=_opt_field(t, "subAssetPercentage"),
+        sub_asset_at_home=_opt_field(t, "sub_asset_at_home"),
+        sub_asset_charging=_opt_field(t, "sub_asset_charging"),
+        sub_asset_percentage=_opt_field(t, "sub_asset_percentage"),
         heading=_opt_field(t, "heading"),
-        debug_mode_open=_opt_field(t, "debugModeOpen"),
-        has_active_manual_control_session=_opt_field(t, "hasActiveManualControlSession"),
-        cover_state=AssetCoverState(_opt_field(t, "coverState") or 0)
-        if _opt_field(t, "coverState") is not None
+        debug_mode_open=_opt_field(t, "debug_mode_open"),
+        has_active_manual_control_session=_opt_field(t, "has_active_manual_control_session"),
+        cover_state=AssetCoverState(_opt_field(t, "cover_state") or 0)
+        if _opt_field(t, "cover_state") is not None
         else None,
-        working_voltage=_opt_field(t, "workingVoltage"),
-        working_current=_opt_field(t, "workingCurrent"),
-        supply_voltage=_opt_field(t, "supplyVoltage"),
-        wind_speed=_opt_field(t, "windSpeed"),
-        position_valid=_opt_field(t, "positionValid"),
+        working_voltage=_opt_field(t, "working_voltage"),
+        working_current=_opt_field(t, "working_current"),
+        supply_voltage=_opt_field(t, "supply_voltage"),
+        wind_speed=_opt_field(t, "wind_speed"),
+        position_valid=_opt_field(t, "position_valid"),
         network_info=net,
         air_conditioner=ac,
-        manual_control_state=ManualControlState(_opt_field(t, "manualControlState") or 0)
-        if _opt_field(t, "manualControlState") is not None
+        manual_control_state=ManualControlState(_opt_field(t, "manual_control_state") or 0)
+        if _opt_field(t, "manual_control_state") is not None
         else None,
         position_state=pos,
     )
@@ -476,32 +478,32 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
 
 def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
     payload = None
-    if t.HasField("payloadTelemetry"):  # type: ignore[attr-defined]
-        p = t.payloadTelemetry
+    if t.HasField("payload_telemetry"):  # type: ignore[attr-defined]
+        p = t.payload_telemetry
         cam = None
-        if p.HasField("cameraData"):
-            cd = p.cameraData
+        if p.HasField("camera_data"):
+            cd = p.camera_data
             cam = CameraData(
-                current_lens=cd.currentLens if cd.HasField("currentLens") else None,
-                gimbal_pitch=cd.gimbalPitch if cd.HasField("gimbalPitch") else None,
-                gimbal_yaw=cd.gimbalYaw if cd.HasField("gimbalYaw") else None,
-                zoom_factor=cd.zoomFactor if cd.HasField("zoomFactor") else None,
-                gimbal_roll=cd.gimbalRoll if cd.HasField("gimbalRoll") else None,
+                current_lens=cd.current_lens if cd.HasField("current_lens") else None,
+                gimbal_pitch=cd.gimbal_pitch if cd.HasField("gimbal_pitch") else None,
+                gimbal_yaw=cd.gimbal_yaw if cd.HasField("gimbal_yaw") else None,
+                zoom_factor=cd.zoom_factor if cd.HasField("zoom_factor") else None,
+                gimbal_roll=cd.gimbal_roll if cd.HasField("gimbal_roll") else None,
             )
         rf = None
-        if p.HasField("rangeFinderData"):
-            rd = p.rangeFinderData
+        if p.HasField("range_finder_data"):
+            rd = p.range_finder_data
             rf = RangeFinderData(
-                target_latitude=rd.targetLatitude if rd.HasField("targetLatitude") else None,
-                target_longitude=rd.targetLongitude if rd.HasField("targetLongitude") else None,
-                target_distance=rd.targetDistance if rd.HasField("targetDistance") else None,
-                target_altitude=rd.targetAltitude if rd.HasField("targetAltitude") else None,
+                target_latitude=rd.target_latitude if rd.HasField("target_latitude") else None,
+                target_longitude=rd.target_longitude if rd.HasField("target_longitude") else None,
+                target_distance=rd.target_distance if rd.HasField("target_distance") else None,
+                target_altitude=rd.target_altitude if rd.HasField("target_altitude") else None,
             )
         sens = None
-        if p.HasField("sensorData"):
-            sd = p.sensorData
+        if p.HasField("sensor_data"):
+            sd = p.sensor_data
             sens = SensorData(
-                target_temperature=sd.targetTemperature if sd.HasField("targetTemperature") else None,
+                target_temperature=sd.target_temperature if sd.HasField("target_temperature") else None,
             )
         payload = PayloadTelemetry(
             id=p.id,
@@ -512,32 +514,32 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
             sensor=sens,
         )
     batt = None
-    if t.HasField("batteryInformation"):  # type: ignore[attr-defined]
-        bi = t.batteryInformation
+    if t.HasField("battery_information"):  # type: ignore[attr-defined]
+        bi = t.battery_information
         batt = SubAssetBatteryInfo(
             percentage=bi.percentage if bi.HasField("percentage") else None,
-            remaining_time=bi.remainingTime if bi.HasField("remainingTime") else None,
-            return_to_home_power=bi.returnToHomePower if bi.HasField("returnToHomePower") else None,
+            remaining_time=bi.remaining_time if bi.HasField("remaining_time") else None,
+            return_to_home_power=bi.return_to_home_power if bi.HasField("return_to_home_power") else None,
         )
     return SubAssetTelemetry(
         id=t.id,
         timestamp=_ts_to_dt(t.timestamp),
         latitude=_opt_field(t, "latitude"),
         longitude=_opt_field(t, "longitude"),
-        absolute_altitude=_opt_field(t, "absoluteAltitude"),
-        relative_altitude=_opt_field(t, "relativeAltitude"),
-        horizontal_speed=_opt_field(t, "horizontalSpeed"),
-        vertical_speed=_opt_field(t, "verticalSpeed"),
-        wind_speed=_opt_field(t, "windSpeed"),
-        wind_direction=_opt_field(t, "windDirection"),
+        absolute_altitude=_opt_field(t, "absolute_altitude"),
+        relative_altitude=_opt_field(t, "relative_altitude"),
+        horizontal_speed=_opt_field(t, "horizontal_speed"),
+        vertical_speed=_opt_field(t, "vertical_speed"),
+        wind_speed=_opt_field(t, "wind_speed"),
+        wind_direction=_opt_field(t, "wind_direction"),
         heading=_opt_field(t, "heading"),
         gear=_opt_field(t, "gear"),
         payload=payload,
         battery=batt,
-        height_limit=_opt_field(t, "heightLimit"),
-        home_distance=_opt_field(t, "homeDistance"),
-        total_movement_distance=_opt_field(t, "totalMovementDistance"),
-        total_movement_time=_opt_field(t, "totalMovementTime"),
+        height_limit=_opt_field(t, "height_limit"),
+        home_distance=_opt_field(t, "home_distance"),
+        total_movement_distance=_opt_field(t, "total_movement_distance"),
+        total_movement_time=_opt_field(t, "total_movement_time"),
         mode=SubAssetMode(_opt_field(t, "mode") or 0) if _opt_field(t, "mode") is not None else None,
         country=_opt_field(t, "country"),
     )
@@ -555,14 +557,14 @@ def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
             command=c.command,
             description=c.description,
             available=c.available,
-            unavailableReason=c.unavailable_reason or "",
+            unavailable_reason=c.unavailable_reason or "",
             metadata=c.metadata,
         )
         for c in caps.capabilities
     ]
     return common_pb2.CurrentCapabilities(
-        assetSn=caps.asset_sn,
-        assetType=int(caps.asset_type),
+        asset_sn=caps.asset_sn,
+        asset_type=int(caps.asset_type),
         capabilities=proto_caps,
         timestamp=ts,
     )
@@ -571,15 +573,15 @@ def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
 def edge_response_to_proto(response: EdgeResponse, edge_pb2, timestamp_pb2, empty_pb2, common_pb2=None):
     ts = _now_ts(timestamp_pb2)
     kwargs: dict = {
-        "hasErrors": not response.success,
+        "has_errors": not response.success,
         "tid": response.tid,
         "sn": response.sn,
         "timestamp": ts,
     }
     if response.asset_id:
-        kwargs["assetId"] = response.asset_id
+        kwargs["asset_id"] = response.asset_id
     if response.message:
-        kwargs["responseMessage"] = response.message
+        kwargs["response_message"] = response.message
 
     if response.error:
         err_ts = _now_ts(timestamp_pb2)
@@ -587,19 +589,19 @@ def edge_response_to_proto(response: EdgeResponse, edge_pb2, timestamp_pb2, empt
         _common = common_pb2 if common_pb2 is not None else edge_pb2
         kwargs["error"] = _common.GlobalErrorMessage(
             timestamp=err_ts,
-            errorMessage=response.error.message,
-            errorCode=int(response.error.code),
+            error_message=response.error.message,
+            error_code=int(response.error.code),
         )
     elif response.stream_url or response.video_id:
-        kwargs["liveStreamStartResponse"] = edge_pb2.LiveStreamStartResponse(
-            streamUrl=response.stream_url or "",
-            videoId=response.video_id or "",
+        kwargs["live_stream_start_response"] = edge_pb2.LiveStreamStartResponse(
+            stream_url=response.stream_url or "",
+            video_id=response.video_id or "",
         )
     elif response.progress:
         kwargs["progress"] = edge_pb2.CommandProgress(
             progress=response.progress.progress,
             state=response.progress.state,
-            leftTimeInSeconds=response.progress.left_time_seconds,
+            left_time_in_seconds=response.progress.left_time_seconds,
         )
     else:
         kwargs["empty"] = empty_pb2.Empty()

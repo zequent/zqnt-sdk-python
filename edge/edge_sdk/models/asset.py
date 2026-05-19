@@ -9,7 +9,7 @@ from .common import AssetConnection, AssetType, AssetVendor, LiveStreamType
 
 @dataclass
 class SubAsset:
-    id: str
+    id: str | None
     sn: str
     name: str
     type: AssetType
@@ -30,7 +30,7 @@ class SubAsset:
 
 @dataclass
 class Asset:
-    id: str
+    id: str | None
     sn: str
     name: str
     type: AssetType

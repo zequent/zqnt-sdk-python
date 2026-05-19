@@ -7,7 +7,7 @@ dependencies = [
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
     "grpcio-health-checking>=1.60.0",
-    "zqnt-utils>=1.0.1",
+    "zqnt-utils",
 ]
 
 [project.optional-dependencies]
@@ -15,15 +15,11 @@ redis = [
     "redis[asyncio]>=5.0.0",
 ]
 dev = [
-    "grpcio-tools>=1.60.0",
-    "grpc-stubs>=1.53.0",
-    "mypy-protobuf>=3.6.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "fakeredis[aioredis]>=2.26.0",
     "ruff>=0.15.12",
-    "zqnt-utils>=1.0.1",
-
+    "zqnt-utils",
 ]
 
 [tool.pytest.ini_options]
@@ -33,7 +29,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-exclude = ["edge_sdk/generated/**"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N"]
@@ -50,4 +45,5 @@ build-backend = "hatchling.build"
 packages = ["edge_sdk"]
 
 [tool.uv.sources]
-zqnt-utils = { git = "https://github.com/Zequent/zqnt-utils-python", rev = "v1.0.1" }
+zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
+#zqnt-utils = { git = "https://github.com/Zequent/zqnt-utils-python", rev = "v1.0.1" }

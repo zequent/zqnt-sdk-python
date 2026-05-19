@@ -19,6 +19,8 @@ class AssetType(IntEnum):
     SENSOR = 3
     CAMERA = 4
     OTHER = 5
+    JAMMER = 6
+    CYBER_ATTACK = 7
 
 
 class AssetVendor(IntEnum):
@@ -27,12 +29,14 @@ class AssetVendor(IntEnum):
     ROS = 2
     MAVLINK = 3
     RTMP_RTSP = 4
+    SAPIENT = 5
 
 
 class AssetConnection(IntEnum):
     MQTT = 0
     IP = 1
     SERIAL = 2
+    TCP = 3
 
 
 class LiveStreamType(IntEnum):

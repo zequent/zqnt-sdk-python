@@ -33,17 +33,8 @@ import grpc.aio
 
 from ..adapter.base import EdgeAdapter
 
-# Generated modules – populated after running scripts/generate_protos.sh
-try:
-    from google.protobuf import empty_pb2, timestamp_pb2
-
-    from ..generated import (  # type: ignore[import]
-        common_pb2,  # type: ignore[import]
-        edge_pb2,
-        edge_pb2_grpc,
-    )
-except ImportError as exc:  # pragma: no cover
-    raise ImportError("Protobuf stubs not found. Run  scripts/generate_protos.sh  first.") from exc
+from google.protobuf import empty_pb2, timestamp_pb2
+from zqnt_utils.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc
 
 from ..models.common import (
     AssetAirConditionerState,
@@ -174,7 +165,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         try:
             caps = await self._adapter.get_capabilities(
                 sn=request.sn,
-                asset_id=request.assetId if request.HasField("assetId") else None,
+                asset_id=request.asset_id if request.HasField("asset_id") else None,
             )
             return edge_pb2.EdgeGetCapabilitiesResponse(
                 capabilities=capabilities_to_proto(caps, common_pb2, timestamp_pb2),
@@ -183,8 +174,8 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
             logger.exception("GetCapabilities error")
             return edge_pb2.EdgeGetCapabilitiesResponse(
                 error=common_pb2.GlobalErrorMessage(
-                    errorMessage=str(exc),
-                    errorCode=int(ErrorCode.SDK_ERROR),
+                    error_message=str(exc),
+                    error_code=int(ErrorCode.SDK_ERROR),
                 )
             )
 
@@ -258,7 +249,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def LookAt(self, request, context):
         await self._assert_supported("look_at", context)
         ctx = proto_to_request_context(request.base)
-        payload_index = request.payloadIndex if request.HasField("payloadIndex") else None
+        payload_index = request.payload_index if request.HasField("payload_index") else None
         locked = request.locked if request.HasField("locked") else None
         return await self._handle_call(
             ctx,
@@ -282,15 +273,15 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def GetDetections(self, request, context):
         await self._assert_supported("get_detections", context)
         ctx = proto_to_request_context(request.base)
-        stream_url = request.streamUrl if request.HasField("streamUrl") else None
+        stream_url = request.stream_url if request.HasField("stream_url") else None
         try:
             async for detection in self._adapter.get_detections(ctx, stream_url):
                 results = [
                     edge_pb2.EdgeDetectionResponse.DetectionResult(
-                        objectId=d.object_id,
-                        objectType=d.object_type,
+                        object_id=d.object_id,
+                        object_type=d.object_type,
                         confidence=d.confidence,
-                        boundingBox=edge_pb2.EdgeDetectionResponse.DetectionResult.BoundingBox(
+                        bounding_box=edge_pb2.EdgeDetectionResponse.DetectionResult.BoundingBox(
                             x=d.bounding_box.x,
                             y=d.bounding_box.y,
                             width=d.bounding_box.width,
@@ -356,7 +347,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def RegisterAsset(self, request, context):
         await self._assert_supported("register_asset", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(ctx, self._adapter.register_asset(ctx, proto_to_asset(request.assetDTO)))
+        return await self._handle_call(ctx, self._adapter.register_asset(ctx, proto_to_asset(request.asset_dto)))
 
     async def DeRegisterAsset(self, request, context):
         await self._assert_supported("deregister_asset", context)
@@ -435,17 +426,17 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def PrepareTask(self, request, context):
         await self._assert_supported("prepare_task", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(ctx, self._adapter.prepare_task(ctx, request.taskId))
+        return await self._handle_call(ctx, self._adapter.prepare_task(ctx, request.task_id))
 
     async def StartTask(self, request, context):
         await self._assert_supported("start_task", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(ctx, self._adapter.start_task(ctx, request.taskId))
+        return await self._handle_call(ctx, self._adapter.start_task(ctx, request.task_id))
 
     async def StopTask(self, request, context):
         await self._assert_supported("stop_task", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(ctx, self._adapter.stop_task(ctx, request.taskId))
+        return await self._handle_call(ctx, self._adapter.stop_task(ctx, request.task_id))
 
 
 def _dummy_ctx() -> RequestContext:
