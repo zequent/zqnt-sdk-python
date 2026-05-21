@@ -4,13 +4,16 @@ ConnectorClient – thin wrapper around the ConnectorService gRPC stub.
 Provides plain-Python methods so adapter code can query assets, missions,
 and tasks without touching protobuf directly::
 
-    client = ConnectorClient(host="platform.example.com", port=50053, sn="DOCK001")
+    client = ConnectorClient(host="platform.example.com", port=50053)
     await client.connect()
 
-    asset = await client.get_asset_by_sn()
-    task  = await client.get_task("task-uuid-here")
+    asset = await client.get_asset_by_sn("DOCK001")
+    task  = await client.get_task("task-uuid-here", sn="DOCK001")
 
     await client.close()
+
+Each method accepts the caller's ``sn`` explicitly so the same client
+instance can serve multiple devices without any shared state.
 
 All calls carry a per-call timeout (default 30 s) and retry automatically
 on transient errors (UNAVAILABLE / DEADLINE_EXCEEDED) with exponential
@@ -33,10 +36,12 @@ class ConnectorClient:
     """
     Client for the ZQNT ConnectorService.
 
+    A single instance can be shared across multiple adapter handler calls
+    because the serial number is passed per-call rather than stored.
+
     Args:
         host:         ConnectorService host.
         port:         ConnectorService port (default 50053).
-        sn:           Serial number used as the base for requests.
         call_timeout: Per-call deadline in seconds (default 30.0).
         max_retries:  Max retry attempts on transient gRPC errors (default 3).
     """
@@ -48,13 +53,11 @@ class ConnectorClient:
         self,
         host: str,
         port: int = 50053,
-        sn: str = "",
         call_timeout: float = 30.0,
         max_retries: int = 3,
     ) -> None:
         self._host = host
         self._port = port
-        self._sn = sn
         self._call_timeout = call_timeout
         self._max_retries = max_retries
         self._channel = None
@@ -71,7 +74,7 @@ class ConnectorClient:
 
         self._channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
         self._stub = connector_pb2_grpc.ConnectorServiceStub(self._channel)
-        logger.info("ConnectorClient connected to %s:%d (sn=%s)", self._host, self._port, self._sn)
+        logger.info("ConnectorClient connected to %s:%d", self._host, self._port)
 
     async def close(self) -> None:
         """Close the channel and release resources."""
@@ -79,14 +82,14 @@ class ConnectorClient:
             await self._channel.close()
             self._channel = None
             self._stub = None
-            logger.info("ConnectorClient closed (sn=%s)", self._sn)
+            logger.info("ConnectorClient closed")
 
     # ------------------------------------------------------------------
     # Asset
     # ------------------------------------------------------------------
 
-    async def get_asset_by_sn(self) -> Asset | None:
-        """Fetch the asset registered under this client's serial number."""
+    async def get_asset_by_sn(self, sn: str) -> Asset | None:
+        """Fetch the asset registered under *sn*."""
         from zqnt_utils.generated.zqnt import connector_pb2
         from ..server._converters import proto_to_asset
 
@@ -94,8 +97,9 @@ class ConnectorClient:
         resp = await self._call(
             "GetAssetBySn",
             tid,
+            sn,
             lambda: self._stub.GetAssetBySn(
-                connector_pb2.ConnectorGetAssetBySnRequest(base=self._base(tid)),
+                connector_pb2.ConnectorGetAssetBySnRequest(base=self._base(tid, sn)),
                 timeout=self._call_timeout,
             ),
         )
@@ -112,9 +116,10 @@ class ConnectorClient:
         resp = await self._call(
             "RegisterAsset",
             tid,
+            asset.sn,
             lambda: self._stub.RegisterAsset(
                 connector_pb2.ConnectorRegisterAssetRequest(
-                    base=self._base(tid),
+                    base=self._base(tid, asset.sn),
                     asset_dto=asset_to_proto(asset, common_pb2),
                 ),
                 timeout=self._call_timeout,
@@ -134,7 +139,7 @@ class ConnectorClient:
     # Mission
     # ------------------------------------------------------------------
 
-    async def get_mission(self, mission_id: str) -> Mission | None:
+    async def get_mission(self, mission_id: str, sn: str = "") -> Mission | None:
         """Fetch a mission by ID."""
         from zqnt_utils.generated.zqnt import connector_pb2
         from ..server._converters import proto_to_mission
@@ -143,8 +148,9 @@ class ConnectorClient:
         resp = await self._call(
             "GetMission",
             tid,
+            sn,
             lambda: self._stub.GetMission(
-                connector_pb2.ConnectorGetMissionRequest(base=self._base(tid), mission_id=mission_id),
+                connector_pb2.ConnectorGetMissionRequest(base=self._base(tid, sn), mission_id=mission_id),
                 timeout=self._call_timeout,
             ),
         )
@@ -156,7 +162,7 @@ class ConnectorClient:
     # Task
     # ------------------------------------------------------------------
 
-    async def get_task(self, task_id: str) -> Task | None:
+    async def get_task(self, task_id: str, sn: str = "") -> Task | None:
         """Fetch a task by ID."""
         from zqnt_utils.generated.zqnt import connector_pb2
         from ..server._converters import proto_to_task
@@ -165,8 +171,9 @@ class ConnectorClient:
         resp = await self._call(
             "GetTask",
             tid,
+            sn,
             lambda: self._stub.GetTask(
-                connector_pb2.ConnectorGetTaskRequest(base=self._base(tid), task_id=task_id),
+                connector_pb2.ConnectorGetTaskRequest(base=self._base(tid, sn), task_id=task_id),
                 timeout=self._call_timeout,
             ),
         )
@@ -174,7 +181,7 @@ class ConnectorClient:
             return proto_to_task(resp.task_dto)
         return None
 
-    async def get_task_by_flight_id(self, flight_id: str) -> Task | None:
+    async def get_task_by_flight_id(self, flight_id: str, sn: str = "") -> Task | None:
         """Fetch a task by its flight ID (waypoint config flightId)."""
         from zqnt_utils.generated.zqnt import connector_pb2
         from ..server._converters import proto_to_task
@@ -183,8 +190,9 @@ class ConnectorClient:
         resp = await self._call(
             "GetTaskByFlightId",
             tid,
+            sn,
             lambda: self._stub.GetTaskByFlightId(
-                connector_pb2.ConnectorGetTaskRequest(base=self._base(tid), taskId=flight_id),
+                connector_pb2.ConnectorGetTaskRequest(base=self._base(tid, sn), task_id=flight_id),
                 timeout=self._call_timeout,
             ),
         )
@@ -200,7 +208,7 @@ class ConnectorClient:
         if self._stub is None:
             raise RuntimeError("ConnectorClient not connected. Call connect() first.")
 
-    async def _call(self, operation: str, tid: str, fn: Callable) -> Any:
+    async def _call(self, operation: str, tid: str, sn: str, fn: Callable) -> Any:
         """
         Execute a gRPC call with retry on transient errors.
 
@@ -216,7 +224,7 @@ class ConnectorClient:
         backoff = self._BACKOFF_INITIAL
         for attempt in range(1, self._max_retries + 1):
             try:
-                logger.debug("%s [tid=%s sn=%s]", operation, tid, self._sn)
+                logger.debug("%s [tid=%s sn=%s]", operation, tid, sn)
                 result = await fn()
                 return result
             except grpc.aio.AioRpcError as exc:
@@ -241,21 +249,20 @@ class ConnectorClient:
                         "%s failed [tid=%s sn=%s code=%s]: %s",
                         operation,
                         tid,
-                        self._sn,
+                        sn,
                         exc.code().name,
                         exc.details(),
                     )
                     raise
 
-    def _base(self, tid: str | None = None):
+    def _base(self, tid: str | None = None, sn: str = ""):
         from google.protobuf import timestamp_pb2
-
         from zqnt_utils.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
         return common_pb2.RequestBase(
             tid=tid if tid is not None else str(uuid.uuid4()),
-            sn=self._sn,
+            sn=sn,
             timestamp=ts,
         )

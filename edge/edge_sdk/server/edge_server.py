@@ -47,11 +47,13 @@ from ..models.common import (
 )
 from ._converters import (
     capabilities_to_proto,
+    custom_command_response_to_proto,
     edge_response_to_proto,
     proto_to_asset,
     proto_to_change_lens,
     proto_to_change_zoom,
     proto_to_coordinates,
+    proto_to_custom_command,
     proto_to_live_stream_start,
     proto_to_live_stream_stop,
     proto_to_manual_control_input,
@@ -437,6 +439,22 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         await self._assert_supported("stop_task", context)
         ctx = proto_to_request_context(request.base)
         return await self._handle_call(ctx, self._adapter.stop_task(ctx, request.task_id))
+
+    async def SendCustomCommand(self, request, context):
+        await self._assert_supported("send_custom_command", context)
+        ctx = proto_to_request_context(request.base)
+        cmd = proto_to_custom_command(request)
+        try:
+            result = await self._adapter.send_custom_command(ctx, cmd)
+            return custom_command_response_to_proto(result, edge_pb2, timestamp_pb2, empty_pb2, common_pb2)
+        except Exception as exc:
+            logger.exception("Adapter error in SendCustomCommand [tid=%s sn=%s]", ctx.tid, ctx.sn)
+            from ..models.common import CustomCommandResponse, ErrorMessage, ErrorCode
+            err_resp = CustomCommandResponse.fail(
+                ctx.tid, ctx.sn, cmd.command_type,
+                ErrorMessage(str(exc), ErrorCode.ASSET_ERROR),
+            )
+            return custom_command_response_to_proto(err_resp, edge_pb2, timestamp_pb2, empty_pb2, common_pb2)
 
 
 def _dummy_ctx() -> RequestContext:

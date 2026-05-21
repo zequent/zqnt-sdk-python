@@ -21,6 +21,7 @@ class AssetType(IntEnum):
     OTHER = 5
     JAMMER = 6
     CYBER_ATTACK = 7
+    SAPIENT = 8
 
 
 class AssetVendor(IntEnum):
@@ -34,9 +35,8 @@ class AssetVendor(IntEnum):
 
 class AssetConnection(IntEnum):
     MQTT = 0
-    IP = 1
+    TCP = 1
     SERIAL = 2
-    TCP = 3
 
 
 class LiveStreamType(IntEnum):
@@ -53,6 +53,7 @@ class AssetMode(IntEnum):
     UPGRADING = 3
     WORKING = 4
     TO_BE_CALIBRATED = 5
+    OFFLINE = 6
 
 
 class SubAssetMode(IntEnum):
@@ -170,6 +171,12 @@ class NetworkStateQuality(IntEnum):
     FAIR = 3
     GOOD = 4
     EXCELLENT = 5
+
+
+class VehicleAction(IntEnum):
+    NONE = 0
+    TAKEOFF = 1
+    LAND = 2
 
 
 # ---------------------------------------------------------------------------
@@ -393,3 +400,65 @@ class DetectionResult:
 @dataclass
 class DetectionResponse:
     detections: list[DetectionResult] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Custom command
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CustomCommandRequest:
+    command_type: str
+    params: dict = field(default_factory=dict)
+
+
+@dataclass
+class CustomCommandResponse:
+    """
+    Return this from :meth:`~edge_sdk.EdgeAdapter.send_custom_command`.
+
+    Use the factory methods :meth:`ok` and :meth:`fail` for convenience.
+    """
+
+    tid: str
+    sn: str
+    success: bool
+    command_type: str
+    result: dict | None = None
+    message: str | None = None
+    error: ErrorMessage | None = None
+
+    @classmethod
+    def ok(
+        cls,
+        tid: str,
+        sn: str,
+        command_type: str,
+        result: dict | None = None,
+        message: str | None = None,
+    ) -> "CustomCommandResponse":
+        return cls(tid=tid, sn=sn, success=True, command_type=command_type, result=result, message=message)
+
+    @classmethod
+    def fail(
+        cls,
+        tid: str,
+        sn: str,
+        command_type: str,
+        error: ErrorMessage,
+    ) -> "CustomCommandResponse":
+        return cls(tid=tid, sn=sn, success=False, command_type=command_type, error=error)
+
+    @classmethod
+    def not_supported(cls, tid: str = "", sn: str = "", command_type: str = "") -> "CustomCommandResponse":
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=False,
+            command_type=command_type,
+            error=ErrorMessage(
+                message="This operation is not supported by this adapter",
+                code=ErrorCode.SDK_ERROR,
+            ),
+        )

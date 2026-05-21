@@ -48,6 +48,8 @@ from ..models.common import (
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
     Coordinates,
+    CustomCommandRequest,
+    CustomCommandResponse,
     DetectionResponse,
     EdgeResponse,
     LiveStreamStartRequest,
@@ -94,6 +96,7 @@ _CAPABILITY_MAP: dict[str, tuple[str, str]] = {
     "prepare_task": ("PrepareTask", "Prepare task for execution"),
     "start_task": ("StartTask", "Start task execution"),
     "stop_task": ("StopTask", "Stop task execution"),
+    "send_custom_command": ("SendCustomCommand", "Send a vendor-specific custom command"),
 }
 
 
@@ -343,3 +346,15 @@ class EdgeAdapter(ABC):
     async def stop_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         """Stop / abort the currently running task."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+
+    async def send_custom_command(
+        self, ctx: RequestContext, request: CustomCommandRequest
+    ) -> CustomCommandResponse:
+        """Send a vendor-specific custom command.
+
+        Override this method to handle arbitrary commands identified by
+        ``request.command_type``.  Parameters are passed as a plain dict in
+        ``request.params``.  Return a :class:`CustomCommandResponse` with an
+        optional ``result`` dict to send structured data back to the caller.
+        """
+        return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, request.command_type)

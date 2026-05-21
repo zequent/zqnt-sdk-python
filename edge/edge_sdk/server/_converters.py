@@ -24,6 +24,8 @@ from ..models.common import (
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
     Coordinates,
+    CustomCommandRequest,
+    CustomCommandResponse,
     EdgeResponse,
     LiveStreamStartRequest,
     LiveStreamStopRequest,
@@ -41,12 +43,19 @@ from ..models.common import (
     SubAssetMode,
     TaskStatus,
     TaskType,
+    VehicleAction,
 )
 from ..models.task import (
+    AreaMappingTaskConfig,
+    AreaVertex,
     DetectionParameter,
     DetectTaskConfig,
+    FlightTaskBreakReason,
+    FollowTaskConfig,
     Mission,
+    PoiTaskConfig,
     Task,
+    TrackTaskConfig,
     Waypoint,
     WaypointTaskConfig,
 )
@@ -274,12 +283,15 @@ def _opt_field(msg, field):
 
 
 def proto_to_waypoint(w) -> Waypoint:
+    va_raw = _opt_field(w, "vehicle_action")
+    vehicle_action = VehicleAction(va_raw) if va_raw is not None else None
     return Waypoint(
         latitude=w.latitude,
         longitude=w.longitude,
         altitude=_opt_field(w, "altitude"),
         speed=_opt_field(w, "speed"),
         fly_through=_opt_field(w, "fly_trough"),
+        vehicle_action=vehicle_action,
         wp_order=_opt_field(w, "wp_order"),
         gimbal_pitch=_opt_field(w, "gimbal_pitch"),
     )
@@ -352,6 +364,113 @@ def proto_to_detect_config(c) -> DetectTaskConfig:
     )
 
 
+def proto_to_area_mapping_config(c) -> AreaMappingTaskConfig:
+    vertices = [
+        AreaVertex(
+            latitude=v.latitude,
+            longitude=v.longitude,
+            order=_opt_field(v, "order"),
+        )
+        for v in c.area_vertices
+    ]
+    return AreaMappingTaskConfig(
+        survey_altitude=c.survey_altitude,
+        area_vertices=vertices,
+        flight_pattern=_opt_field(c, "flight_pattern"),
+        front_overlap=_opt_field(c, "front_overlap"),
+        side_overlap=_opt_field(c, "side_overlap"),
+        speed=_opt_field(c, "speed"),
+        gimbal_pitch=_opt_field(c, "gimbal_pitch"),
+        camera_angle=_opt_field(c, "camera_angle"),
+        terrain_following=_opt_field(c, "terrain_following"),
+        ground_sampling_distance=_opt_field(c, "ground_sampling_distance"),
+        enable_3d_reconstruction=_opt_field(c, "enable3_d_reconstruction"),
+    )
+
+
+def proto_to_poi_config(c) -> PoiTaskConfig:
+    return PoiTaskConfig(
+        poi_latitude=c.poi_latitude,
+        poi_longitude=c.poi_longitude,
+        poi_altitude=c.poi_altitude,
+        orbit_radius=_opt_field(c, "orbit_radius"),
+        orbit_speed=_opt_field(c, "orbit_speed"),
+        flight_altitude=_opt_field(c, "flight_altitude"),
+        number_of_orbits=_opt_field(c, "number_of_orbits"),
+        orbit_direction=_opt_field(c, "orbit_direction"),
+        start_angle=_opt_field(c, "start_angle"),
+        end_angle=_opt_field(c, "end_angle"),
+        capture_enabled=_opt_field(c, "capture_enabled"),
+        capture_interval=_opt_field(c, "capture_interval"),
+        lock_camera_on_poi=_opt_field(c, "lock_camera_on_poi"),
+    )
+
+
+def proto_to_follow_config(c) -> FollowTaskConfig:
+    return FollowTaskConfig(
+        target_type=c.target_type,
+        initial_latitude=_opt_field(c, "initial_latitude"),
+        initial_longitude=_opt_field(c, "initial_longitude"),
+        follow_distance=_opt_field(c, "follow_distance"),
+        relative_altitude=_opt_field(c, "relative_altitude"),
+        max_speed=_opt_field(c, "max_speed"),
+        follow_mode=_opt_field(c, "follow_mode"),
+        angle_offset=_opt_field(c, "angle_offset"),
+        obstacle_avoidance=_opt_field(c, "obstacle_avoidance"),
+        max_duration=_opt_field(c, "max_duration"),
+        max_distance_from_start=_opt_field(c, "max_distance_from_start"),
+        lost_target_action=_opt_field(c, "lost_target_action"),
+        lost_target_timeout=_opt_field(c, "lost_target_timeout"),
+        lock_camera_on_target=_opt_field(c, "lock_camera_on_target"),
+        gimbal_pitch_offset=_opt_field(c, "gimbal_pitch_offset"),
+        auto_capture=_opt_field(c, "auto_capture"),
+        capture_interval=_opt_field(c, "capture_interval"),
+    )
+
+
+def proto_to_track_config(c) -> TrackTaskConfig:
+    return TrackTaskConfig(
+        target_type=c.target_type,
+        initial_latitude=_opt_field(c, "initial_latitude"),
+        initial_longitude=_opt_field(c, "initial_longitude"),
+        target_altitude=_opt_field(c, "target_altitude"),
+        tracking_mode=_opt_field(c, "tracking_mode"),
+        max_movement_radius=_opt_field(c, "max_movement_radius"),
+        tracking_altitude=_opt_field(c, "tracking_altitude"),
+        gimbal_tracking=_opt_field(c, "gimbal_tracking"),
+        auto_zoom=_opt_field(c, "auto_zoom"),
+        zoom_level=_opt_field(c, "zoom_level"),
+        tracking_sensitivity=_opt_field(c, "tracking_sensitivity"),
+        max_duration=_opt_field(c, "max_duration"),
+        lost_target_action=_opt_field(c, "lost_target_action"),
+        lost_target_timeout=_opt_field(c, "lost_target_timeout"),
+        search_pattern=_opt_field(c, "search_pattern"),
+        search_duration=_opt_field(c, "search_duration"),
+        continuous_recording=_opt_field(c, "continuous_recording"),
+        photo_capture=_opt_field(c, "photo_capture"),
+        capture_interval=_opt_field(c, "capture_interval"),
+        confidence_threshold=_opt_field(c, "confidence_threshold"),
+    )
+
+
+def _parse_task_type(raw) -> TaskType | None:
+    """Parse task_type from proto string (e.g. 'TASK_TYPE_DETECT') or int."""
+    if raw is None:
+        return None
+    if isinstance(raw, int):
+        try:
+            return TaskType(raw)
+        except ValueError:
+            return None
+    s = str(raw)
+    prefix = "TASK_TYPE_"
+    name = s[len(prefix):] if s.startswith(prefix) else s
+    try:
+        return TaskType[name]
+    except KeyError:
+        return None
+
+
 def proto_to_task(t) -> Task:
     wp_config = None
     detect_config = None
@@ -365,15 +484,24 @@ def proto_to_task(t) -> Task:
         wp_config = proto_to_waypoint_config(t.waypoint_config)
     elif which == "detect_config":
         detect_config = proto_to_detect_config(t.detect_config)
-    # area / poi / follow / track configs follow the same pattern but are omitted
-    # for brevity – add converters as needed.
+    elif which == "area_mapping_config":
+        area_config = proto_to_area_mapping_config(t.area_mapping_config)
+    elif which == "poi_config":
+        poi_config = proto_to_poi_config(t.poi_config)
+    elif which == "follow_config":
+        follow_config = proto_to_follow_config(t.follow_config)
+    elif which == "track_config":
+        track_config = proto_to_track_config(t.track_config)
+
+    break_reason_raw = _opt_field(t, "break_reason")
+    break_reason = FlightTaskBreakReason(break_reason_raw) if break_reason_raw is not None else None
 
     return Task(
         id=_opt_field(t, "id"),
         mission_id=_opt_field(t, "mission_id"),
         name=_opt_field(t, "name"),
         description=_opt_field(t, "description"),
-        task_type=TaskType(_opt_field(t, "task_type") or 0),
+        task_type=_parse_task_type(_opt_field(t, "task_type")),
         status=TaskStatus(t.status),
         asset_id=_opt_field(t, "asset_id"),
         sn_number=_opt_field(t, "sn_number"),
@@ -385,6 +513,9 @@ def proto_to_task(t) -> Task:
         poi_config=poi_config,
         follow_config=follow_config,
         track_config=track_config,
+        break_reason=break_reason,
+        external_command_type=_opt_field(t, "external_command_type"),
+        modified_from=_opt_field(t, "modified_from"),
         created_at=_ts_to_dt(_opt_field(t, "created_at")),
         modified_at=_ts_to_dt(_opt_field(t, "modified_at")),
     )
@@ -607,3 +738,50 @@ def edge_response_to_proto(response: EdgeResponse, edge_pb2, timestamp_pb2, empt
         kwargs["empty"] = empty_pb2.Empty()
 
     return edge_pb2.EdgeResponse(**kwargs)
+
+
+def custom_command_response_to_proto(
+    response: CustomCommandResponse,
+    edge_pb2,
+    timestamp_pb2,
+    empty_pb2,
+    common_pb2=None,
+):
+    from google.protobuf import struct_pb2
+
+    ts = _now_ts(timestamp_pb2)
+    kwargs: dict = {
+        "has_errors": not response.success,
+        "tid": response.tid,
+        "sn": response.sn,
+        "timestamp": ts,
+        "command_type": response.command_type,
+    }
+    if response.message:
+        kwargs["response_message"] = response.message
+
+    if response.error:
+        err_ts = _now_ts(timestamp_pb2)
+        _common = common_pb2 if common_pb2 is not None else edge_pb2
+        kwargs["error"] = _common.GlobalErrorMessage(
+            timestamp=err_ts,
+            error_message=response.error.message,
+            error_code=int(response.error.code),
+        )
+    elif response.result is not None:
+        s = struct_pb2.Struct()
+        s.update(response.result)
+        kwargs["result"] = s
+    else:
+        kwargs["empty"] = empty_pb2.Empty()
+
+    return edge_pb2.EdgeCustomCommandResponse(**kwargs)
+
+
+def proto_to_custom_command(r) -> CustomCommandRequest:
+    from google.protobuf import json_format
+
+    params = {}
+    if r.HasField("params"):  # type: ignore[attr-defined]
+        params = json_format.MessageToDict(r.params)
+    return CustomCommandRequest(command_type=r.command_type, params=params)
