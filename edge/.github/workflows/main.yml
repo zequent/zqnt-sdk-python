@@ -30,19 +30,15 @@ jobs:
         uses: astral-sh/setup-uv@v2
 
       # REQUIRED for private git dependencies
-      # Create a repo/org secret named GH_PAT
-      # with access to Zequent/zqnt-utils-python
       - name: Configure git authentication
         run: |
-          git config --global url."https://${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
+          git config --global credential.helper store
+          echo "https://x-access-token:${{ secrets.GH_PAT }}@github.com" >> ~/.git-credentials
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Install dependencies
         run: |
           uv sync --all-extras
-
-      - name: Generate protobuf stubs
-        run: |
-          uv run bash scripts/generate_protos.sh
 
       - name: Lint with ruff
         run: |
