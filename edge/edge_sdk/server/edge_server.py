@@ -30,12 +30,10 @@ from typing import Any
 
 import grpc
 import grpc.aio
-
-from ..adapter.base import EdgeAdapter
-
 from google.protobuf import empty_pb2, timestamp_pb2
 from zqnt_utils.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc
 
+from ..adapter.base import EdgeAdapter
 from ..models.common import (
     AssetAirConditionerState,
     AssetType,
@@ -449,9 +447,12 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
             return custom_command_response_to_proto(result, edge_pb2, timestamp_pb2, empty_pb2, common_pb2)
         except Exception as exc:
             logger.exception("Adapter error in SendCustomCommand [tid=%s sn=%s]", ctx.tid, ctx.sn)
-            from ..models.common import CustomCommandResponse, ErrorMessage, ErrorCode
+            from ..models.common import CustomCommandResponse, ErrorCode, ErrorMessage
+
             err_resp = CustomCommandResponse.fail(
-                ctx.tid, ctx.sn, cmd.command_type,
+                ctx.tid,
+                ctx.sn,
+                cmd.command_type,
                 ErrorMessage(str(exc), ErrorCode.ASSET_ERROR),
             )
             return custom_command_response_to_proto(err_resp, edge_pb2, timestamp_pb2, empty_pb2, common_pb2)

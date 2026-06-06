@@ -38,6 +38,7 @@ except PackageNotFoundError:
 from .adapter.base import EdgeAdapter
 from .client.connector_client import ConnectorClient
 from .client.telemetry_publisher import TelemetryPublisher
+from .config import EdgeAdapterConfig, EdgeAdapterRuntime
 from .models import (
     # task / mission
     AreaMappingTaskConfig,
@@ -109,6 +110,8 @@ __all__ = [
     "__version__",
     # core
     "EdgeAdapter",
+    "EdgeAdapterConfig",
+    "EdgeAdapterRuntime",
     "EdgeServer",
     "RegistrationConfig",
     "TelemetryPublisher",

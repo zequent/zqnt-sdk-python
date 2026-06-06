@@ -464,7 +464,7 @@ def _parse_task_type(raw) -> TaskType | None:
             return None
     s = str(raw)
     prefix = "TASK_TYPE_"
-    name = s[len(prefix):] if s.startswith(prefix) else s
+    name = s[len(prefix) :] if s.startswith(prefix) else s
     try:
         return TaskType[name]
     except KeyError:
@@ -695,7 +695,7 @@ def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
     ]
     return common_pb2.CurrentCapabilities(
         asset_sn=caps.asset_sn,
-        asset_type=int(caps.asset_type),
+        asset_type=caps.asset_type.name,
         capabilities=proto_caps,
         timestamp=ts,
     )

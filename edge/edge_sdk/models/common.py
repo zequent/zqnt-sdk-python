@@ -402,6 +402,14 @@ class DetectionResponse:
     detections: list[DetectionResult] = field(default_factory=list)
 
 
+@dataclass
+class DetectionBatch:
+    """Batch of detection results to publish via DetectionPublisher."""
+
+    detections: list[DetectionResult] = field(default_factory=list)
+    stream_url: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Custom command
 # ---------------------------------------------------------------------------

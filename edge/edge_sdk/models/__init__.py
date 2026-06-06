@@ -13,6 +13,7 @@ from .common import (
     ChangeCameraZoomRequest,
     CommandProgress,
     Coordinates,
+    DetectionBatch,
     DetectionResponse,
     DetectionResult,
     EdgeResponse,
@@ -35,6 +36,7 @@ from .common import (
     TaskStatus,
     TaskType,
 )
+from .notification import AssetStatusEvent, OperationEvent, TaskEvent
 from .task import (
     AreaMappingTaskConfig,
     AreaVertex,
@@ -102,6 +104,11 @@ __all__ = [
     "BoundingBox",
     "DetectionResult",
     "DetectionResponse",
+    "DetectionBatch",
+    # notification
+    "AssetStatusEvent",
+    "TaskEvent",
+    "OperationEvent",
     # task
     "Task",
     "Mission",

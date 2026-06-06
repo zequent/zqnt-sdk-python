@@ -53,11 +53,11 @@ class TelemetryPublisher:
     _BACKOFF_MAX = 60.0
 
     def __init__(
-            self,
-            host: str,
-            port: int = 50052,
-            sn: str = "",
-            queue_max_size: int = 1000,
+        self,
+        host: str,
+        port: int = 50052,
+        sn: str = "",
+        queue_max_size: int = 1000,
     ) -> None:
         self._host = host
         self._port = port
@@ -141,7 +141,6 @@ class TelemetryPublisher:
         """
         import grpc
         import grpc.aio
-
         from zqnt_utils.generated.zqnt import live_data_pb2_grpc
 
         backoff = self._BACKOFF_INITIAL
@@ -227,7 +226,6 @@ class TelemetryPublisher:
 
     def _base(self):
         from google.protobuf import timestamp_pb2
-
         from zqnt_utils.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
@@ -236,7 +234,6 @@ class TelemetryPublisher:
 
     def _build_asset_request(self, t: AssetTelemetry):
         from google.protobuf import timestamp_pb2
-
         from zqnt_utils.generated.zqnt import live_data_pb2
 
         ts = timestamp_pb2.Timestamp()
@@ -329,7 +326,6 @@ class TelemetryPublisher:
 
     def _build_subasset_request(self, t: SubAssetTelemetry):
         from google.protobuf import timestamp_pb2
-
         from zqnt_utils.generated.zqnt import live_data_pb2
 
         ts = timestamp_pb2.Timestamp()
@@ -378,22 +374,30 @@ class TelemetryPublisher:
                 pay_kwargs["timestamp"] = pts
             if p.camera is not None:
                 cam_kwargs: dict = {}
-                _set_optional(cam_kwargs, p.camera, {
-                    "current_lens": "current_lens",
-                    "gimbal_pitch": "gimbal_pitch",
-                    "gimbal_yaw": "gimbal_yaw",
-                    "zoom_factor": "zoom_factor",
-                    "gimbal_roll": "gimbal_roll",
-                })
+                _set_optional(
+                    cam_kwargs,
+                    p.camera,
+                    {
+                        "current_lens": "current_lens",
+                        "gimbal_pitch": "gimbal_pitch",
+                        "gimbal_yaw": "gimbal_yaw",
+                        "zoom_factor": "zoom_factor",
+                        "gimbal_roll": "gimbal_roll",
+                    },
+                )
                 pay_kwargs["camera_data"] = live_data_pb2.PayloadTelemetry.CameraData(**cam_kwargs)
             if p.range_finder is not None:
                 rf_kwargs: dict = {}
-                _set_optional(rf_kwargs, p.range_finder, {
-                    "target_latitude": "target_latitude",
-                    "target_longitude": "target_longitude",
-                    "target_distance": "target_distance",
-                    "target_altitude": "target_altitude",
-                })
+                _set_optional(
+                    rf_kwargs,
+                    p.range_finder,
+                    {
+                        "target_latitude": "target_latitude",
+                        "target_longitude": "target_longitude",
+                        "target_distance": "target_distance",
+                        "target_altitude": "target_altitude",
+                    },
+                )
                 pay_kwargs["range_finder_data"] = live_data_pb2.PayloadTelemetry.RangeFinderData(**rf_kwargs)
             if p.sensor is not None and p.sensor.target_temperature is not None:
                 pay_kwargs["sensor_data"] = live_data_pb2.PayloadTelemetry.SensorData(

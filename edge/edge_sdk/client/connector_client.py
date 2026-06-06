@@ -91,6 +91,7 @@ class ConnectorClient:
     async def get_asset_by_sn(self, sn: str) -> Asset | None:
         """Fetch the asset registered under *sn*."""
         from zqnt_utils.generated.zqnt import connector_pb2
+
         from ..server._converters import proto_to_asset
 
         tid = str(uuid.uuid4())
@@ -110,6 +111,7 @@ class ConnectorClient:
     async def register_asset(self, asset: Asset) -> str | None:
         """Register an asset on the platform. Returns the asset id, or None on failure."""
         from zqnt_utils.generated.zqnt import common_pb2, connector_pb2
+
         from ..server._converters import asset_to_proto
 
         tid = str(uuid.uuid4())
@@ -142,6 +144,7 @@ class ConnectorClient:
     async def get_mission(self, mission_id: str, sn: str = "") -> Mission | None:
         """Fetch a mission by ID."""
         from zqnt_utils.generated.zqnt import connector_pb2
+
         from ..server._converters import proto_to_mission
 
         tid = str(uuid.uuid4())
@@ -165,6 +168,7 @@ class ConnectorClient:
     async def get_task(self, task_id: str, sn: str = "") -> Task | None:
         """Fetch a task by ID."""
         from zqnt_utils.generated.zqnt import connector_pb2
+
         from ..server._converters import proto_to_task
 
         tid = str(uuid.uuid4())
@@ -184,6 +188,7 @@ class ConnectorClient:
     async def get_task_by_flight_id(self, flight_id: str, sn: str = "") -> Task | None:
         """Fetch a task by its flight ID (waypoint config flightId)."""
         from zqnt_utils.generated.zqnt import connector_pb2
+
         from ..server._converters import proto_to_task
 
         tid = str(uuid.uuid4())

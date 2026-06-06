@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from edge_sdk.client.telemetry_publisher import TelemetryPublisher, _SENTINEL
+from edge_sdk.client.telemetry_publisher import _SENTINEL, TelemetryPublisher
 from edge_sdk.models.telemetry import AssetTelemetry, SubAssetTelemetry
 
 

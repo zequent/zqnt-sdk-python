@@ -9,7 +9,6 @@ servicer routing, status codes, and exception handling.
 import grpc
 import grpc.aio
 import pytest
-
 from zqnt_utils.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc  # type: ignore[import]
 
 # ---------------------------------------------------------------------------
@@ -60,8 +59,8 @@ async def test_get_capabilities_start_task_available(server_port):
 async def test_start_task_returns_ok(server_port):
     async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
-        resp = await stub.StartTask(edge_pb2.EdgeStartTaskRequest(base=_base(), taskId="task-42"))
-    assert resp.hasErrors is False or resp.hasErrors is None
+        resp = await stub.StartTask(edge_pb2.EdgeStartTaskRequest(base=_base(), task_id="task-42"))
+    assert resp.has_errors is False or resp.has_errors is None
 
 
 # ---------------------------------------------------------------------------
@@ -105,9 +104,9 @@ async def test_adapter_exception_returns_error_not_crash(crashing_server_port):
     """
     async with grpc.aio.insecure_channel(f"localhost:{crashing_server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
-        resp = await stub.StartTask(edge_pb2.EdgeStartTaskRequest(base=_base(), taskId="boom"))
-    assert resp.hasErrors is True
-    assert resp.error.errorMessage != ""
+        resp = await stub.StartTask(edge_pb2.EdgeStartTaskRequest(base=_base(), task_id="boom"))
+    assert resp.has_errors is True
+    assert resp.error.error_message != ""
 
 
 # ---------------------------------------------------------------------------

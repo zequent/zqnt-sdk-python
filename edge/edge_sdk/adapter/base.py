@@ -347,9 +347,7 @@ class EdgeAdapter(ABC):
         """Stop / abort the currently running task."""
         return EdgeResponse.not_supported(ctx.tid, ctx.sn)
 
-    async def send_custom_command(
-        self, ctx: RequestContext, request: CustomCommandRequest
-    ) -> CustomCommandResponse:
+    async def send_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
         """Send a vendor-specific custom command.
 
         Override this method to handle arbitrary commands identified by
