@@ -580,8 +580,8 @@ class EdgeServer:
         Falls back to a direct redis call if zqnt-utils is not installed.
         """
         cfg = self._registration  # type: ignore[union-attr]
-        vendor = proto_enum_name(cfg.asset_vendor)   # e.g. "ASSET_VENDOR_MAVLINK"
-        asset_type = proto_enum_name(cfg.asset_type) # e.g. "ASSET_TYPE_AIRCRAFT"
+        vendor = proto_enum_name(cfg.asset_vendor)  # e.g. "ASSET_VENDOR_MAVLINK"
+        asset_type = proto_enum_name(cfg.asset_type)  # e.g. "ASSET_TYPE_AIRCRAFT"
 
         try:
             from zqnt_utils.caching import CachingService

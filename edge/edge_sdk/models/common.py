@@ -30,7 +30,7 @@ def proto_enum_lookup(enum_cls: Type[_E], name: str) -> _E:
             f"{name!r} is not a valid {enum_cls.__name__} proto name — "
             f"expected prefix {prefix!r} (e.g. {prefix}AIRCRAFT)"
         )
-    return enum_cls[name.upper()[len(prefix):]]
+    return enum_cls[name.upper()[len(prefix) :]]
 
 
 def proto_enum_name(value: IntEnum) -> str:
