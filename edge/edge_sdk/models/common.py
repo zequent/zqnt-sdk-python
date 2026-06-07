@@ -3,9 +3,50 @@ Plain-Python models that mirror the common.proto definitions.
 No protobuf types are exposed here.
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
+from typing import Type, TypeVar
+
+_E = TypeVar("_E", bound=IntEnum)
+
+
+def proto_enum_lookup(enum_cls: Type[_E], name: str) -> _E:
+    """
+    Resolve a proto-style full enum name to the Python IntEnum value.
+
+    The prefix is derived from the class name (CamelCase → SCREAMING_SNAKE_CASE):
+    ``AssetType`` → ``ASSET_TYPE_``, ``AssetVendor`` → ``ASSET_VENDOR_``.
+
+    Examples::
+
+        proto_enum_lookup(AssetType, "ASSET_TYPE_AIRCRAFT")    # → AssetType.AIRCRAFT
+        proto_enum_lookup(AssetVendor, "ASSET_VENDOR_MAVLINK") # → AssetVendor.MAVLINK
+    """
+    prefix = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", enum_cls.__name__).upper() + "_"
+    if not name.upper().startswith(prefix):
+        raise KeyError(
+            f"{name!r} is not a valid {enum_cls.__name__} proto name — "
+            f"expected prefix {prefix!r} (e.g. {prefix}AIRCRAFT)"
+        )
+    return enum_cls[name.upper()[len(prefix):]]
+
+
+def proto_enum_name(value: IntEnum) -> str:
+    """
+    Convert a Python IntEnum value to its proto-style full name.
+
+    The prefix is derived from the class name (CamelCase → SCREAMING_SNAKE_CASE).
+
+    Examples::
+
+        proto_enum_name(AssetType.AIRCRAFT)    # → "ASSET_TYPE_AIRCRAFT"
+        proto_enum_name(AssetVendor.MAVLINK)   # → "ASSET_VENDOR_MAVLINK"
+    """
+    prefix = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", type(value).__name__).upper() + "_"
+    return prefix + value.name
+
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -406,6 +447,7 @@ class DetectionResponse:
 class DetectionBatch:
     """Batch of detection results to publish via DetectionPublisher."""
 
+    sn: str = ""  # asset serial number – required for multi-asset adapters
     detections: list[DetectionResult] = field(default_factory=list)
     stream_url: str | None = None
 

@@ -24,6 +24,7 @@ backoff up to *max_retries* attempts.  Each request logs its transaction ID
 import asyncio
 import logging
 import uuid
+from collections.abc import AsyncIterator
 from typing import Any, Callable
 
 from ..models.asset import Asset
@@ -107,6 +108,26 @@ class ConnectorClient:
         if resp.HasField("asset_dto"):
             return proto_to_asset(resp.asset_dto)
         return None
+
+    async def watch_assets(self) -> AsyncIterator[list[Asset]]:
+        """
+        Subscribe to the ConnectorService ``AssetMonitoring`` stream.
+
+        Yields a list of :class:`Asset` objects on every snapshot the server
+        pushes.  The stream runs until cancelled or the server closes it.
+        Callers should run this inside a retry loop if they want reconnection.
+        """
+        from zqnt_utils.generated.zqnt import connector_pb2
+
+        from ..server._converters import proto_to_asset
+
+        tid = str(uuid.uuid4())
+        stream = self._stub.AssetMonitoring(
+            connector_pb2.ConnectorAssetMonitorRequest(base=self._base(tid)),
+        )
+        async for response in stream:
+            if response.HasField("asset_list"):
+                yield [proto_to_asset(a) for a in response.asset_list.assets]
 
     async def register_asset(self, asset: Asset) -> str | None:
         """Register an asset on the platform. Returns the asset id, or None on failure."""

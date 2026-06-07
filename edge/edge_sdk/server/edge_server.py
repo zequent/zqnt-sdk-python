@@ -42,6 +42,8 @@ from ..models.common import (
     ErrorCode,
     ErrorMessage,
     RequestContext,
+    proto_enum_lookup,
+    proto_enum_name,
 )
 from ._converters import (
     capabilities_to_proto,
@@ -89,8 +91,8 @@ class RegistrationConfig:
     Expected env vars::
 
         EDGE_ENDPOINT   grpc://my-adapter.internal:50051
-        ASSET_TYPE      SENSOR          # must match AssetType enum name
-        ASSET_VENDOR    ROS             # must match AssetVendor enum name
+        ASSET_TYPE      ASSET_TYPE_AIRCRAFT    # proto-style full name
+        ASSET_VENDOR    ASSET_VENDOR_MAVLINK   # proto-style full name
         REDIS_URL       redis://redis:6379
     """
 
@@ -106,8 +108,8 @@ class RegistrationConfig:
 
         return cls(
             endpoint=os.environ["EDGE_ENDPOINT"],
-            asset_type=AssetType[os.environ["ASSET_TYPE"]],
-            asset_vendor=AssetVendor[os.environ["ASSET_VENDOR"]],
+            asset_type=proto_enum_lookup(AssetType, os.environ["ASSET_TYPE"]),
+            asset_vendor=proto_enum_lookup(AssetVendor, os.environ["ASSET_VENDOR"]),
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379"),
         )
 
@@ -578,7 +580,8 @@ class EdgeServer:
         Falls back to a direct redis call if zqnt-utils is not installed.
         """
         cfg = self._registration  # type: ignore[union-attr]
-        vendor = cfg.asset_vendor.name
+        vendor = proto_enum_name(cfg.asset_vendor)   # e.g. "ASSET_VENDOR_MAVLINK"
+        asset_type = proto_enum_name(cfg.asset_type) # e.g. "ASSET_TYPE_AIRCRAFT"
 
         try:
             from zqnt_utils.caching import CachingService
@@ -587,7 +590,7 @@ class EdgeServer:
             dto = EdgeEndpointDTO(
                 endpoint=cfg.endpoint,
                 online=online,
-                asset_type=cfg.asset_type.name,
+                asset_type=asset_type,
                 asset_vendor=vendor,
             )
             async with CachingService(cfg.redis_url) as cache:
@@ -613,7 +616,7 @@ class EdgeServer:
                 {
                     "endpoint": cfg.endpoint,
                     "online": online,
-                    "assetType": cfg.asset_type.name,
+                    "assetType": asset_type,
                     "assetVendor": vendor,
                 }
             )

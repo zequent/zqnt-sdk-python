@@ -21,14 +21,16 @@ Environment variables (all optional, sensible defaults provided):
     CONNECTOR_PORT      ConnectorService port (default: 50053)
     TELEMETRY_HOST      LiveDataService host (default: localhost)
     TELEMETRY_PORT      LiveDataService port (default: 50052)
-    ADAPTER_SN          Serial number reported by TelemetryPublisher (default: "")
+    ADAPTER_SN          Adapter identifier used for logging (default: "").
+                        Each telemetry frame carries the asset's own SN — this
+                        does not need to match an asset SN for multi-asset adapters.
     LOG_LEVEL           Python log level name (default: INFO)
     LOG_FORMAT          "json" or "text" (default: json)
 
     Optional – automatic Redis service-discovery registration:
     EDGE_ENDPOINT       gRPC endpoint advertised to the platform
-    ASSET_TYPE          AssetType enum name, e.g. SENSOR
-    ASSET_VENDOR        AssetVendor enum name, e.g. ROS
+    ASSET_TYPE          AssetType proto name, e.g. ASSET_TYPE_AIRCRAFT
+    ASSET_VENDOR        AssetVendor proto name, e.g. ASSET_VENDOR_MAVLINK
     REDIS_URL           Redis URL (default: redis://localhost:6379)
 """
 
@@ -128,7 +130,7 @@ class EdgeAdapterRuntime:
         Create an :class:`~edge_sdk.EdgeServer`, wire in the optional
         :class:`~edge_sdk.RegistrationConfig`, and block until termination.
         """
-        from .models.common import AssetType, AssetVendor
+        from .models.common import AssetType, AssetVendor, proto_enum_lookup
         from .server.edge_server import EdgeServer, RegistrationConfig
 
         cfg = self._config
@@ -137,8 +139,8 @@ class EdgeAdapterRuntime:
             try:
                 registration = RegistrationConfig(
                     endpoint=cfg.edge_endpoint,
-                    asset_type=AssetType[cfg.asset_type_name],
-                    asset_vendor=AssetVendor[cfg.asset_vendor_name],
+                    asset_type=proto_enum_lookup(AssetType, cfg.asset_type_name),
+                    asset_vendor=proto_enum_lookup(AssetVendor, cfg.asset_vendor_name),
                     redis_url=cfg.redis_url,
                 )
             except KeyError as exc:

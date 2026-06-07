@@ -224,13 +224,13 @@ class TelemetryPublisher:
     # Proto builders
     # ------------------------------------------------------------------
 
-    def _base(self):
+    def _base(self, sn: str | None = None):
         from google.protobuf import timestamp_pb2
         from zqnt_utils.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
-        return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=self._sn, timestamp=ts)
+        return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=sn if sn is not None else self._sn, timestamp=ts)
 
     def _build_asset_request(self, t: AssetTelemetry):
         from google.protobuf import timestamp_pb2
@@ -319,7 +319,7 @@ class TelemetryPublisher:
             kwargs["position_state"] = live_data_pb2.AssetTelemetry.PositionState(**ps_kwargs)
 
         return live_data_pb2.ProduceTelemetryRequest(
-            base=self._base(),
+            base=self._base(sn=t.id),
             type=0,  # ASSET_TELEMETRY
             asset_telemetry=live_data_pb2.AssetTelemetry(**kwargs),
         )
@@ -406,7 +406,7 @@ class TelemetryPublisher:
             kwargs["payload_telemetry"] = live_data_pb2.PayloadTelemetry(**pay_kwargs)
 
         return live_data_pb2.ProduceTelemetryRequest(
-            base=self._base(),
+            base=self._base(sn=t.id),
             type=1,  # SUBASSET_TELEMETRY
             sub_asset_telemetry=live_data_pb2.SubAssetTelemetry(**kwargs),
         )

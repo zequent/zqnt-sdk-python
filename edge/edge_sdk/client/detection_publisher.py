@@ -199,13 +199,13 @@ class DetectionPublisher:
     # Proto builder
     # ------------------------------------------------------------------
 
-    def _base(self):
+    def _base(self, sn: str | None = None):
         from google.protobuf import timestamp_pb2
         from zqnt_utils.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
-        return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=self._sn, timestamp=ts)
+        return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=sn if sn is not None else self._sn, timestamp=ts)
 
     def _build_detection_request(self, batch: DetectionBatch):
         from zqnt_utils.generated.zqnt import common_pb2
@@ -225,7 +225,7 @@ class DetectionPublisher:
             for d in batch.detections
         ]
 
-        kwargs: dict = {"base": self._base(), "detections": detections}
+        kwargs: dict = {"base": self._base(sn=batch.sn or None), "detections": detections}
         if batch.stream_url is not None:
             kwargs["stream_url"] = batch.stream_url
 

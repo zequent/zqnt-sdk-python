@@ -23,6 +23,7 @@ class TaskEvent:
     task_id: str
     task_type: TaskType
     status: TaskStatus
+    sn: str = ""  # asset serial number – required for multi-asset adapters
     progress: float | None = None  # 0.0 – 1.0, present when RUNNING
     message: str | None = None  # error details when ERROR
     external_task_type: str | None = None
@@ -35,4 +36,5 @@ class OperationEvent:
     operation_id: str
     mission_type: MissionType
     status: MissionStatus
+    sn: str = ""  # asset serial number – required for multi-asset adapters
     message: str | None = None

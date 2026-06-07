@@ -215,13 +215,13 @@ class NotificationPublisher:
     # Proto builders
     # ------------------------------------------------------------------
 
-    def _base(self):
+    def _base(self, sn: str | None = None):
         from google.protobuf import timestamp_pb2
         from zqnt_utils.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
-        return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=self._sn, timestamp=ts)
+        return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=sn if sn is not None else self._sn, timestamp=ts)
 
     def _build_asset_status_request(self, event: AssetStatusEvent):
         from zqnt_utils.generated.zqnt import live_data_pb2
@@ -231,7 +231,7 @@ class NotificationPublisher:
             kwargs["asset_id"] = event.asset_id
 
         return live_data_pb2.ProduceNotificationRequest(
-            base=self._base(),
+            base=self._base(sn=event.sn),
             asset_status=live_data_pb2.AssetStatusEvent(**kwargs),
         )
 
@@ -251,7 +251,7 @@ class NotificationPublisher:
             kwargs["external_task_type"] = event.external_task_type
 
         return live_data_pb2.ProduceNotificationRequest(
-            base=self._base(),
+            base=self._base(sn=event.sn or None),
             task_event=live_data_pb2.TaskEvent(**kwargs),
         )
 
@@ -267,6 +267,6 @@ class NotificationPublisher:
             kwargs["message"] = event.message
 
         return live_data_pb2.ProduceNotificationRequest(
-            base=self._base(),
+            base=self._base(sn=event.sn or None),
             operation_event=live_data_pb2.OperationEvent(**kwargs),
         )
