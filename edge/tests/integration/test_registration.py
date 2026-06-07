@@ -151,8 +151,8 @@ async def test_register_asset_vendor(fake_cache):
 
 def test_from_env_reads_environment_variables(monkeypatch):
     monkeypatch.setenv("EDGE_ENDPOINT", "grpc://test:50051")
-    monkeypatch.setenv("ASSET_TYPE", "SENSOR")
-    monkeypatch.setenv("ASSET_VENDOR", "ROS")
+    monkeypatch.setenv("ASSET_TYPE", "ASSET_TYPE_SENSOR")
+    monkeypatch.setenv("ASSET_VENDOR", "ASSET_VENDOR_ROS")
     monkeypatch.setenv("REDIS_URL", "redis://redis:6379")
 
     cfg = RegistrationConfig.from_env()
@@ -165,8 +165,8 @@ def test_from_env_reads_environment_variables(monkeypatch):
 
 def test_from_env_uses_default_redis_url(monkeypatch):
     monkeypatch.setenv("EDGE_ENDPOINT", "grpc://test:50051")
-    monkeypatch.setenv("ASSET_TYPE", "DOCK")
-    monkeypatch.setenv("ASSET_VENDOR", "DJI")
+    monkeypatch.setenv("ASSET_TYPE", "ASSET_TYPE_DOCK")
+    monkeypatch.setenv("ASSET_VENDOR", "ASSET_VENDOR_DJI")
     monkeypatch.delenv("REDIS_URL", raising=False)
 
     cfg = RegistrationConfig.from_env()
