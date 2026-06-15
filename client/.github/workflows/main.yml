@@ -1,30 +1,26 @@
-name: Main Release
+name: Main
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+  packages: read
 
 jobs:
-  release:
+  ci:
+    name: Lint · Test
     runs-on: ubuntu-latest
-    name: Lint, Test, Build & Release
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Configure git authentication
         run: |
           git config --global url."https://${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
 
-      - name: Fetch submodules
-        run: |
-          git submodule update --init --recursive
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -35,12 +31,10 @@ jobs:
         uses: astral-sh/setup-uv@v2
 
       - name: Install dependencies
-        run: |
-          uv sync --all-extras
+        run: uv sync --all-extras
 
       - name: Generate protobuf stubs
-        run: |
-          uv run bash scripts/generate_protos.sh
+        run: uv run bash scripts/generate_protos.sh
 
       - name: Lint with ruff
         run: |
@@ -48,35 +42,4 @@ jobs:
           uv run ruff format --check .
 
       - name: Run tests
-        run: |
-          uv run pytest tests/ -v
-
-      - name: Build package
-        run: |
-          uv run --with build python -m build
-
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=$(grep "^version" pyproject.toml | cut -d'"' -f2)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Release ${{ steps.version.outputs.version }}
-          files: dist/*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create deployment status
-        if: success()
-        run: |
-          echo "Successfully released version ${{ steps.version.outputs.version }}"
-          echo "Package: zqnt-client-sdk"
-          echo "Available at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
+        run: uv run pytest tests/ -v
