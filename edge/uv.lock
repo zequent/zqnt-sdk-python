@@ -44,8 +44,8 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-utils", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.2.0" },
-    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.2.0" },
+    { name = "zqnt-utils", editable = "../../../utils/zqnt-utils-python" },
+    { name = "zqnt-utils", marker = "extra == 'dev'", editable = "../../../utils/zqnt-utils-python" },
 ]
 provides-extras = ["redis", "dev"]
 
@@ -251,9 +251,24 @@ wheels = [
 [[package]]
 name = "zqnt-utils"
 version = "1.2.0"
-source = { git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.2.0#913ebdddcbb93ad2a90b885b8fbc3a214427aa0f" }
+source = { editable = "../../../utils/zqnt-utils-python" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
     { name = "redis" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "grpcio", specifier = ">=1.60.0" },
+    { name = "protobuf", specifier = ">=4.25.0" },
+    { name = "redis", extras = ["asyncio"], specifier = ">=8.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "grpcio-tools", specifier = ">=1.60.0" },
+    { name = "mypy-protobuf", specifier = ">=3.5.0" },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "ruff", specifier = ">=0.15.15" },
 ]

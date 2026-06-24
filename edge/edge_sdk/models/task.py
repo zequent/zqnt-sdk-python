@@ -303,6 +303,7 @@ class Task:
     sn_number: str | None = None
     current_progress: int | None = None
     current_step: str | None = None
+    config: str | None = None
     waypoint_config: WaypointTaskConfig | None = None
     detect_config: DetectTaskConfig | None = None
     area_mapping_config: AreaMappingTaskConfig | None = None

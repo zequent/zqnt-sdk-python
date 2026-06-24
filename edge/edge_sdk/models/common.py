@@ -72,6 +72,7 @@ class AssetVendor(IntEnum):
     MAVLINK = 3
     RTMP_RTSP = 4
     SAPIENT = 5
+    BETAFLIGHT = 6
 
 
 class AssetConnection(IntEnum):

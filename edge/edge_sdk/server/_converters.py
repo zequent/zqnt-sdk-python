@@ -8,7 +8,12 @@ Functions that build proto objects receive the pb2 module as a parameter so
 they can construct the right classes without a hard import dependency here.
 """
 
+import json
+import types
+import typing
+from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
+from enum import Enum
 
 from zqnt_utils.proto_utils import parse_enum
 
@@ -299,7 +304,7 @@ def proto_to_waypoint(w) -> Waypoint:
 
 def proto_to_waypoint_config(c) -> WaypointTaskConfig:
     return WaypointTaskConfig(
-        flight_id=c.flight_id,
+        flight_id=c.external_task_id,
         waypoints=[proto_to_waypoint(w) for w in c.waypoints],
         fly_to_wayline_mode=_opt_field(c, "fly_to_wayline_mode"),
         wayline_finish_action=_opt_field(c, "wayline_finish_action"),
@@ -471,6 +476,107 @@ def _parse_task_type(raw) -> TaskType | None:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Legacy JSON-string config parsing
+#
+# Older systems still populate the deprecated `config` string field (JSON blob)
+# instead of the type-safe `task_config` oneof. When the oneof is unset we parse
+# that JSON into the matching typed config dataclass, keyed by task_type, so
+# downstream consumers can rely on the typed configs regardless of the source.
+# ---------------------------------------------------------------------------
+
+
+def _norm_key(k: str) -> str:
+    """Normalize a JSON/field key so camelCase, snake_case and PascalCase all match."""
+    return "".join(c for c in k.lower() if c.isalnum())
+
+
+def _unwrap_optional(tp):
+    """Strip `| None` / Optional[...] down to the underlying type."""
+    origin = typing.get_origin(tp)
+    if origin is typing.Union or origin is getattr(types, "UnionType", None):
+        args = [a for a in typing.get_args(tp) if a is not type(None)]
+        if len(args) == 1:
+            return args[0]
+    return tp
+
+
+def _coerce_enum(enum_cls, value):
+    if isinstance(value, enum_cls):
+        return value
+    try:
+        if isinstance(value, str):
+            if value in enum_cls.__members__:
+                return enum_cls[value]
+            return enum_cls(int(value))
+        return enum_cls(value)
+    except (KeyError, ValueError):
+        return None
+
+
+def _coerce_value(tp, value):
+    if value is None:
+        return None
+    tp = _unwrap_optional(tp)
+    if typing.get_origin(tp) is list:
+        args = typing.get_args(tp)
+        item_tp = args[0] if args else None
+        if isinstance(value, list) and item_tp is not None:
+            return [_coerce_value(item_tp, v) for v in value]
+        return value
+    if is_dataclass(tp) and isinstance(value, dict):
+        return _dict_to_dataclass(tp, value)
+    if isinstance(tp, type) and issubclass(tp, Enum):
+        return _coerce_enum(tp, value)
+    return value
+
+
+def _dict_to_dataclass(cls, data):
+    """Best-effort build of a dataclass from a (camelCase or snake_case) dict."""
+    if not isinstance(data, dict):
+        return None
+    field_map = {_norm_key(f.name): f for f in fields(cls)}
+    kwargs = {}
+    for k, v in data.items():
+        f = field_map.get(_norm_key(k))
+        if f is None:
+            continue
+        kwargs[f.name] = _coerce_value(f.type, v)
+    try:
+        return cls(**kwargs)
+    except TypeError:
+        # Required field missing in the legacy blob — treat as unmappable.
+        return None
+
+
+_LEGACY_CONFIG_DISPATCH: dict[TaskType, tuple[str, type]] = {
+    TaskType.WAYPOINT: ("waypoint_config", WaypointTaskConfig),
+    TaskType.DETECT: ("detect_config", DetectTaskConfig),
+    TaskType.AREA_MAPPING: ("area_mapping_config", AreaMappingTaskConfig),
+    TaskType.POI: ("poi_config", PoiTaskConfig),
+    TaskType.FOLLOW: ("follow_config", FollowTaskConfig),
+    TaskType.TRACK: ("track_config", TrackTaskConfig),
+}
+
+
+def _parse_legacy_config(task_type: TaskType | None, raw: str | None):
+    """Parse a legacy JSON-string config into (attr_name, typed_config) or None."""
+    if not raw or task_type is None:
+        return None
+    entry = _LEGACY_CONFIG_DISPATCH.get(task_type)
+    if entry is None:
+        return None
+    attr, cls = entry
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    obj = _dict_to_dataclass(cls, data)
+    if obj is None:
+        return None
+    return attr, obj
+
+
 def proto_to_task(t) -> Task:
     wp_config = None
     detect_config = None
@@ -478,6 +584,9 @@ def proto_to_task(t) -> Task:
     poi_config = None
     follow_config = None
     track_config = None
+
+    task_type = _parse_task_type(_opt_field(t, "task_type"))
+    config_raw = _opt_field(t, "config")
 
     which = t.WhichOneof("task_config")
     if which == "waypoint_config":
@@ -492,6 +601,23 @@ def proto_to_task(t) -> Task:
         follow_config = proto_to_follow_config(t.follow_config)
     elif which == "track_config":
         track_config = proto_to_track_config(t.track_config)
+    elif config_raw:
+        # Legacy fallback: no typed oneof, but a deprecated JSON-string config.
+        parsed = _parse_legacy_config(task_type, config_raw)
+        if parsed is not None:
+            attr, obj = parsed
+            if attr == "waypoint_config":
+                wp_config = obj
+            elif attr == "detect_config":
+                detect_config = obj
+            elif attr == "area_mapping_config":
+                area_config = obj
+            elif attr == "poi_config":
+                poi_config = obj
+            elif attr == "follow_config":
+                follow_config = obj
+            elif attr == "track_config":
+                track_config = obj
 
     break_reason_raw = _opt_field(t, "break_reason")
     break_reason = FlightTaskBreakReason(break_reason_raw) if break_reason_raw is not None else None
@@ -501,7 +627,7 @@ def proto_to_task(t) -> Task:
         mission_id=_opt_field(t, "mission_id"),
         name=_opt_field(t, "name"),
         description=_opt_field(t, "description"),
-        task_type=_parse_task_type(_opt_field(t, "task_type")),
+        task_type=task_type,
         status=TaskStatus(t.status),
         asset_id=_opt_field(t, "asset_id"),
         sn_number=_opt_field(t, "sn_number"),
@@ -510,6 +636,7 @@ def proto_to_task(t) -> Task:
         waypoint_config=wp_config,
         detect_config=detect_config,
         area_mapping_config=area_config,
+        config=config_raw,
         poi_config=poi_config,
         follow_config=follow_config,
         track_config=track_config,

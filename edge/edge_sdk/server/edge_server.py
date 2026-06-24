@@ -225,24 +225,28 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
 
     async def ManualControlInput(self, request_iterator, context):
         await self._assert_supported("manual_control_input", context)
-        ctx = None
+
+        # Peek the first message to build ctx before calling the adapter.
+        # Previously ctx was set lazily inside the generator (nonlocal), but the
+        # adapter received _dummy_ctx() (empty sn) before any iteration happened.
+        try:
+            first_req = await request_iterator.__anext__()
+        except StopAsyncIteration:
+            return _ok_or_error(EdgeResponse.ok("", ""), "", "")
+
+        ctx = proto_to_request_context(first_req.base)
 
         async def _input_gen():
-            nonlocal ctx
+            yield proto_to_manual_control_input(first_req.request)
             async for req in request_iterator:
-                if ctx is None:
-                    ctx = proto_to_request_context(req.base)
                 yield proto_to_manual_control_input(req.request)
 
         try:
-            gen = _input_gen()
-            result = await self._adapter.manual_control_input(ctx or _dummy_ctx(), gen)
-            return _ok_or_error(result, ctx.tid if ctx else "", ctx.sn if ctx else "")
+            result = await self._adapter.manual_control_input(ctx, _input_gen())
+            return _ok_or_error(result, ctx.tid, ctx.sn)
         except Exception as exc:
-            tid = ctx.tid if ctx else ""
-            sn = ctx.sn if ctx else ""
-            logger.exception("Adapter error in ManualControlInput [tid=%s sn=%s]", tid, sn)
-            return _error_proto(tid, sn, exc)
+            logger.exception("Adapter error in ManualControlInput [tid=%s sn=%s]", ctx.tid, ctx.sn)
+            return _error_proto(ctx.tid, ctx.sn, exc)
 
     # ------------------------------------------------------------------
     # Gimbal & camera
