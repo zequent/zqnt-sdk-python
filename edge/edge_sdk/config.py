@@ -42,8 +42,6 @@ import os
 import sys
 from typing import TYPE_CHECKING
 
-from zqnt_utils.generated.zqnt.common_pb2 import AssetVendor
-
 if TYPE_CHECKING:
     from .adapter.base import EdgeAdapter
     from .client.connector_client import ConnectorClient
