@@ -21,6 +21,7 @@ jobs:
       - name: Configure git authentication
         run: |
           git config --global url."https://${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Fetch submodules
         run: |
