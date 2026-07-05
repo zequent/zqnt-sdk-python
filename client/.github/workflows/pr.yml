@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   packages: write
+  pull-requests: write
 
 jobs:
   check:
@@ -17,15 +18,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Configure git authentication
-        run: |
-          git config --global url."https://${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-
-      - name: Fetch submodules
-        run: |
-          git submodule update --init --recursive
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -35,13 +30,16 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v2
 
+      # REQUIRED for private git dependencies
+      - name: Configure git authentication
+        run: |
+          git config --global credential.helper store
+          echo "https://x-access-token:${{ secrets.GH_PAT }}@github.com" >> ~/.git-credentials
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+
       - name: Install dependencies
         run: |
           uv sync --all-extras
-
-      - name: Generate protobuf stubs
-        run: |
-          uv run bash scripts/generate_protos.sh
 
       - name: Lint with ruff
         run: |
