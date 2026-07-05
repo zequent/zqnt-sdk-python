@@ -1,16 +1,17 @@
 """Domain models for the LiveData sub-client.
 
 Mirrors ``com.zqnt.sdk.client.livedata.domains`` from the Java client SDK.
-The ``StreamTelemetryResponse`` payload (asset / sub-asset telemetry) is
-expressed as plain dataclasses so SDK consumers never see protobuf types.
+The streaming payloads (telemetry and notifications) are expressed as plain
+dataclasses so SDK consumers never see protobuf types.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
-from .enums import AssetType, LiveStreamType
+from .common import ErrorInfo
+from .enums import AssetType, LiveStreamType, NotificationEventType
 
 # ---------------------------------------------------------------------------
 # Request dataclasses
@@ -26,6 +27,15 @@ class StreamTelemetryRequest:
     duration_seconds: int = 0
     asset_id: str | None = None
     tid: str | None = None
+
+
+@dataclass(slots=True)
+class StreamNotificationRequest:
+    """Subscription request for the ``StreamNotifications`` server-streaming RPC."""
+
+    sn: str
+    tid: str | None = None
+    event_types: list[NotificationEventType] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -158,6 +168,27 @@ class AssetAirConditioner:
 
 
 @dataclass(slots=True)
+class AssetWirelessLinkInfo:
+    fourth_generation_freq_band: float | None = None
+    fourth_generation_gnd_quality: int | None = None
+    fourth_generation_link_state: bool | None = None
+    fourth_generation_quality: int | None = None
+    fourth_generation_uav_quality: int | None = None
+    dongle_number: int | None = None
+    link_workmode: str | None = None
+    sdr_freq_band: float | None = None
+    sdr_link_state: bool | None = None
+    sdr_quality: int | None = None
+
+
+@dataclass(slots=True)
+class AssetSdrState:
+    down_quality: int | None = None
+    up_quality: int | None = None
+    frequency_band: float | None = None
+
+
+@dataclass(slots=True)
 class AssetPositionState:
     gps_number: int | None = None
     rtk_number: int | None = None
@@ -168,6 +199,7 @@ class AssetPositionState:
 class AssetTelemetry:
     id: str
     timestamp: datetime | None = None
+    sn: str | None = None
     latitude: float | None = None
     longitude: float | None = None
     absolute_altitude: float | None = None
@@ -194,6 +226,8 @@ class AssetTelemetry:
     air_conditioner: AssetAirConditioner | None = None
     manual_control_state: str | None = None
     position_state: AssetPositionState | None = None
+    wireless_link: AssetWirelessLinkInfo | None = None
+    sdr_state: AssetSdrState | None = None
 
 
 @dataclass(slots=True)
@@ -243,3 +277,45 @@ class StreamTelemetryResponse:
     asset_telemetry: AssetTelemetry | None = None
     sub_asset_telemetry: SubAssetTelemetry | None = None
     error: StreamTelemetryError | None = None
+
+
+@dataclass(slots=True)
+class NotificationAssetStatus:
+    sn: str
+    asset_id: str | None = None
+    online: bool | None = None
+    message: str | None = None
+
+
+@dataclass(slots=True)
+class NotificationTaskEvent:
+    task_id: str
+    task_type: str | None = None
+    status: str | None = None
+    progress: float | None = None
+    message: str | None = None
+    external_task_type: str | None = None
+
+
+@dataclass(slots=True)
+class NotificationOperationEvent:
+    operation_id: str
+    mission_type: str | None = None
+    status: str | None = None
+    message: str | None = None
+
+
+@dataclass(slots=True)
+class StreamNotificationResponse:
+    """Single frame of the ``StreamNotifications`` server-streaming RPC."""
+
+    tid: str
+    sn: str
+    timestamp: datetime | None = None
+    has_errors: bool = False
+    asset_id: str | None = None
+    event_type: str | None = None
+    asset_status: NotificationAssetStatus | None = None
+    task_event: NotificationTaskEvent | None = None
+    operation_event: NotificationOperationEvent | None = None
+    error: ErrorInfo | None = None

@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..models._converters import (
+    has_field,
     opt_field,
     proto_to_error_info,
     proto_ts_to_datetime,
@@ -20,6 +21,8 @@ from ..models.live_data import (
     AssetPositionState,
     AssetSubAssetInformation,
     AssetTelemetry,
+    AssetSdrState,
+    AssetWirelessLinkInfo,
     CameraData,
     ChangeLensRequest,
     ChangeZoomRequest,
@@ -27,9 +30,14 @@ from ..models.live_data import (
     LiveDataStartLiveStreamRequest,
     LiveDataStopLiveStreamRequest,
     LiveStreamStartResult,
+    NotificationAssetStatus,
+    NotificationOperationEvent,
+    NotificationTaskEvent,
     PayloadTelemetry,
     RangeFinderData,
     SensorData,
+    StreamNotificationRequest,
+    StreamNotificationResponse,
     StreamTelemetryError,
     StreamTelemetryRequest,
     StreamTelemetryResponse,
@@ -69,6 +77,18 @@ def stream_telemetry_request_to_proto(req: StreamTelemetryRequest):
     if req.duration_seconds:
         kwargs["duration"] = req.duration_seconds
     return live_data_pb2.LiveDataStreamTelemetryRequest(**kwargs)
+
+
+def stream_notifications_request_to_proto(req: StreamNotificationRequest):
+    from ..generated import live_data_pb2  # type: ignore[import]
+    from ..models._converters import build_request_base
+
+    kwargs: dict[str, Any] = {
+        "base": build_request_base(req.sn, tid=req.tid),
+    }
+    if req.event_types:
+        kwargs["eventTypes"] = [getattr(event_type, "value", event_type) for event_type in req.event_types]
+    return live_data_pb2.LiveDataStreamNotificationsRequest(**kwargs)
 
 
 def start_live_stream_to_proto(req: LiveDataStartLiveStreamRequest):
@@ -160,6 +180,66 @@ def proto_to_live_data_response(proto) -> LiveDataResponse:
     )
 
 
+def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
+    """Decode ``LiveDataNotificationResponse`` into the SDK dataclass."""
+    event_type: str | None = None
+    asset_status: NotificationAssetStatus | None = None
+    task_event: NotificationTaskEvent | None = None
+    operation_event: NotificationOperationEvent | None = None
+    error = None
+
+    event = proto.WhichOneof("event")
+    if event in {"asset_status", "assetStatus"}:
+        event_type = "NOTIFICATION_EVENT_ASSET_STATUS"
+        asset = proto.assetStatus
+        asset_status = NotificationAssetStatus(
+            sn=asset.sn,
+            asset_id=opt_field(asset, "assetId"),
+            online=opt_field(asset, "online"),
+            message=opt_field(asset, "message"),
+        )
+    elif event in {"task_event", "taskEvent"}:
+        event_type = "NOTIFICATION_EVENT_TASK"
+        task = proto.taskEvent
+        from ..generated import common_pb2  # type: ignore[import]
+
+        task_event = NotificationTaskEvent(
+            task_id=task.taskId,
+            task_type=_enum_name(common_pb2.TaskTypeProto, task.taskType),
+            status=_enum_name(common_pb2.TaskStatus, task.status),
+            progress=opt_field(task, "progress"),
+            message=opt_field(task, "message"),
+            external_task_type=opt_field(task, "externalTaskType"),
+        )
+    elif event in {"operation_event", "operationEvent"}:
+        event_type = "NOTIFICATION_EVENT_OPERATION"
+        operation = proto.operationEvent
+        from ..generated import common_pb2  # type: ignore[import]
+
+        operation_event = NotificationOperationEvent(
+            operation_id=operation.operationId,
+            mission_type=_enum_name(common_pb2.MissionType, operation.missionType),
+            status=_enum_name(common_pb2.MissionStatus, operation.status),
+            message=opt_field(operation, "message"),
+        )
+    elif event == "error":
+        info = proto_to_error_info(proto.error)
+        error = info
+
+    return StreamNotificationResponse(
+        tid=proto.tid,
+        sn=proto.sn,
+        timestamp=proto_ts_to_datetime(proto.timestamp),
+        has_errors=proto.hasErrors,
+        asset_id=opt_field(proto, "assetId"),
+        event_type=event_type,
+        asset_status=asset_status,
+        task_event=task_event,
+        operation_event=operation_event,
+        error=error,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Telemetry decoders
 # ---------------------------------------------------------------------------
@@ -169,22 +249,22 @@ def _decode_asset_telemetry(t) -> AssetTelemetry:
     from ..generated import common_pb2  # type: ignore[import]
 
     net = None
-    if t.HasField("networkInformation"):
+    if has_field(t, "networkInformation"):
         ni = t.networkInformation
         net = AssetNetworkInfo(
-            type=_enum_name(common_pb2.NetworkTypeEnum, ni.type) if ni.HasField("type") else None,
+            type=_enum_name(common_pb2.NetworkTypeEnum, ni.type) if has_field(ni, "type") else None,
             rate=opt_field(ni, "rate"),
-            quality=_enum_name(common_pb2.NetworkStateQualityEnum, ni.quality) if ni.HasField("quality") else None,
+            quality=_enum_name(common_pb2.NetworkStateQualityEnum, ni.quality) if has_field(ni, "quality") else None,
         )
     ac = None
-    if t.HasField("airConditioner"):
+    if has_field(t, "airConditioner"):
         a = t.airConditioner
         ac = AssetAirConditioner(
-            state=_enum_name(common_pb2.AssetAirConditionerStateEnum, a.state) if a.HasField("state") else None,
+            state=_enum_name(common_pb2.AssetAirConditionerStateEnum, a.state) if has_field(a, "state") else None,
             switch_time=opt_field(a, "switchTime"),
         )
     sub_info = None
-    if t.HasField("subAssetInformation"):
+    if has_field(t, "subAssetInformation"):
         si = t.subAssetInformation
         sub_info = AssetSubAssetInformation(
             sn=opt_field(si, "sn"),
@@ -193,16 +273,40 @@ def _decode_asset_telemetry(t) -> AssetTelemetry:
             online=opt_field(si, "online"),
         )
     pos = None
-    if t.HasField("positionState"):
+    if has_field(t, "positionState"):
         ps = t.positionState
         pos = AssetPositionState(
             gps_number=opt_field(ps, "gpsNumber"),
             rtk_number=opt_field(ps, "rtkNumber"),
             quality=opt_field(ps, "quality"),
         )
+    wireless_link = None
+    if has_field(t, "wirelessLink"):
+        wl = t.wirelessLink
+        wireless_link = AssetWirelessLinkInfo(
+            fourth_generation_freq_band=opt_field(wl, "fourthGenerationFreqBand"),
+            fourth_generation_gnd_quality=opt_field(wl, "fourthGenerationGndQuality"),
+            fourth_generation_link_state=opt_field(wl, "fourthGenerationLinkState"),
+            fourth_generation_quality=opt_field(wl, "fourthGenerationQuality"),
+            fourth_generation_uav_quality=opt_field(wl, "fourthGenerationUavQuality"),
+            dongle_number=opt_field(wl, "dongleNumber"),
+            link_workmode=opt_field(wl, "linkWorkmode"),
+            sdr_freq_band=opt_field(wl, "sdrFreqBand"),
+            sdr_link_state=opt_field(wl, "sdrLinkState"),
+            sdr_quality=opt_field(wl, "sdrQuality"),
+        )
+    sdr_state = None
+    if has_field(t, "sdrState"):
+        sdr = t.sdrState
+        sdr_state = AssetSdrState(
+            down_quality=opt_field(sdr, "downQuality"),
+            up_quality=opt_field(sdr, "upQuality"),
+            frequency_band=opt_field(sdr, "frequencyBand"),
+        )
     return AssetTelemetry(
         id=t.id,
         timestamp=proto_ts_to_datetime(t.timestamp),
+        sn=opt_field(t, "sn"),
         latitude=opt_field(t, "latitude"),
         longitude=opt_field(t, "longitude"),
         absolute_altitude=opt_field(t, "absoluteAltitude"),
@@ -210,8 +314,8 @@ def _decode_asset_telemetry(t) -> AssetTelemetry:
         environment_temp=opt_field(t, "environmentTemp"),
         inside_temp=opt_field(t, "insideTemp"),
         humidity=opt_field(t, "humidity"),
-        mode=_enum_name(common_pb2.AssetMode, t.mode) if t.HasField("mode") else None,
-        rainfall=_enum_name(common_pb2.RainfallEnum, t.rainfall) if t.HasField("rainfall") else None,
+        mode=_enum_name(common_pb2.AssetMode, t.mode) if has_field(t, "mode") else None,
+        rainfall=_enum_name(common_pb2.RainfallEnum, t.rainfall) if has_field(t, "rainfall") else None,
         sub_asset_information=sub_info,
         sub_asset_at_home=opt_field(t, "subAssetAtHome"),
         sub_asset_charging=opt_field(t, "subAssetCharging"),
@@ -219,7 +323,7 @@ def _decode_asset_telemetry(t) -> AssetTelemetry:
         heading=opt_field(t, "heading"),
         debug_mode_open=opt_field(t, "debugModeOpen"),
         has_active_manual_control_session=opt_field(t, "hasActiveManualControlSession"),
-        cover_state=_enum_name(common_pb2.AssetCoverStateEnum, t.coverState) if t.HasField("coverState") else None,
+        cover_state=_enum_name(common_pb2.AssetCoverStateEnum, t.coverState) if has_field(t, "coverState") else None,
         working_voltage=opt_field(t, "workingVoltage"),
         working_current=opt_field(t, "workingCurrent"),
         supply_voltage=opt_field(t, "supplyVoltage"),
@@ -228,15 +332,17 @@ def _decode_asset_telemetry(t) -> AssetTelemetry:
         network_information=net,
         air_conditioner=ac,
         manual_control_state=_enum_name(common_pb2.ManualControlStateEnum, t.manualControlState)
-        if t.HasField("manualControlState")
+        if has_field(t, "manualControlState")
         else None,
         position_state=pos,
+        wireless_link=wireless_link,
+        sdr_state=sdr_state,
     )
 
 
 def _decode_payload(p) -> PayloadTelemetry:
     cam = None
-    if p.HasField("cameraData"):
+    if has_field(p, "cameraData"):
         cd = p.cameraData
         cam = CameraData(
             current_lens=opt_field(cd, "currentLens"),
@@ -246,7 +352,7 @@ def _decode_payload(p) -> PayloadTelemetry:
             zoom_factor=opt_field(cd, "zoomFactor"),
         )
     rf = None
-    if p.HasField("rangeFinderData"):
+    if has_field(p, "rangeFinderData"):
         rd = p.rangeFinderData
         rf = RangeFinderData(
             target_latitude=opt_field(rd, "targetLatitude"),
@@ -255,7 +361,7 @@ def _decode_payload(p) -> PayloadTelemetry:
             target_altitude=opt_field(rd, "targetAltitude"),
         )
     sens = None
-    if p.HasField("sensorData"):
+    if has_field(p, "sensorData"):
         sd = p.sensorData
         sens = SensorData(target_temperature=opt_field(sd, "targetTemperature"))
     return PayloadTelemetry(
@@ -271,9 +377,9 @@ def _decode_payload(p) -> PayloadTelemetry:
 def _decode_sub_asset_telemetry(t) -> SubAssetTelemetry:
     from ..generated import common_pb2  # type: ignore[import]
 
-    payload = _decode_payload(t.payloadTelemetry) if t.HasField("payloadTelemetry") else None
+    payload = _decode_payload(t.payloadTelemetry) if has_field(t, "payloadTelemetry") else None
     batt = None
-    if t.HasField("batteryInformation"):
+    if has_field(t, "batteryInformation"):
         bi = t.batteryInformation
         batt = SubAssetBatteryInfo(
             percentage=opt_field(bi, "percentage"),
@@ -299,7 +405,7 @@ def _decode_sub_asset_telemetry(t) -> SubAssetTelemetry:
         home_distance=opt_field(t, "homeDistance"),
         total_movement_distance=opt_field(t, "totalMovementDistance"),
         total_movement_time=opt_field(t, "totalMovementTime"),
-        mode=_enum_name(common_pb2.SubAssetMode, t.mode) if t.HasField("mode") else None,
+        mode=_enum_name(common_pb2.SubAssetMode, t.mode) if has_field(t, "mode") else None,
         country=opt_field(t, "country"),
     )
 

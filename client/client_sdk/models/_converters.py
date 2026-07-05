@@ -75,6 +75,17 @@ def opt_field(msg, field: str):
         return getattr(msg, field, None)
 
 
+def has_field(msg, field: str) -> bool:
+    """Return whether a proto field is set.
+
+    Safe for generated classes that do not expose the field yet.
+    """
+    try:
+        return msg.HasField(field)  # type: ignore[attr-defined]
+    except (ValueError, AttributeError):
+        return False
+
+
 def _resolve_error_code(raw_code) -> str:
     """Decode a proto ``ErrorCode`` enum value to its symbolic name."""
     try:

@@ -213,6 +213,28 @@ class MissionAutonomyClient:
         proto = await self._resilience_helper.execute(lambda: self._stub.StopTask(req, timeout=self._timeout))
         return proto_to_task_response(proto)
 
+    async def pause_task(self, task_id: str) -> TaskResponse:
+        validate_non_blank("taskId", task_id)
+        logger.info("PauseTask: id=%s", task_id)
+        from ..generated import mission_autonomy_pb2
+        req = mission_autonomy_pb2.PauseTaskRequest(
+            base=build_request_base(_DEFAULT_SN),
+            taskId=task_id,
+        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.PauseTask(req, timeout=self._timeout))
+        return proto_to_task_response(proto)
+
+    async def resume_task(self, task_id: str) -> TaskResponse:
+        validate_non_blank("taskId", task_id)
+        logger.info("ResumeTask: id=%s", task_id)
+        from ..generated import mission_autonomy_pb2
+        req = mission_autonomy_pb2.ResumeTaskRequest(
+            base=build_request_base(_DEFAULT_SN),
+            taskId=task_id,
+        )
+        proto = await self._resilience_helper.execute(lambda: self._stub.ResumeTask(req, timeout=self._timeout))
+        return proto_to_task_response(proto)
+
     # ------------------------------------------------------------------
     # Scheduler CRUD
     # ------------------------------------------------------------------

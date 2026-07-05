@@ -37,6 +37,8 @@ except PackageNotFoundError:
 
 from .models import (
     AssetTelemetry,
+    AssetSdrState,
+    AssetWirelessLinkInfo,
     ChangeLensRequest,
     ChangeZoomRequest,
     DockOperationRequest,
@@ -98,6 +100,8 @@ __all__ = [
     "StreamTelemetryRequest",
     "StreamTelemetryResponse",
     "AssetTelemetry",
+    "AssetWirelessLinkInfo",
+    "AssetSdrState",
     "SubAssetTelemetry",
     "LiveDataStartLiveStreamRequest",
     "LiveDataStopLiveStreamRequest",

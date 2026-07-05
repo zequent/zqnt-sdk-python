@@ -1,4 +1,4 @@
-"""LiveData sub-client (telemetry streaming, live stream, camera control)."""
+"""LiveData sub-client (telemetry, notifications, live stream, camera control)."""
 
 from .client import LiveDataClient
 from .stream_handle import StreamHandle

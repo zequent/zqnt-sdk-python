@@ -1,4 +1,4 @@
-"""LiveData sub-client – unary RPCs + server-streaming telemetry subscription.
+"""LiveData sub-client – unary RPCs + server-streaming telemetry/notifications.
 
 Mirrors :java:`com.zqnt.sdk.client.livedata.application.LiveData` adapted for
 ``asyncio`` + ``grpc.aio``. The streaming subscription transparently
@@ -24,6 +24,8 @@ from ..models.live_data import (
     LiveDataResponse,
     LiveDataStartLiveStreamRequest,
     LiveDataStopLiveStreamRequest,
+    StreamNotificationRequest,
+    StreamNotificationResponse,
     StreamTelemetryRequest,
     StreamTelemetryResponse,
 )
@@ -31,9 +33,11 @@ from ._converters import (
     change_lens_to_proto,
     change_zoom_to_proto,
     proto_to_live_data_response,
+    proto_to_stream_notification_response,
     proto_to_stream_telemetry_response,
     start_live_stream_to_proto,
     stop_live_stream_to_proto,
+    stream_notifications_request_to_proto,
     stream_telemetry_request_to_proto,
 )
 from .stream_handle import StreamHandle
@@ -41,6 +45,7 @@ from .stream_handle import StreamHandle
 logger = logging.getLogger(__name__)
 
 OnTelemetry = Callable[[StreamTelemetryResponse], Awaitable[None] | None]
+OnNotification = Callable[[StreamNotificationResponse], Awaitable[None] | None]
 OnError = Callable[[BaseException], Awaitable[None] | None]
 
 
@@ -226,6 +231,96 @@ class LiveDataClient:
                 return
             delay = min(base_delay * attempt, _MAX_BACKOFF_SECONDS)
             logger.info("StreamTelemetry reconnect attempt %d in %.2fs", attempt, delay)
+            try:
+                await asyncio.sleep(delay)
+            except asyncio.CancelledError:
+                return
+
+    def stream_notifications(
+        self,
+        request: StreamNotificationRequest,
+        on_notification: OnNotification,
+        on_error: OnError | None = None,
+    ) -> StreamHandle:
+        """Subscribe to the notification stream."""
+        validate_sn(request.sn)
+
+        handle = StreamHandle()
+        task = asyncio.create_task(
+            self._notification_stream_loop(request, on_notification, on_error, handle),
+            name=f"livedata-notifications-{request.sn}",
+        )
+        handle._bind(task)
+        return handle
+
+    async def _notification_stream_loop(
+        self,
+        request: StreamNotificationRequest,
+        on_notification: OnNotification,
+        on_error: OnError | None,
+        handle: StreamHandle,
+    ) -> None:
+        attempt = 0
+        max_attempts = self._resilience.max_retry_attempts
+        base_delay = self._resilience.retry_delay_millis / 1000.0
+
+        while not handle.is_stopped:
+            data_received = False
+            try:
+                proto_request = stream_notifications_request_to_proto(request)
+                logger.info("StreamNotifications connect: sn=%s", request.sn)
+                stream = self._stub.StreamNotifications(proto_request)
+                async for frame in stream:
+                    if handle.is_stopped:
+                        break
+                    data_received = True
+                    attempt = 0
+                    try:
+                        result = on_notification(proto_to_stream_notification_response(frame))
+                        if asyncio.iscoroutine(result):
+                            await result
+                    except Exception:  # noqa: BLE001 - user callback shouldn't kill stream
+                        logger.exception("on_notification callback raised")
+                if handle.is_stopped:
+                    return
+                logger.info("StreamNotifications ended cleanly; reconnecting")
+            except asyncio.CancelledError:
+                logger.info("StreamNotifications cancelled")
+                return
+            except grpc.aio.AioRpcError as exc:
+                if handle.is_stopped:
+                    return
+                code = exc.code()
+                logger.warning(
+                    "StreamNotifications gRPC error: %s (%s)",
+                    code.name if code else "?",
+                    exc.details(),
+                )
+                if code not in _RETRYABLE_CODES:
+                    await _maybe_call(on_error, exc)
+                    return
+            except Exception as exc:  # noqa: BLE001
+                if handle.is_stopped:
+                    return
+                logger.exception("StreamNotifications unexpected error")
+                await _maybe_call(on_error, exc)
+                return
+
+            if data_received:
+                attempt = 0
+            attempt += 1
+            if attempt > max_attempts:
+                logger.error(
+                    "StreamNotifications: exceeded %d reconnect attempts; giving up",
+                    max_attempts,
+                )
+                await _maybe_call(
+                    on_error,
+                    RuntimeError(f"stream_notifications exceeded {max_attempts} reconnect attempts"),
+                )
+                return
+            delay = min(base_delay * attempt, _MAX_BACKOFF_SECONDS)
+            logger.info("StreamNotifications reconnect attempt %d in %.2fs", attempt, delay)
             try:
                 await asyncio.sleep(delay)
             except asyncio.CancelledError:

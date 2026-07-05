@@ -49,6 +49,23 @@ class LiveDataServiceCommand(IntEnum):
     STOP_LIVE_STREAM = 4
 
 
+class NotificationEventType(IntEnum):
+    """Mirrors ``live-data.proto`` :proto:`NotificationEventType`."""
+
+    UNSPECIFIED = 0
+    ASSET_STATUS = 1
+    TASK = 2
+    OPERATION = 3
+
+
+class NotificationSeverity(IntEnum):
+    """Mirrors ``live-data.proto`` :proto:`NotificationSeverity`."""
+
+    INFO = 0
+    WARN = 1
+    CRITICAL = 2
+
+
 class TaskType(IntEnum):
     """Mirrors ``common.proto`` :proto:`TaskTypeProto`."""
 

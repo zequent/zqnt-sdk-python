@@ -47,6 +47,11 @@ class LiveDataServiceStub(object):
                 request_serializer=live__data__pb2.ProduceTelemetryRequest.SerializeToString,
                 response_deserializer=live__data__pb2.LiveDataResponse.FromString,
                 _registered_method=True)
+        self.StreamNotifications = channel.unary_stream(
+                '/LiveDataService/StreamNotifications',
+                request_serializer=live__data__pb2.LiveDataStreamNotificationsRequest.SerializeToString,
+                response_deserializer=live__data__pb2.LiveDataNotificationResponse.FromString,
+                _registered_method=True)
         self.StartLiveStream = channel.unary_unary(
                 '/LiveDataService/StartLiveStream',
                 request_serializer=live__data__pb2.LiveDataStartLiveStreamRequest.SerializeToString,
@@ -99,6 +104,13 @@ class LiveDataServiceServicer(object):
 
     def ProduceTelemetry(self, request_iterator, context):
         """Telemetry Production - Clients (Edge adapters) send telemetry to server
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StreamNotifications(self, request, context):
+        """Notification Streaming - clients subscribe to system/lifecycle events
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -159,6 +171,11 @@ def add_LiveDataServiceServicer_to_server(servicer, server):
                     servicer.ProduceTelemetry,
                     request_deserializer=live__data__pb2.ProduceTelemetryRequest.FromString,
                     response_serializer=live__data__pb2.LiveDataResponse.SerializeToString,
+            ),
+            'StreamNotifications': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamNotifications,
+                    request_deserializer=live__data__pb2.LiveDataStreamNotificationsRequest.FromString,
+                    response_serializer=live__data__pb2.LiveDataNotificationResponse.SerializeToString,
             ),
             'StartLiveStream': grpc.unary_unary_rpc_method_handler(
                     servicer.StartLiveStream,
@@ -253,6 +270,33 @@ class LiveDataService(object):
             '/LiveDataService/ProduceTelemetry',
             live__data__pb2.ProduceTelemetryRequest.SerializeToString,
             live__data__pb2.LiveDataResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamNotifications(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/LiveDataService/StreamNotifications',
+            live__data__pb2.LiveDataStreamNotificationsRequest.SerializeToString,
+            live__data__pb2.LiveDataNotificationResponse.FromString,
             options,
             channel_credentials,
             insecure,

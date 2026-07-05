@@ -6,6 +6,7 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
+from google.protobuf import descriptor_pb2 as _descriptor_pb2
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
@@ -32,6 +33,287 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0flive-data.prot
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'live_data_pb2', _globals)
+
+
+def _add_notification_descriptors() -> None:
+  file_proto = _descriptor_pb2.FileDescriptorProto()
+  file_proto.name = 'live-data-notifications.proto'
+  file_proto.syntax = 'proto3'
+  file_proto.dependency.extend([
+      'google/protobuf/timestamp.proto',
+      'common.proto',
+  ])
+
+  enum_proto = file_proto.enum_type.add()
+  enum_proto.name = 'NotificationEventType'
+  for name, number in (
+      ('NOTIFICATION_EVENT_UNSPECIFIED', 0),
+      ('NOTIFICATION_EVENT_ASSET_STATUS', 1),
+      ('NOTIFICATION_EVENT_TASK', 2),
+      ('NOTIFICATION_EVENT_OPERATION', 3),
+  ):
+    value = enum_proto.value.add()
+    value.name = name
+    value.number = number
+
+  req_msg = file_proto.message_type.add()
+  req_msg.name = 'LiveDataStreamNotificationsRequest'
+  req_msg.field.add(
+      name='base',
+      number=1,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.RequestBase',
+  )
+  req_msg.field.add(
+      name='eventTypes',
+      number=2,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+      type_name='.NotificationEventType',
+  )
+
+  asset_msg = file_proto.message_type.add()
+  asset_msg.name = 'AssetStatusEvent'
+  asset_msg.oneof_decl.add(name='_assetId')
+  asset_msg.oneof_decl.add(name='_message')
+  asset_msg.field.add(
+      name='sn',
+      number=1,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+  )
+  field = asset_msg.field.add(
+      name='assetId',
+      number=2,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+      oneof_index=0,
+      proto3_optional=True,
+  )
+  field.oneof_index = 0
+  asset_msg.field.add(
+      name='online',
+      number=3,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_BOOL,
+  )
+  field = asset_msg.field.add(
+      name='message',
+      number=4,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+      oneof_index=1,
+      proto3_optional=True,
+  )
+  field.oneof_index = 1
+
+  task_msg = file_proto.message_type.add()
+  task_msg.name = 'TaskEvent'
+  task_msg.oneof_decl.add(name='_progress')
+  task_msg.oneof_decl.add(name='_message')
+  task_msg.oneof_decl.add(name='_externalTaskType')
+  task_msg.field.add(
+      name='taskId',
+      number=1,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+  )
+  task_msg.field.add(
+      name='taskType',
+      number=2,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+      type_name='.TaskTypeProto',
+  )
+  task_msg.field.add(
+      name='status',
+      number=3,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+      type_name='.TaskStatus',
+  )
+  field = task_msg.field.add(
+      name='progress',
+      number=4,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_FLOAT,
+      oneof_index=0,
+      proto3_optional=True,
+  )
+  field.oneof_index = 0
+  field = task_msg.field.add(
+      name='message',
+      number=5,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+      oneof_index=1,
+      proto3_optional=True,
+  )
+  field.oneof_index = 1
+  field = task_msg.field.add(
+      name='externalTaskType',
+      number=6,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+      oneof_index=2,
+      proto3_optional=True,
+  )
+  field.oneof_index = 2
+
+  operation_msg = file_proto.message_type.add()
+  operation_msg.name = 'OperationEvent'
+  operation_msg.oneof_decl.add(name='_message')
+  operation_msg.field.add(
+      name='operationId',
+      number=1,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+  )
+  operation_msg.field.add(
+      name='missionType',
+      number=2,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+      type_name='.MissionType',
+  )
+  operation_msg.field.add(
+      name='status',
+      number=3,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+      type_name='.MissionStatus',
+  )
+  field = operation_msg.field.add(
+      name='message',
+      number=4,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+      oneof_index=0,
+      proto3_optional=True,
+  )
+  field.oneof_index = 0
+
+  response_msg = file_proto.message_type.add()
+  response_msg.name = 'LiveDataNotificationResponse'
+  response_msg.oneof_decl.add(name='event')
+  response_msg.oneof_decl.add(name='_assetId')
+  response_msg.field.add(
+      name='tid',
+      number=1,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+  )
+  response_msg.field.add(
+      name='timestamp',
+      number=2,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.google.protobuf.Timestamp',
+  )
+  response_msg.field.add(
+      name='hasErrors',
+      number=3,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_BOOL,
+  )
+  response_msg.field.add(
+      name='sn',
+      number=4,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+  )
+  field = response_msg.field.add(
+      name='assetId',
+      number=5,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+      oneof_index=1,
+      proto3_optional=True,
+  )
+  field.oneof_index = 1
+  response_msg.field.add(
+      name='assetStatus',
+      number=6,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.AssetStatusEvent',
+      oneof_index=0,
+  )
+  response_msg.field.add(
+      name='taskEvent',
+      number=7,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.TaskEvent',
+      oneof_index=0,
+  )
+  response_msg.field.add(
+      name='operationEvent',
+      number=8,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.OperationEvent',
+      oneof_index=0,
+  )
+  response_msg.field.add(
+      name='error',
+      number=9,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.GlobalErrorMessage',
+      oneof_index=0,
+  )
+
+  produce_msg = file_proto.message_type.add()
+  produce_msg.name = 'ProduceNotificationRequest'
+  produce_msg.oneof_decl.add(name='event')
+  produce_msg.field.add(
+      name='base',
+      number=1,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.RequestBase',
+  )
+  produce_msg.field.add(
+      name='assetStatus',
+      number=2,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.AssetStatusEvent',
+      oneof_index=0,
+  )
+  produce_msg.field.add(
+      name='taskEvent',
+      number=3,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.TaskEvent',
+      oneof_index=0,
+  )
+  produce_msg.field.add(
+      name='operationEvent',
+      number=4,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.OperationEvent',
+      oneof_index=0,
+  )
+  produce_msg.field.add(
+      name='error',
+      number=5,
+      label=_descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+      type=_descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+      type_name='.GlobalErrorMessage',
+      oneof_index=0,
+  )
+
+  notification_descriptor = _descriptor_pool.Default().AddSerializedFile(file_proto.SerializeToString())
+  _builder.BuildMessageAndEnumDescriptors(notification_descriptor, _globals)
+  _builder.BuildTopDescriptorsAndMessages(notification_descriptor, 'live_data_pb2', _globals)
+
+
+_add_notification_descriptors()
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\035com.zqnt.utils.livedata.protoB\rLiveDataProtoP\001Z\022gen/livedata/proto'

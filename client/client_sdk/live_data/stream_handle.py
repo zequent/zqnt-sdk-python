@@ -1,4 +1,4 @@
-"""Async-friendly stream handle returned by :meth:`LiveDataClient.stream_telemetry`.
+"""Async-friendly stream handle returned by LiveData streaming subscriptions.
 
 Mirrors :java:`com.zqnt.sdk.client.livedata.domains.StreamHandle` adapted for
 ``asyncio``. The handle owns the background task that pumps telemetry frames
