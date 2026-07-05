@@ -217,6 +217,7 @@ class MissionAutonomyClient:
         validate_non_blank("taskId", task_id)
         logger.info("PauseTask: id=%s", task_id)
         from ..generated import mission_autonomy_pb2
+
         req = mission_autonomy_pb2.PauseTaskRequest(
             base=build_request_base(_DEFAULT_SN),
             taskId=task_id,
@@ -228,6 +229,7 @@ class MissionAutonomyClient:
         validate_non_blank("taskId", task_id)
         logger.info("ResumeTask: id=%s", task_id)
         from ..generated import mission_autonomy_pb2
+
         req = mission_autonomy_pb2.ResumeTaskRequest(
             base=build_request_base(_DEFAULT_SN),
             taskId=task_id,

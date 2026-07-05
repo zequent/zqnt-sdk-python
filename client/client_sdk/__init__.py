@@ -36,8 +36,8 @@ except PackageNotFoundError:
     __version__ = "1.0.1"
 
 from .models import (
-    AssetTelemetry,
     AssetSdrState,
+    AssetTelemetry,
     AssetWirelessLinkInfo,
     ChangeLensRequest,
     ChangeZoomRequest,
