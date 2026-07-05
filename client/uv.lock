@@ -387,7 +387,6 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
-    { name = "zqnt-utils" },
 ]
 dotenv = [
     { name = "python-dotenv" },
@@ -406,7 +405,6 @@ requires-dist = [
     { name = "python-dotenv", marker = "extra == 'dotenv'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
     { name = "zqnt-utils", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.2.3" },
-    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/Zequent/zqnt-utils-python?rev=v1.2.3" },
 ]
 provides-extras = ["dotenv", "dev"]
 
