@@ -70,7 +70,7 @@ class ManualControlInputSession:
         self._call = self._stub.ManualControlInput(self._request_iterator(), timeout=self._timeout)
 
     async def _request_iterator(self):
-        from ..generated import common_pb2, remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
         while True:
             item = await self._queue.get()
@@ -87,8 +87,8 @@ class ManualControlInputSession:
             if inp.throttle is not None:
                 inp_kwargs["throttle"] = inp.throttle
             if inp.gimbal_pitch is not None:
-                inp_kwargs["gimbalPitch"] = inp.gimbal_pitch
-            yield remote_control_pb2.RemoteControlManualControlInputRequest(
+                inp_kwargs["gimbal_pitch"] = inp.gimbal_pitch
+            yield common_pb2.ManualControlInputCommandRequest(
                 base=build_request_base(self._sn),
                 request=common_pb2.ManualControlInput(**inp_kwargs),
             )

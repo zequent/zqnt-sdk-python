@@ -8,10 +8,10 @@ from typing import Any
 
 import grpc
 import pytest
+from zqnt_utils.generated.zqnt import common_pb2
 
 from client_sdk import ZequentClientError, ZequentRetryExhaustedError
 from client_sdk.config.resilience import ResilienceConfig
-from client_sdk.generated import remote_control_pb2
 from client_sdk.grpc_.resilience import GrpcResilience
 from client_sdk.models import TakeoffRequest
 from client_sdk.remote_control.client import RemoteControlClient
@@ -39,11 +39,9 @@ class _FlakyStub:
                 raise _FakeAioRpcError(self._code)
             from google.protobuf import empty_pb2
 
-            return remote_control_pb2.RemoteControlResponse(
-                hasErrors=False,
-                tid="tid-1",
-                sn="DOCK-1",
-                responseMessage="ok",
+            return common_pb2.CommandResponse(
+                has_errors=False,
+                meta=common_pb2.ResponseMeta(tid="tid-1", sn="DOCK-1", response_message="ok"),
                 empty=empty_pb2.Empty(),
             )
 

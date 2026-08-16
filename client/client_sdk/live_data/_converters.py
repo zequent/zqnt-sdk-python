@@ -64,7 +64,8 @@ def _enum_name(enum_module, enum_value, default: str | None = None) -> str | Non
 
 
 def stream_telemetry_request_to_proto(req: StreamTelemetryRequest):
-    from ..generated import common_pb2, live_data_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2, live_data_pb2  # type: ignore[import]
+
     from ..models._converters import build_request_base
 
     # Default command = START_TELEMETRY_STREAM (0)
@@ -80,7 +81,8 @@ def stream_telemetry_request_to_proto(req: StreamTelemetryRequest):
 
 
 def stream_notifications_request_to_proto(req: StreamNotificationRequest):
-    from ..generated import live_data_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import live_data_pb2  # type: ignore[import]
+
     from ..models._converters import build_request_base
 
     kwargs: dict[str, Any] = {
@@ -92,7 +94,8 @@ def stream_notifications_request_to_proto(req: StreamNotificationRequest):
 
 
 def start_live_stream_to_proto(req: LiveDataStartLiveStreamRequest):
-    from ..generated import live_data_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import live_data_pb2  # type: ignore[import]
+
     from ..models._converters import build_request_base
 
     inner = live_data_pb2.LiveStreamStartRequest(
@@ -108,7 +111,8 @@ def start_live_stream_to_proto(req: LiveDataStartLiveStreamRequest):
 
 
 def stop_live_stream_to_proto(req: LiveDataStopLiveStreamRequest):
-    from ..generated import live_data_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import live_data_pb2  # type: ignore[import]
+
     from ..models._converters import build_request_base
 
     inner = live_data_pb2.LiveStreamStopRequest(videoId=req.video_id)
@@ -119,7 +123,8 @@ def stop_live_stream_to_proto(req: LiveDataStopLiveStreamRequest):
 
 
 def change_lens_to_proto(req: ChangeLensRequest):
-    from ..generated import common_pb2, live_data_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2, live_data_pb2  # type: ignore[import]
+
     from ..models._converters import build_request_base
 
     inner = common_pb2.ChangeCameraLensRequest(lens=req.lens)
@@ -130,7 +135,8 @@ def change_lens_to_proto(req: ChangeLensRequest):
 
 
 def change_zoom_to_proto(req: ChangeZoomRequest):
-    from ..generated import common_pb2, live_data_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2, live_data_pb2  # type: ignore[import]
+
     from ..models._converters import build_request_base
 
     inner_kwargs: dict[str, Any] = {"zoom": req.zoom}
@@ -201,7 +207,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
     elif event in {"task_event", "taskEvent"}:
         event_type = "NOTIFICATION_EVENT_TASK"
         task = proto.taskEvent
-        from ..generated import common_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
         task_event = NotificationTaskEvent(
             task_id=task.taskId,
@@ -214,7 +220,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
     elif event in {"operation_event", "operationEvent"}:
         event_type = "NOTIFICATION_EVENT_OPERATION"
         operation = proto.operationEvent
-        from ..generated import common_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
         operation_event = NotificationOperationEvent(
             operation_id=operation.operationId,
@@ -246,7 +252,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
 
 
 def _decode_asset_telemetry(t) -> AssetTelemetry:
-    from ..generated import common_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
     net = None
     if has_field(t, "networkInformation"):
@@ -375,7 +381,7 @@ def _decode_payload(p) -> PayloadTelemetry:
 
 
 def _decode_sub_asset_telemetry(t) -> SubAssetTelemetry:
-    from ..generated import common_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
     payload = _decode_payload(t.payloadTelemetry) if has_field(t, "payloadTelemetry") else None
     batt = None

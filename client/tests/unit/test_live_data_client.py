@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 from google.protobuf import empty_pb2, timestamp_pb2
+from zqnt_utils.generated.zqnt import common_pb2, live_data_pb2
 
 from client_sdk.config.resilience import ResilienceConfig
-from client_sdk.generated import common_pb2, live_data_pb2
 from client_sdk.live_data.client import LiveDataClient
 from client_sdk.models.live_data import (
     ChangeLensRequest,

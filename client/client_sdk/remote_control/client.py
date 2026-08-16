@@ -49,7 +49,7 @@ class RemoteControlClient:
     ) -> None:
         # Lazy import: stubs may not be generated yet.
         try:
-            from ..generated import remote_control_pb2_grpc  # type: ignore[import]
+            from zqnt_utils.generated.zqnt import remote_control_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
             raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
@@ -75,11 +75,11 @@ class RemoteControlClient:
         validate_coordinates(request.latitude, request.longitude, request.altitude)
         logger.info("Takeoff: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlTakeOffRequest(
+        proto_request = common_pb2.CoordinateCommandRequest(
             base=build_request_base(request.sn),
-            request=build_coordinates(request.latitude, request.longitude, request.altitude),
+            coordinate=build_coordinates(request.latitude, request.longitude, request.altitude),
         )
         proto = await self._resilience_helper.execute(lambda: self._stub.TakeOff(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
@@ -89,11 +89,11 @@ class RemoteControlClient:
         validate_coordinates(request.latitude, request.longitude, request.altitude)
         logger.info("GoTo: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlGoToRequest(
+        proto_request = common_pb2.CoordinateCommandRequest(
             base=build_request_base(request.sn),
-            request=build_coordinates(request.latitude, request.longitude, request.altitude),
+            coordinate=build_coordinates(request.latitude, request.longitude, request.altitude),
         )
         proto = await self._resilience_helper.execute(lambda: self._stub.GoTo(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
@@ -102,13 +102,13 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("ReturnToHome: sn=%s", request.sn)
 
-        from ..generated import common_pb2, remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
         rth_kwargs: dict = {}
         if request.altitude is not None:
             rth_kwargs["altitude"] = request.altitude
 
-        proto_request = remote_control_pb2.RemoteControlReturnToHomeRequest(
+        proto_request = common_pb2.ReturnToHomeCommandRequest(
             base=build_request_base(request.sn),
             request=common_pb2.ReturnToHomeRequest(**rth_kwargs),
         )
@@ -122,11 +122,11 @@ class RemoteControlClient:
         validate_coordinates(request.latitude, request.longitude, request.altitude)
         logger.info("LookAt: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlLookAtRequest(
+        proto_request = common_pb2.LookAtCommandRequest(
             base=build_request_base(request.sn),
-            request=build_coordinates(request.latitude, request.longitude, request.altitude),
+            coordinate=build_coordinates(request.latitude, request.longitude, request.altitude),
         )
         proto = await self._resilience_helper.execute(lambda: self._stub.LookAt(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
@@ -152,17 +152,17 @@ class RemoteControlClient:
             request.sn,
         )
 
-        from ..generated import common_pb2, remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
         mc_kwargs: dict = {
-            "clientId": request.client_id,
-            "userId": request.user_id,
-            "sessionId": request.session_id,
+            "client_id": request.client_id,
+            "user_id": request.user_id,
+            "session_id": request.session_id,
         }
         if request.reason is not None:
             mc_kwargs["reason"] = request.reason
 
-        proto_request = remote_control_pb2.RemoteControlManualControlRequest(
+        proto_request = common_pb2.ManualControlCommandRequest(
             base=build_request_base(request.sn),
             request=common_pb2.ManualControlRequest(**mc_kwargs),
         )
@@ -196,9 +196,9 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("OpenCover: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlOpenCoverRequest(
+        proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
         )
         proto = await self._resilience_helper.execute(
@@ -210,13 +210,13 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("CloseCover: sn=%s, force=%s", request.sn, request.value)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
         kwargs: dict = {"base": build_request_base(request.sn)}
         if request.value is not None:
             kwargs["force"] = request.value
 
-        proto_request = remote_control_pb2.RemoteControlCloseCoverRequest(**kwargs)
+        proto_request = common_pb2.CloseCoverCommandRequest(**kwargs)
         proto = await self._resilience_helper.execute(
             lambda: self._stub.CloseCover(proto_request, timeout=self._timeout)
         )
@@ -226,9 +226,9 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("StartCharging: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlStartChargingRequest(
+        proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
         )
         proto = await self._resilience_helper.execute(
@@ -240,9 +240,9 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("StopCharging: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlStopChargingRequest(
+        proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
         )
         proto = await self._resilience_helper.execute(
@@ -258,9 +258,9 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("RebootAsset: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlRebootAssetRequest(
+        proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
         )
         proto = await self._resilience_helper.execute(
@@ -272,11 +272,14 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("BootSubAsset: sn=%s, boot=%s", request.sn, request.value)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlBootSubAssetRequest(
+        # BootSubAsset uses the generic ToggleCommandRequest (field `enabled`), same as edge.proto's
+        # own BootSubAsset RPC — despite there also being an unused BootSubAssetCommandRequest
+        # (field `boot_up`) in the schema that neither service's BootSubAsset RPC actually takes.
+        proto_request = common_pb2.ToggleCommandRequest(
             base=build_request_base(request.sn),
-            boot=bool(request.value) if request.value is not None else False,
+            enabled=bool(request.value) if request.value is not None else False,
         )
         proto = await self._resilience_helper.execute(
             lambda: self._stub.BootSubAsset(proto_request, timeout=self._timeout)
@@ -287,14 +290,15 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("DebugMode: sn=%s, enabled=%s", request.sn, request.value)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlDebugModeRequest(
+        proto_request = common_pb2.ToggleCommandRequest(
             base=build_request_base(request.sn),
             enabled=bool(request.value) if request.value is not None else False,
         )
         proto = await self._resilience_helper.execute(
-            lambda: self._stub.EnterOrCloseRemoteDebugMode(proto_request, timeout=self._timeout)
+            # RPC renamed from EnterOrCloseRemoteDebugMode -> SetRemoteDebugMode.
+            lambda: self._stub.SetRemoteDebugMode(proto_request, timeout=self._timeout)
         )
         return proto_to_response(proto, request.sn)
 
@@ -302,10 +306,17 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("ChangeAcMode: sn=%s", request.sn)
 
-        from ..generated import remote_control_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-        proto_request = remote_control_pb2.RemoteControlChangeAcModeRequest(
+        # NOTE: ChangeAcModeCommandRequest now requires a `mode: AssetAirConditionerStateEnum`
+        # (see asset.proto) that DockOperationRequest has no field for -- this was already the case
+        # before this fix (the old proto message took no mode either), so this preserves the
+        # existing (incomplete) behaviour rather than silently inventing a new one. Giving callers a
+        # way to actually choose a mode needs a DockOperationRequest change, deliberately not done
+        # here.
+        proto_request = common_pb2.ChangeAcModeCommandRequest(
             base=build_request_base(request.sn),
+            mode=common_pb2.AIR_CONDITIONER_IDLE,
         )
         proto = await self._resilience_helper.execute(
             lambda: self._stub.ChangeAcMode(proto_request, timeout=self._timeout)

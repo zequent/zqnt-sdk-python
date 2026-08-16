@@ -47,7 +47,7 @@ class MissionAutonomyClient:
         resilience: ResilienceConfig,
     ) -> None:
         try:
-            from ..generated import mission_autonomy_pb2_grpc  # type: ignore[import]
+            from zqnt_utils.generated.zqnt import mission_autonomy_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
             raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
@@ -68,7 +68,7 @@ class MissionAutonomyClient:
         validate_non_blank("mission.name", mission.name)
         logger.info("CreateMission: name=%s", mission.name)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.CreateMissionRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -82,7 +82,7 @@ class MissionAutonomyClient:
         validate_non_blank("mission.name", mission.name)
         logger.info("UpdateMission: id=%s", mission_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.UpdateMissionRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -96,7 +96,7 @@ class MissionAutonomyClient:
         validate_non_blank("missionId", mission_id)
         logger.info("GetMission: id=%s", mission_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.GetMissionRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -109,7 +109,7 @@ class MissionAutonomyClient:
         validate_non_blank("missionId", mission_id)
         logger.info("DeleteMission: id=%s", mission_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.DeleteMissionRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -125,7 +125,7 @@ class MissionAutonomyClient:
     async def create_task(self, task: TaskDTO) -> TaskResponse:
         logger.info("CreateTask: name=%s", task.name)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.CreateTaskRequest(
             base=build_request_base(task.sn_number or _DEFAULT_SN),
@@ -138,7 +138,7 @@ class MissionAutonomyClient:
         validate_non_blank("taskId", task_id)
         logger.info("UpdateTask: id=%s", task_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.UpdateTaskRequest(
             base=build_request_base(task.sn_number or _DEFAULT_SN),
@@ -152,7 +152,7 @@ class MissionAutonomyClient:
         validate_non_blank("taskId", task_id)
         logger.info("GetTask: id=%s", task_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.GetTaskRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -165,7 +165,7 @@ class MissionAutonomyClient:
         validate_non_blank("flightId", flight_id)
         logger.info("GetTaskByFlightId: flightId=%s", flight_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.GetTaskRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -178,7 +178,7 @@ class MissionAutonomyClient:
         validate_non_blank("taskId", task_id)
         logger.info("DeleteTask: id=%s", task_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.DeleteTaskRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -191,7 +191,7 @@ class MissionAutonomyClient:
         validate_non_blank("taskId", task_id)
         logger.info("StartTask: id=%s", task_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.StartTaskRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -204,7 +204,7 @@ class MissionAutonomyClient:
         validate_non_blank("taskId", task_id)
         logger.info("StopTask: id=%s", task_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.StopTaskRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -216,7 +216,7 @@ class MissionAutonomyClient:
     async def pause_task(self, task_id: str) -> TaskResponse:
         validate_non_blank("taskId", task_id)
         logger.info("PauseTask: id=%s", task_id)
-        from ..generated import mission_autonomy_pb2
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2
 
         req = mission_autonomy_pb2.PauseTaskRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -228,7 +228,7 @@ class MissionAutonomyClient:
     async def resume_task(self, task_id: str) -> TaskResponse:
         validate_non_blank("taskId", task_id)
         logger.info("ResumeTask: id=%s", task_id)
-        from ..generated import mission_autonomy_pb2
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2
 
         req = mission_autonomy_pb2.ResumeTaskRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -246,7 +246,7 @@ class MissionAutonomyClient:
         validate_non_blank("scheduler.cronExpression", scheduler.cron_expression)
         logger.info("CreateScheduler: name=%s", scheduler.name)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.CreateSchedulerRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -259,7 +259,7 @@ class MissionAutonomyClient:
         validate_non_blank("schedulerId", scheduler_id)
         logger.info("UpdateScheduler: id=%s", scheduler_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.UpdateSchedulerRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -273,7 +273,7 @@ class MissionAutonomyClient:
         validate_non_blank("schedulerId", scheduler_id)
         logger.info("GetScheduler: id=%s", scheduler_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.GetSchedulerRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -286,7 +286,7 @@ class MissionAutonomyClient:
         validate_non_blank("schedulerId", scheduler_id)
         logger.info("DeleteScheduler: id=%s", scheduler_id)
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.DeleteSchedulerRequest(
             base=build_request_base(_DEFAULT_SN),
@@ -299,7 +299,7 @@ class MissionAutonomyClient:
         """Fetch all schedulers. Result is in :attr:`SchedulerResponse.schedulers`."""
         logger.info("GetAllSchedulers")
 
-        from ..generated import mission_autonomy_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import mission_autonomy_pb2  # type: ignore[import]
 
         req = mission_autonomy_pb2.GetTaskRequest(
             base=build_request_base(_DEFAULT_SN),

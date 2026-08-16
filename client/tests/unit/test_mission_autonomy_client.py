@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from zqnt_utils.generated.zqnt import common_pb2, mission_autonomy_pb2
 
 from client_sdk.config.resilience import ResilienceConfig
-from client_sdk.generated import common_pb2, mission_autonomy_pb2
 from client_sdk.mission_autonomy.client import MissionAutonomyClient
 from client_sdk.models.enums import MissionStatus, MissionType, TaskStatus, TaskType
 from client_sdk.models.mission_autonomy import MissionDTO, SchedulerDTO, TaskDTO

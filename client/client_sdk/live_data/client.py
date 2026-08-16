@@ -73,7 +73,7 @@ class LiveDataClient:
         resilience: ResilienceConfig,
     ) -> None:
         try:
-            from ..generated import live_data_pb2_grpc  # type: ignore[import]
+            from zqnt_utils.generated.zqnt import live_data_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
             raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 

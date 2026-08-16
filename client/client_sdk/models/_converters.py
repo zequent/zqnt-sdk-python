@@ -19,8 +19,7 @@ from .common import ErrorInfo, ProgressInfo, RemoteControlResponse
 def build_request_base(sn: str, tid: str | None = None):
     """Build a ``RequestBase`` proto with a fresh tid + UTC timestamp."""
     from google.protobuf import timestamp_pb2
-
-    from ..generated import common_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
     ts = timestamp_pb2.Timestamp()
     ts.GetCurrentTime()
@@ -32,9 +31,10 @@ def build_request_base(sn: str, tid: str | None = None):
 
 
 def build_coordinates(latitude: float, longitude: float, altitude: float):
-    from ..generated import common_pb2  # type: ignore[import]
+    # Coordinates was renamed GeoCoordinate (same fields) in the current schema.
+    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
-    return common_pb2.Coordinates(
+    return common_pb2.GeoCoordinate(
         latitude=latitude,
         longitude=longitude,
         altitude=altitude,
@@ -89,7 +89,7 @@ def has_field(msg, field: str) -> bool:
 def _resolve_error_code(raw_code) -> str:
     """Decode a proto ``ErrorCode`` enum value to its symbolic name."""
     try:
-        from ..generated import common_pb2  # type: ignore[import]
+        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
         return common_pb2.ErrorCode.Name(raw_code)
     except Exception:  # pragma: no cover - defensive
@@ -99,8 +99,8 @@ def _resolve_error_code(raw_code) -> str:
 def proto_to_error_info(err) -> ErrorInfo:
     """Convert a ``GlobalErrorMessage`` proto into :class:`ErrorInfo`."""
     return ErrorInfo(
-        error_code=_resolve_error_code(err.errorCode),
-        error_message=err.errorMessage,
+        error_code=_resolve_error_code(err.error_code),
+        error_message=err.error_message,
         timestamp=proto_ts_to_datetime(err.timestamp) if err.HasField("timestamp") else None,  # type: ignore[attr-defined]
     )
 
@@ -109,12 +109,18 @@ def proto_to_progress_info(p) -> ProgressInfo:
     return ProgressInfo(
         progress=p.progress,
         state=p.state,
-        left_time_in_seconds=p.leftTimeInSeconds,
+        left_time_in_seconds=p.left_time_in_seconds,
     )
 
 
 def proto_to_response(proto, sn: str) -> RemoteControlResponse:
-    """Convert a ``RemoteControlResponse`` proto into the SDK dataclass."""
+    """Convert a ``CommandResponse`` proto into the SDK dataclass.
+
+    tid/sn/asset_id/response_message live under ``proto.meta`` (a ``ResponseMeta``)
+    now, not flat on the response itself — the *sn* parameter is still accepted
+    (and preferred over ``meta.sn``, matching prior behaviour) because callers
+    already know it from the request and meta may not always be populated.
+    """
     error: ErrorInfo | None = None
     progress: ProgressInfo | None = None
 
@@ -123,12 +129,13 @@ def proto_to_response(proto, sn: str) -> RemoteControlResponse:
     if proto.HasField("progress"):
         progress = proto_to_progress_info(proto.progress)
 
+    meta = proto.meta if proto.HasField("meta") else None
     return RemoteControlResponse(
-        success=not proto.hasErrors,
-        tid=proto.tid,
+        success=not proto.has_errors,
+        tid=meta.tid if meta is not None else "",
         sn=sn,
-        asset_id=proto.assetId if proto.HasField("assetId") else None,
-        message=proto.responseMessage if proto.HasField("responseMessage") else None,
+        asset_id=(meta.asset_id if meta.HasField("asset_id") else None) if meta is not None else None,
+        message=(meta.response_message if meta.HasField("response_message") else None) if meta is not None else None,
         error=error,
         progress=progress,
     )

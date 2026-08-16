@@ -7,20 +7,18 @@ from typing import Any
 
 import pytest
 from google.protobuf import empty_pb2
+from zqnt_utils.generated.zqnt import common_pb2
 
-from client_sdk.generated import remote_control_pb2
 from client_sdk.models.remote_control_input import ManualControlInput
 from client_sdk.remote_control.manual_control_session import (
     ManualControlInputSession,
 )
 
 
-def _ok() -> remote_control_pb2.RemoteControlResponse:
-    return remote_control_pb2.RemoteControlResponse(
-        hasErrors=False,
-        tid="tid-mc",
-        sn="DOCK-1",
-        responseMessage="ok",
+def _ok() -> common_pb2.CommandResponse:
+    return common_pb2.CommandResponse(
+        has_errors=False,
+        meta=common_pb2.ResponseMeta(tid="tid-mc", sn="DOCK-1", response_message="ok"),
         empty=empty_pb2.Empty(),
     )
 

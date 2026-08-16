@@ -403,7 +403,7 @@ def _proto_to_track_config(proto) -> TrackTaskConfig:
 
 
 def task_to_proto(task: TaskDTO):
-    from ..generated import common_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
     kwargs: dict[str, Any] = {"status": task.status.value}
     _set_opt(kwargs, "id", task.id)
@@ -485,7 +485,7 @@ def _proto_to_task_config(proto) -> TaskConfig | None:
 
 
 def mission_to_proto(mission: MissionDTO):
-    from ..generated import common_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
     kwargs: dict[str, Any] = {
         "name": mission.name,
@@ -535,7 +535,7 @@ def proto_to_mission(proto) -> MissionDTO:
 
 
 def scheduler_to_proto(s: SchedulerDTO):
-    from ..generated import common_pb2  # type: ignore[import]
+    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
     kwargs: dict[str, Any] = {
         "name": s.name,
