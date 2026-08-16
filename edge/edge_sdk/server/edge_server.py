@@ -169,12 +169,12 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
                 sn=request.sn,
                 asset_id=request.asset_id if request.HasField("asset_id") else None,
             )
-            return edge_pb2.EdgeGetCapabilitiesResponse(
+            return common_pb2.AssetCapabilitiesResponse(
                 capabilities=capabilities_to_proto(caps, common_pb2, timestamp_pb2),
             )
         except Exception as exc:
             logger.exception("GetCapabilities error")
-            return edge_pb2.EdgeGetCapabilitiesResponse(
+            return common_pb2.AssetCapabilitiesResponse(
                 error=common_pb2.GlobalErrorMessage(
                     error_message=str(exc),
                     error_code=int(ErrorCode.SDK_ERROR),
@@ -188,12 +188,12 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     async def TakeOff(self, request, context):
         await self._assert_supported("take_off", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(ctx, self._adapter.take_off(ctx, proto_to_coordinates(request.request)))
+        return await self._handle_call(ctx, self._adapter.take_off(ctx, proto_to_coordinates(request.coordinate)))
 
     async def GoTo(self, request, context):
         await self._assert_supported("go_to", context)
         ctx = proto_to_request_context(request.base)
-        return await self._handle_call(ctx, self._adapter.go_to(ctx, proto_to_coordinates(request.request)))
+        return await self._handle_call(ctx, self._adapter.go_to(ctx, proto_to_coordinates(request.coordinate)))
 
     async def ReturnToHome(self, request, context):
         await self._assert_supported("return_to_home", context)
@@ -259,7 +259,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         locked = request.locked if request.HasField("locked") else None
         return await self._handle_call(
             ctx,
-            self._adapter.look_at(ctx, proto_to_coordinates(request.request), payload_index, locked),
+            self._adapter.look_at(ctx, proto_to_coordinates(request.coordinate), payload_index, locked),
         )
 
     async def TakePhoto(self, request, context):
@@ -283,11 +283,11 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         try:
             async for detection in self._adapter.get_detections(ctx, stream_url):
                 results = [
-                    edge_pb2.EdgeDetectionResponse.DetectionResult(
+                    common_pb2.DetectionResult(
                         object_id=d.object_id,
                         object_type=d.object_type,
                         confidence=d.confidence,
-                        bounding_box=edge_pb2.EdgeDetectionResponse.DetectionResult.BoundingBox(
+                        bounding_box=common_pb2.BoundingBox(
                             x=d.bounding_box.x,
                             y=d.bounding_box.y,
                             width=d.bounding_box.width,
@@ -296,7 +296,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
                     )
                     for d in detection.detections
                 ]
-                yield edge_pb2.EdgeDetectionResponse(base=request.base, detections=results)
+                yield common_pb2.DetectionBatch(base=request.base, detections=results)
         except NotImplementedError:
             await context.abort(
                 grpc.StatusCode.UNIMPLEMENTED,

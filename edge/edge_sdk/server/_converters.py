@@ -809,54 +809,76 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
 
 
 def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
+    # NOTE: the wire contract for capabilities grew a much richer Capability Contract model
+    # (CapabilityState enum instead of a plain bool, plus constraints/input_schema/output_schema/
+    # errors/events/schema_version — see device-control-contracts.proto). This SDK's own
+    # Capability/Capabilities dataclasses (edge_sdk/models/common.py) still only carry the old,
+    # flat fields, so this is a best-effort mapping onto the new message shape, not a full
+    # migration to the richer contract — adapters can't yet declare input_schema/output_schema/
+    # errors/events through this SDK. That's real follow-up work (same thing edge-go-sdk deferred
+    # for the same reason), not something to improvise silently here.
     ts = _now_ts(timestamp_pb2)
     proto_caps = [
         common_pb2.Capability(
-            command=c.command,
+            command_id=c.command,
+            display_name=c.command,
             description=c.description,
-            available=c.available,
+            state=(
+                common_pb2.CAPABILITY_STATE_AVAILABLE
+                if c.available
+                else common_pb2.CAPABILITY_STATE_UNSUPPORTED
+            ),
             unavailable_reason=c.unavailable_reason or "",
             metadata=c.metadata,
         )
         for c in caps.capabilities
     ]
-    return common_pb2.CurrentCapabilities(
+    return common_pb2.AssetCapabilities(
         asset_sn=caps.asset_sn,
         asset_type=caps.asset_type.name,
         capabilities=proto_caps,
         timestamp=ts,
+        snapshot_state=common_pb2.CAPABILITY_SNAPSHOT_STATE_CURRENT,
     )
 
 
 def edge_response_to_proto(response: EdgeResponse, edge_pb2, timestamp_pb2, empty_pb2, common_pb2=None):
+    # CommandResponse (like every other message below) lives in device-control-contracts.proto,
+    # publicly re-exported through common_pb2 — edge_pb2 itself only defines the service, no
+    # messages of its own. edge_pb2 is kept as a fallback for callers that don't pass common_pb2,
+    # though none of the current ones rely on that anymore.
+    _common = common_pb2 if common_pb2 is not None else edge_pb2
+
     ts = _now_ts(timestamp_pb2)
-    kwargs: dict = {
-        "has_errors": not response.success,
+    meta_kwargs: dict = {
         "tid": response.tid,
         "sn": response.sn,
         "timestamp": ts,
     }
     if response.asset_id:
-        kwargs["asset_id"] = response.asset_id
+        meta_kwargs["asset_id"] = response.asset_id
     if response.message:
-        kwargs["response_message"] = response.message
+        meta_kwargs["response_message"] = response.message
+
+    kwargs: dict = {
+        "has_errors": not response.success,
+        "meta": _common.ResponseMeta(**meta_kwargs),
+    }
 
     if response.error:
         err_ts = _now_ts(timestamp_pb2)
-        # GlobalErrorMessage lives in common_pb2, not edge_pb2
-        _common = common_pb2 if common_pb2 is not None else edge_pb2
         kwargs["error"] = _common.GlobalErrorMessage(
             timestamp=err_ts,
             error_message=response.error.message,
             error_code=int(response.error.code),
         )
     elif response.stream_url or response.video_id:
-        kwargs["live_stream_start_response"] = edge_pb2.LiveStreamStartResponse(
+        kwargs["live_stream_start_response"] = _common.LiveStreamStartResponse(
             stream_url=response.stream_url or "",
             video_id=response.video_id or "",
         )
     elif response.progress:
-        kwargs["progress"] = edge_pb2.CommandProgress(
+        kwargs["progress"] = _common.CommandProgress(
             progress=response.progress.progress,
             state=response.progress.state,
             left_time_in_seconds=response.progress.left_time_seconds,
@@ -864,7 +886,7 @@ def edge_response_to_proto(response: EdgeResponse, edge_pb2, timestamp_pb2, empt
     else:
         kwargs["empty"] = empty_pb2.Empty()
 
-    return edge_pb2.EdgeResponse(**kwargs)
+    return _common.CommandResponse(**kwargs)
 
 
 def custom_command_response_to_proto(
@@ -876,20 +898,27 @@ def custom_command_response_to_proto(
 ):
     from google.protobuf import struct_pb2
 
+    _common = common_pb2 if common_pb2 is not None else edge_pb2
+
     ts = _now_ts(timestamp_pb2)
-    kwargs: dict = {
-        "has_errors": not response.success,
+    meta_kwargs: dict = {
         "tid": response.tid,
         "sn": response.sn,
         "timestamp": ts,
-        "command_type": response.command_type,
     }
     if response.message:
-        kwargs["response_message"] = response.message
+        meta_kwargs["response_message"] = response.message
+
+    kwargs: dict = {
+        "has_errors": not response.success,
+        "meta": _common.ResponseMeta(**meta_kwargs),
+        # The wire field is command_id, not command_type — command_type is this SDK's own
+        # (unchanged) Python-facing name for it, on both CustomCommandRequest/Response models.
+        "command_id": response.command_type,
+    }
 
     if response.error:
         err_ts = _now_ts(timestamp_pb2)
-        _common = common_pb2 if common_pb2 is not None else edge_pb2
         kwargs["error"] = _common.GlobalErrorMessage(
             timestamp=err_ts,
             error_message=response.error.message,
@@ -902,7 +931,7 @@ def custom_command_response_to_proto(
     else:
         kwargs["empty"] = empty_pb2.Empty()
 
-    return edge_pb2.EdgeCustomCommandResponse(**kwargs)
+    return _common.CustomCommandResponse(**kwargs)
 
 
 def proto_to_custom_command(r) -> CustomCommandRequest:
@@ -911,4 +940,5 @@ def proto_to_custom_command(r) -> CustomCommandRequest:
     params = {}
     if r.HasField("params"):  # type: ignore[attr-defined]
         params = json_format.MessageToDict(r.params)
-    return CustomCommandRequest(command_type=r.command_type, params=params)
+    # r.command_id: see the command_id/command_type note in custom_command_response_to_proto.
+    return CustomCommandRequest(command_type=r.command_id, params=params)

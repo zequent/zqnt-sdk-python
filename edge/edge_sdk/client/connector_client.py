@@ -117,17 +117,13 @@ class ConnectorClient:
         pushes.  The stream runs until cancelled or the server closes it.
         Callers should run this inside a retry loop if they want reconnection.
         """
-        from zqnt_utils.generated.zqnt import connector_pb2
-
         from ..server._converters import proto_to_asset
 
         tid = str(uuid.uuid4())
-        stream = self._stub.AssetMonitoring(
-            connector_pb2.ConnectorAssetMonitorRequest(base=self._base(tid)),
-        )
+        stream = self._stub.AssetMonitoring(self._base(tid))
         async for response in stream:
-            if response.HasField("asset_list"):
-                yield [proto_to_asset(a) for a in response.asset_list.assets]
+            if response.HasField("assets"):
+                yield [proto_to_asset(a) for a in response.assets.assets]
 
     async def register_asset(self, asset: Asset) -> str | None:
         """Register an asset on the platform. Returns the asset id, or None on failure."""
