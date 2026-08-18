@@ -37,6 +37,8 @@ except PackageNotFoundError:
 
 from .adapter.base import EdgeAdapter
 from .client.connector_client import ConnectorClient
+from .client.live_data_service import LiveDataService
+from .client.mission_autonomy_client import MissionAutonomyClient
 from .client.telemetry_publisher import TelemetryPublisher
 from .config import EdgeAdapterConfig, EdgeAdapterRuntime
 from .models import (
@@ -54,6 +56,8 @@ from .models import (
     AssetMode,
     AssetNetworkInfo,
     AssetPositionState,
+    # notification
+    AssetStatusEvent,
     AssetSubAssetInfo,
     AssetTelemetry,
     AssetType,
@@ -65,6 +69,8 @@ from .models import (
     Capability,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
+    CommandExecutionEvent,
+    CommandExecutionStatus,
     CommandProgress,
     Coordinates,
     DetectionParameter,
@@ -82,6 +88,7 @@ from .models import (
     ManualControlRequest,
     ManualControlState,
     Mission,
+    MissionEvent,
     MissionStatus,
     MissionType,
     NetworkStateQuality,
@@ -92,6 +99,8 @@ from .models import (
     RangeFinderData,
     RequestContext,
     ReturnToHomeRequest,
+    SchedulerDTO,
+    SchedulerType,
     SensorData,
     SubAsset,
     SubAssetBatteryInfo,
@@ -116,6 +125,8 @@ __all__ = [
     "RegistrationConfig",
     "TelemetryPublisher",
     "ConnectorClient",
+    "MissionAutonomyClient",
+    "LiveDataService",
     # enums
     "AssetType",
     "AssetVendor",
@@ -131,6 +142,8 @@ __all__ = [
     "MissionType",
     "MissionStatus",
     "ErrorCode",
+    "CommandExecutionStatus",
+    "SchedulerType",
     "Rainfall",
     "NetworkType",
     "NetworkStateQuality",
@@ -155,6 +168,12 @@ __all__ = [
     # asset
     "Asset",
     "SubAsset",
+    # notification
+    "AssetStatusEvent",
+    "MissionEvent",
+    "CommandExecutionEvent",
+    # scheduler
+    "SchedulerDTO",
     # task
     "Task",
     "Mission",

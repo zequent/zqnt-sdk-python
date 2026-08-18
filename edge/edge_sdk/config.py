@@ -21,6 +21,8 @@ Environment variables (all optional, sensible defaults provided):
     CONNECTOR_PORT      ConnectorService port (default: 50053)
     TELEMETRY_HOST      LiveDataService host (default: localhost)
     TELEMETRY_PORT      LiveDataService port (default: 50052)
+    MISSION_AUTONOMY_HOST  MissionAutonomyService host (default: localhost)
+    MISSION_AUTONOMY_PORT  MissionAutonomyService port (default: 50054)
     ADAPTER_SN          Adapter identifier used for logging (default: "").
                         Each telemetry frame carries the asset's own SN — this
                         does not need to match an asset SN for multi-asset adapters.
@@ -45,6 +47,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .adapter.base import EdgeAdapter
     from .client.connector_client import ConnectorClient
+    from .client.mission_autonomy_client import MissionAutonomyClient
     from .client.telemetry_publisher import TelemetryPublisher
 
 logger = logging.getLogger(__name__)
@@ -76,8 +79,9 @@ class EdgeAdapterRuntime:
     Obtain an instance via ``async with EdgeAdapterConfig(...).runtime() as rt:``.
 
     Attributes:
-        connector:  Connected :class:`~edge_sdk.ConnectorClient`.
-        telemetry:  Running :class:`~edge_sdk.TelemetryPublisher`.
+        connector:         Connected :class:`~edge_sdk.ConnectorClient`.
+        telemetry:         Running :class:`~edge_sdk.TelemetryPublisher`.
+        mission_autonomy:  Connected :class:`~edge_sdk.MissionAutonomyClient`.
     """
 
     def __init__(
@@ -87,9 +91,11 @@ class EdgeAdapterRuntime:
         self._config = config
         self.connector: "ConnectorClient" = None  # type: ignore[assignment]
         self.telemetry: "TelemetryPublisher" = None  # type: ignore[assignment]
+        self.mission_autonomy: "MissionAutonomyClient" = None  # type: ignore[assignment]
 
     async def __aenter__(self) -> "EdgeAdapterRuntime":
         from .client.connector_client import ConnectorClient
+        from .client.mission_autonomy_client import MissionAutonomyClient
         from .client.telemetry_publisher import TelemetryPublisher
 
         _setup_logging(self._config.log_level, self._config.log_format)
@@ -103,17 +109,24 @@ class EdgeAdapterRuntime:
             port=self._config.telemetry_port,
             sn=self._config.adapter_sn,
         )
+        self.mission_autonomy = MissionAutonomyClient(
+            host=self._config.mission_autonomy_host,
+            port=self._config.mission_autonomy_port,
+        )
 
         await self.connector.connect()
         await self.telemetry.connect()
+        await self.mission_autonomy.connect()
         logger.info(
-            "EdgeAdapterRuntime started [grpc=%s:%d connector=%s:%d telemetry=%s:%d sn=%s]",
+            "EdgeAdapterRuntime started [grpc=%s:%d connector=%s:%d telemetry=%s:%d mission_autonomy=%s:%d sn=%s]",
             self._config.grpc_host,
             self._config.grpc_port,
             self._config.connector_host,
             self._config.connector_port,
             self._config.telemetry_host,
             self._config.telemetry_port,
+            self._config.mission_autonomy_host,
+            self._config.mission_autonomy_port,
             self._config.adapter_sn,
         )
         return self
@@ -123,6 +136,8 @@ class EdgeAdapterRuntime:
             await self.telemetry.close()
         if self.connector is not None:
             await self.connector.close()
+        if self.mission_autonomy is not None:
+            await self.mission_autonomy.close()
         logger.info("EdgeAdapterRuntime stopped")
 
     async def serve(self, adapter: "EdgeAdapter") -> None:
@@ -170,6 +185,8 @@ class EdgeAdapterConfig:
     connector_port: int = 50053
     telemetry_host: str = "localhost"
     telemetry_port: int = 50052
+    mission_autonomy_host: str = "localhost"
+    mission_autonomy_port: int = 50054
     adapter_sn: str = ""
     log_level: str = "INFO"
     log_format: str = "json"
@@ -190,6 +207,8 @@ class EdgeAdapterConfig:
             connector_port=int(os.getenv("CONNECTOR_PORT", "50053")),
             telemetry_host=os.getenv("TELEMETRY_HOST", "localhost"),
             telemetry_port=int(os.getenv("TELEMETRY_PORT", "50052")),
+            mission_autonomy_host=os.getenv("MISSION_AUTONOMY_HOST", "localhost"),
+            mission_autonomy_port=int(os.getenv("MISSION_AUTONOMY_PORT", "50054")),
             adapter_sn=os.getenv("ADAPTER_SN", ""),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             log_format=os.getenv("LOG_FORMAT", "json"),

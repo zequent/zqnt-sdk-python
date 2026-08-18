@@ -186,6 +186,30 @@ class MissionStatus(IntEnum):
     ERROR = 4
 
 
+class SchedulerType(IntEnum):
+    """Mirrors ``mission-autonomy-types.proto`` :proto:`SchedulerType`."""
+
+    MISSION = 0
+    TASK = 1
+    SYSTEM_JOBS = 2
+    ORGANIZATION = 3
+    DATABASE = 4
+    CONNECTORS = 5
+
+
+class CommandExecutionStatus(IntEnum):
+    """Mirrors ``events.proto`` :proto:`CommandExecutionStatus` — vendor-neutral lifecycle
+    feedback for one physical command dispatched to an edge adapter. Replaces the retired
+    task-event notification model."""
+
+    UNSPECIFIED = 0
+    ACCEPTED = 1
+    RUNNING = 2
+    SUCCEEDED = 3
+    FAILED = 4
+    CANCELLED = 5
+
+
 class ErrorCode(IntEnum):
     SYSTEM_ERROR = 0
     CLIENT_ERROR = 1

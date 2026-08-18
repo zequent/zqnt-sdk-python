@@ -182,21 +182,18 @@ def proto_to_sub_asset(s) -> SubAsset:
         vendor=parse_enum(AssetVendor, s.vendor, AssetVendor.DJI),
         connection=parse_enum(AssetConnection, s.connection, AssetConnection.MQTT),
         model=s.model,
-        organization=s.organization,
-        online=s.online,
-        stream_type=parse_enum(LiveStreamType, s.stream_type, LiveStreamType.UNKNOWN),
-        connection_string=s.connection_string if s.HasField("connection_string") else None,  # type: ignore[attr-defined]
-        port=s.port if s.HasField("port") else None,  # type: ignore[attr-defined]
-        live_stream_server=s.live_stream_server if s.HasField("live_stream_server") else None,  # type: ignore[attr-defined]
-        external_device_type=s.external_device_type if s.HasField("external_device_type") else None,  # type: ignore[attr-defined]
-        external_device_sub_type=s.external_device_sub_type if s.HasField("external_device_sub_type") else None,  # type: ignore[attr-defined]
-        external_id=s.external_id if s.HasField("external_id") else None,  # type: ignore[attr-defined]
-        stream_url_predefined=s.stream_url_predefined if s.HasField("stream_url_predefined") else None,  # type: ignore[attr-defined]
+        system_connection_string=_opt_field(s, "system_connection_string"),
+        external_device_type=_opt_field(s, "external_device_type"),
+        external_device_sub_type=_opt_field(s, "external_device_sub_type"),
+        external_id=_opt_field(s, "external_id"),
+        stream_url_predefined=_opt_field(s, "stream_url_predefined"),
+        live_stream_push_url=_opt_field(s, "live_stream_push_url"),
+        live_stream_pull_url=_opt_field(s, "live_stream_pull_url"),
+        modified_from=_opt_field(s, "modified_from"),
     )
 
 
 def proto_to_asset(a) -> Asset:
-    sub = proto_to_sub_asset(a.sub_asset_dto) if a.HasField("sub_asset_dto") else None  # type: ignore[attr-defined]
     return Asset(
         id=_opt_field(a, "id"),
         sn=a.sn,
@@ -206,15 +203,14 @@ def proto_to_asset(a) -> Asset:
         connection=parse_enum(AssetConnection, a.connection, AssetConnection.MQTT),
         model=a.model,
         organization=a.organization,
-        online=a.online,
-        stream_type=LiveStreamType(a.stream_type),
-        connection_string=a.connection_string if a.HasField("connection_string") else None,  # type: ignore[attr-defined]
-        port=a.port if a.HasField("port") else None,  # type: ignore[attr-defined]
-        live_stream_server=a.live_stream_server if a.HasField("live_stream_server") else None,  # type: ignore[attr-defined]
-        external_device_type=a.external_device_type if a.HasField("external_device_type") else None,  # type: ignore[attr-defined]
-        external_device_sub_type=a.external_device_sub_type if a.HasField("external_device_sub_type") else None,  # type: ignore[attr-defined]
-        external_id=a.external_id if a.HasField("external_id") else None,  # type: ignore[attr-defined]
-        sub_asset=sub,
+        system_connection_string=_opt_field(a, "system_connection_string"),
+        external_device_type=_opt_field(a, "external_device_type"),
+        external_device_sub_type=_opt_field(a, "external_device_sub_type"),
+        external_id=_opt_field(a, "external_id"),
+        live_stream_push_url=_opt_field(a, "live_stream_push_url"),
+        live_stream_pull_url=_opt_field(a, "live_stream_pull_url"),
+        modified_from=_opt_field(a, "modified_from"),
+        sub_assets=[proto_to_sub_asset(s) for s in a.sub_assets],
     )
 
 
@@ -227,16 +223,9 @@ def _sub_asset_to_proto(sub: "SubAsset", common_pb2):
         vendor=f"ASSET_VENDOR_{sub.vendor.name}",
         connection=sub.connection.name,
         model=sub.model,
-        organization=sub.organization,
-        online=sub.online,
-        stream_type=f"LIVE_STREAM_TYPE_{sub.stream_type.name}",
     )
-    if sub.connection_string is not None:
-        kwargs["connection_string"] = sub.connection_string
-    if sub.port is not None:
-        kwargs["port"] = sub.port
-    if sub.live_stream_server is not None:
-        kwargs["live_stream_server"] = sub.live_stream_server
+    if sub.system_connection_string is not None:
+        kwargs["system_connection_string"] = sub.system_connection_string
     if sub.external_device_type is not None:
         kwargs["external_device_type"] = sub.external_device_type
     if sub.external_device_sub_type is not None:
@@ -245,6 +234,12 @@ def _sub_asset_to_proto(sub: "SubAsset", common_pb2):
         kwargs["external_id"] = sub.external_id
     if sub.stream_url_predefined is not None:
         kwargs["stream_url_predefined"] = sub.stream_url_predefined
+    if sub.live_stream_push_url is not None:
+        kwargs["live_stream_push_url"] = sub.live_stream_push_url
+    if sub.live_stream_pull_url is not None:
+        kwargs["live_stream_pull_url"] = sub.live_stream_pull_url
+    if sub.modified_from is not None:
+        kwargs["modified_from"] = sub.modified_from
     return common_pb2.SubAssetProtoDTO(**kwargs)
 
 
@@ -258,23 +253,23 @@ def asset_to_proto(asset: "Asset", common_pb2):
         connection=asset.connection.name,
         model=asset.model,
         organization=asset.organization,
-        online=asset.online,
-        stream_type=f"LIVE_STREAM_TYPE_{asset.stream_type.name}",
     )
-    if asset.connection_string is not None:
-        kwargs["connection_string"] = asset.connection_string
-    if asset.port is not None:
-        kwargs["port"] = asset.port
-    if asset.live_stream_server is not None:
-        kwargs["live_stream_server"] = asset.live_stream_server
+    if asset.system_connection_string is not None:
+        kwargs["system_connection_string"] = asset.system_connection_string
     if asset.external_device_type is not None:
         kwargs["external_device_type"] = asset.external_device_type
     if asset.external_device_sub_type is not None:
         kwargs["external_device_sub_type"] = asset.external_device_sub_type
     if asset.external_id is not None:
         kwargs["external_id"] = asset.external_id
-    if asset.sub_asset is not None:
-        kwargs["sub_asset_dto"] = _sub_asset_to_proto(asset.sub_asset, common_pb2)
+    if asset.live_stream_push_url is not None:
+        kwargs["live_stream_push_url"] = asset.live_stream_push_url
+    if asset.live_stream_pull_url is not None:
+        kwargs["live_stream_pull_url"] = asset.live_stream_pull_url
+    if asset.modified_from is not None:
+        kwargs["modified_from"] = asset.modified_from
+    if asset.sub_assets:
+        kwargs["sub_assets"] = [_sub_asset_to_proto(s, common_pb2) for s in asset.sub_assets]
     return common_pb2.AssetProtoDTO(**kwargs)
 
 
@@ -823,11 +818,7 @@ def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
             command_id=c.command,
             display_name=c.command,
             description=c.description,
-            state=(
-                common_pb2.CAPABILITY_STATE_AVAILABLE
-                if c.available
-                else common_pb2.CAPABILITY_STATE_UNSUPPORTED
-            ),
+            state=(common_pb2.CAPABILITY_STATE_AVAILABLE if c.available else common_pb2.CAPABILITY_STATE_UNSUPPORTED),
             unavailable_reason=c.unavailable_reason or "",
             metadata=c.metadata,
         )

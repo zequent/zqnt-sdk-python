@@ -62,6 +62,7 @@ Subclass `EdgeAdapter` and implement the methods for your hardware:
 from edge_sdk import EdgeAdapter, EdgeResponse, AssetType, Capabilities
 from edge_sdk.models import RequestContext, Coordinates
 
+
 class MyDroneAdapter(EdgeAdapter):
     """Adapter for a custom drone platform."""
 
@@ -72,11 +73,7 @@ class MyDroneAdapter(EdgeAdapter):
     async def take_off(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Handle take-off command."""
         # Call your drone SDK here
-        await hardware.take_off(
-            coordinates.latitude,
-            coordinates.longitude,
-            coordinates.altitude
-        )
+        await hardware.take_off(coordinates.latitude, coordinates.longitude, coordinates.altitude)
         return EdgeResponse.ok(ctx.tid, ctx.sn, "Take-off initiated")
 
     async def go_to(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
@@ -97,6 +94,7 @@ class MyDroneAdapter(EdgeAdapter):
 import asyncio
 from edge_sdk import EdgeServer, TelemetryPublisher
 
+
 async def main():
     # Create your adapter
     adapter = MyDroneAdapter()
@@ -105,16 +103,13 @@ async def main():
     server = EdgeServer(adapter=adapter, port=50051)
 
     # Optionally publish telemetry
-    publisher = TelemetryPublisher(
-        host="platform-host",
-        port=50052,
-        sn="DRONE-001"
-    )
+    publisher = TelemetryPublisher(host="platform-host", port=50052, sn="DRONE-001")
     await publisher.connect()
 
     async with asyncio.TaskGroup() as tg:
         tg.create_task(server.serve())
         tg.create_task(telemetry_loop(publisher))
+
 
 async def telemetry_loop(publisher):
     """Publish telemetry every second."""
@@ -128,6 +123,7 @@ async def telemetry_loop(publisher):
             )
         )
         await asyncio.sleep(1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -168,9 +164,9 @@ EdgeResponse.ok(tid, sn, stream_url="rtmp://...")
 Contains request metadata:
 
 ```python
-ctx.tid # Transaction ID (for tracing)
-ctx.sn # Asset serial number
-ctx.timestamp # Request timestamp
+ctx.tid  # Transaction ID (for tracing)
+ctx.sn  # Asset serial number
+ctx.timestamp  # Request timestamp
 ```
 
 ### TelemetryPublisher
@@ -250,16 +246,13 @@ async def prepare_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
 ```python
 from edge_sdk import ErrorMessage, ErrorCode
 
+
 async def some_operation(self, ctx: RequestContext) -> EdgeResponse:
     try:
         result = await hardware.do_something()
         return EdgeResponse.ok(ctx.tid, ctx.sn)
     except HardwareError as e:
-        return EdgeResponse.fail(
-            ctx.tid,
-            ctx.sn,
-            ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR)
-        )
+        return EdgeResponse.fail(ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR))
 ```
 
 ### Server Registration (with Redis)
@@ -285,12 +278,14 @@ import pytest
 from edge_sdk import EdgeAdapter, EdgeResponse, AssetType
 from tests.conftest import test_adapter, server_port
 
+
 class MyTestAdapter(EdgeAdapter):
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.AIRCRAFT)
 
     async def take_off(self, ctx, coordinates):
         return EdgeResponse.ok(ctx.tid, ctx.sn)
+
 
 @pytest.mark.asyncio
 async def test_take_off(server_port):

@@ -11,6 +11,7 @@ from .common import (
     Capability,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
+    CommandExecutionStatus,
     CommandProgress,
     Coordinates,
     DetectionBatch,
@@ -32,11 +33,13 @@ from .common import (
     Rainfall,
     RequestContext,
     ReturnToHomeRequest,
+    SchedulerType,
     SubAssetMode,
     TaskStatus,
     TaskType,
 )
-from .notification import AssetStatusEvent, OperationEvent, TaskEvent
+from .notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
+from .scheduler import SchedulerDTO
 from .task import (
     AreaMappingTaskConfig,
     AreaVertex,
@@ -83,6 +86,8 @@ __all__ = [
     "MissionType",
     "MissionStatus",
     "ErrorCode",
+    "CommandExecutionStatus",
+    "SchedulerType",
     "Rainfall",
     "NetworkType",
     "NetworkStateQuality",
@@ -107,8 +112,10 @@ __all__ = [
     "DetectionBatch",
     # notification
     "AssetStatusEvent",
-    "TaskEvent",
-    "OperationEvent",
+    "MissionEvent",
+    "CommandExecutionEvent",
+    # scheduler
+    "SchedulerDTO",
     # task
     "Task",
     "Mission",
