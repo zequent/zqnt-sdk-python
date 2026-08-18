@@ -113,6 +113,25 @@ def proto_to_progress_info(p) -> ProgressInfo:
     )
 
 
+def dict_to_struct(d: dict | None):
+    """Build a ``google.protobuf.Struct`` from a plain dict (``None``/``{}`` -> empty Struct)."""
+    from google.protobuf import struct_pb2
+
+    s = struct_pb2.Struct()
+    if d:
+        s.update(d)
+    return s
+
+
+def struct_to_dict(s) -> dict:
+    """Decode a ``google.protobuf.Struct`` (or ``None``) into a plain dict."""
+    if s is None:
+        return {}
+    from google.protobuf import json_format
+
+    return json_format.MessageToDict(s)
+
+
 def proto_to_response(proto, sn: str) -> RemoteControlResponse:
     """Convert a ``CommandResponse`` proto into the SDK dataclass.
 

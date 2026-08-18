@@ -5,8 +5,8 @@ Mirrors the Java client SDK (``com.zqnt.sdk.client.ZequentClient``) so that
 ``.env`` files and configuration concepts are interchangeable between the
 Java and Python SDKs.
 
-Sub-clients (remote_control, mission_autonomy, live_data) are wired in
-incrementally; the channel lifecycle below is already complete.
+Sub-clients (connector, remote_control, mission_autonomy, live_data) are all wired; the channel
+lifecycle below is complete.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from .config.service_config import ServiceConfig
 from .grpc_.channel_factory import create_channel
 
 if TYPE_CHECKING:
+    from .connector.client import ConnectorClient
     from .live_data.client import LiveDataClient
     from .mission_autonomy.client import MissionAutonomyClient
     from .remote_control.client import RemoteControlClient
@@ -33,6 +34,7 @@ class ZequentClient:
     Top-level entrypoint. Holds one ``grpc.aio.Channel`` per service and
     exposes typed sub-clients:
 
+        client.connector
         client.remote_control
         client.mission_autonomy
         client.live_data
@@ -45,11 +47,13 @@ class ZequentClient:
 
     def __init__(
         self,
+        connector_config: ServiceConfig,
         remote_control_config: ServiceConfig,
         mission_autonomy_config: ServiceConfig,
         live_data_config: ServiceConfig,
         resilience: ResilienceConfig | None = None,
     ) -> None:
+        self._connector_config = connector_config
         self._remote_control_config = remote_control_config
         self._mission_autonomy_config = mission_autonomy_config
         self._live_data_config = live_data_config
@@ -57,10 +61,12 @@ class ZequentClient:
 
         # Channels are created eagerly so that connection problems surface
         # at construction time rather than on the first RPC.
+        self._connector_channel: grpc.aio.Channel = create_channel(connector_config)
         self._remote_control_channel: grpc.aio.Channel = create_channel(remote_control_config)
         self._mission_autonomy_channel: grpc.aio.Channel = create_channel(mission_autonomy_config)
         self._live_data_channel: grpc.aio.Channel = create_channel(live_data_config)
         self._channels: list[grpc.aio.Channel] = [
+            self._connector_channel,
             self._remote_control_channel,
             self._mission_autonomy_channel,
             self._live_data_channel,
@@ -68,6 +74,7 @@ class ZequentClient:
         self._closed = False
 
         # Lazy sub-clients.
+        self._connector: "ConnectorClient | None" = None
         self._remote_control: "RemoteControlClient | None" = None
         self._mission_autonomy: "MissionAutonomyClient | None" = None
         self._live_data: "LiveDataClient | None" = None
@@ -99,6 +106,10 @@ class ZequentClient:
         return self._resilience
 
     @property
+    def connector_channel(self) -> grpc.aio.Channel:
+        return self._connector_channel
+
+    @property
     def remote_control_channel(self) -> grpc.aio.Channel:
         return self._remote_control_channel
 
@@ -113,6 +124,14 @@ class ZequentClient:
     # ------------------------------------------------------------------
     # Sub-clients
     # ------------------------------------------------------------------
+
+    @property
+    def connector(self) -> "ConnectorClient":
+        if self._connector is None:
+            from .connector.client import ConnectorClient
+
+            self._connector = ConnectorClient(self._connector_channel, self._resilience)
+        return self._connector
 
     @property
     def remote_control(self) -> "RemoteControlClient":

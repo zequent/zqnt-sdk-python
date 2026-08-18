@@ -6,8 +6,8 @@ import asyncio
 from typing import Any
 
 import pytest
-from google.protobuf import empty_pb2, timestamp_pb2
-from zqnt_utils.generated.zqnt import common_pb2, live_data_pb2
+from google.protobuf import empty_pb2
+from zqnt_utils.generated.zqnt import common_pb2, events_pb2, live_data_types_pb2
 
 from client_sdk.config.resilience import ResilienceConfig
 from client_sdk.live_data.client import LiveDataClient
@@ -22,24 +22,21 @@ from client_sdk.models.live_data import (
 )
 
 
-def _ok_unary(message: str = "ok") -> live_data_pb2.LiveDataResponse:
-    return live_data_pb2.LiveDataResponse(
-        hasErrors=False,
-        tid="tid-1",
-        sn="DOCK-1",
-        responseMessage=message,
+def _ok_unary(message: str = "ok") -> common_pb2.CommandResponse:
+    return common_pb2.CommandResponse(
+        has_errors=False,
+        meta=common_pb2.ResponseMeta(tid="tid-1", sn="DOCK-1", response_message=message),
         empty=empty_pb2.Empty(),
     )
 
 
-def _stream_started(video_id: str = "vid-1") -> live_data_pb2.LiveDataResponse:
-    return live_data_pb2.LiveDataResponse(
-        hasErrors=False,
-        tid="tid-2",
-        sn="DOCK-1",
-        liveStreamStartResponse=common_pb2.LiveStreamStartResponse(
-            streamUrl="rtmp://example/live",
-            videoId=video_id,
+def _stream_started(video_id: str = "vid-1") -> common_pb2.CommandResponse:
+    return common_pb2.CommandResponse(
+        has_errors=False,
+        meta=common_pb2.ResponseMeta(tid="tid-2", sn="DOCK-1"),
+        live_stream_start_response=common_pb2.LiveStreamStartResponse(
+            stream_url="rtmp://example/live",
+            video_id=video_id,
         ),
     )
 
@@ -95,7 +92,7 @@ async def test_start_live_stream_decodes_response() -> None:
     assert resp.live_stream_start.stream_url == "rtmp://example/live"
     sent_request = stub.calls["StartLiveStream"][0]
     assert sent_request.base.sn == "DOCK-1"
-    assert sent_request.request.videoId == "VID-9"
+    assert sent_request.request.video_id == "VID-9"
 
 
 @pytest.mark.asyncio
@@ -141,191 +138,127 @@ async def test_change_zoom_with_lens() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _telemetry_frame(asset_id: str = "AST-1") -> live_data_pb2.LiveDataTelemetryResponse:
-    return live_data_pb2.LiveDataTelemetryResponse(
+def _telemetry_frame(asset_id: str = "AST-1") -> live_data_types_pb2.LiveDataTelemetryResponse:
+    return live_data_types_pb2.LiveDataTelemetryResponse(
         tid="tid-stream",
         sn="DOCK-1",
-        hasErrors=False,
-        assetId=asset_id,
-        assetTelemetry=live_data_pb2.AssetTelemetry(
+        has_errors=False,
+        asset_id=asset_id,
+        data=live_data_types_pb2.Telemetry(
             id="AST-1",
+            sn="DOCK-1",
             latitude=12.34,
             longitude=56.78,
             heading=180.0,
+            asset=live_data_types_pb2.AssetTelemetryDetails(),
         ),
     )
 
 
-def _extended_telemetry_frame() -> live_data_pb2.LiveDataTelemetryResponse:
-    return live_data_pb2.LiveDataTelemetryResponse(
+def _extended_telemetry_frame() -> live_data_types_pb2.LiveDataTelemetryResponse:
+    return live_data_types_pb2.LiveDataTelemetryResponse(
         tid="tid-stream",
         sn="DOCK-1",
-        hasErrors=False,
-        assetId="AST-9",
-        assetTelemetry=live_data_pb2.AssetTelemetry(
+        has_errors=False,
+        asset_id="AST-9",
+        data=live_data_types_pb2.Telemetry(
             id="AST-9",
+            sn="SN-9",
             latitude=12.34,
             longitude=56.78,
-            absoluteAltitude=123.4,
-            relativeAltitude=23.4,
-            environmentTemp=18.5,
-            insideTemp=21.0,
-            humidity=65.0,
-            mode=common_pb2.AssetMode.ASSET_MODE_WORKING,
-            rainfall=common_pb2.RainfallEnum.RAINFALL_LIGHT,
-            subAssetInformation=live_data_pb2.AssetTelemetry.AssetSubAssetInformation(
-                sn="SUB-1",
-                model="M-1",
-                paired=True,
-                online=False,
-            ),
-            subAssetAtHome=True,
-            subAssetCharging=False,
-            subAssetPercentage=77.5,
+            absolute_altitude=123.4,
+            relative_altitude=23.4,
             heading=182.5,
-            debugModeOpen=True,
-            hasActiveManualControlSession=True,
-            coverState=common_pb2.AssetCoverStateEnum.COVER_STATE_OPENED,
-            workingVoltage=24,
-            workingCurrent=3,
-            supplyVoltage=12,
-            windSpeed=6.2,
-            positionValid=True,
-            networkInformation=live_data_pb2.AssetTelemetry.AssetNetworkInformation(
-                type=common_pb2.NetworkTypeEnum.NETWORK_TYPE_4_G,
-                rate=42.5,
-                quality=common_pb2.NetworkStateQualityEnum.NETWORK_STATE_QUALITY_GOOD,
-            ),
-            airConditioner=live_data_pb2.AssetTelemetry.AssetAirConditioner(
-                state=common_pb2.AssetAirConditionerStateEnum.AIR_CONDITIONER_COOL,
-                switchTime=15,
-            ),
-            manualControlState=common_pb2.ManualControlStateEnum.MANUAL_CONTROL_STATE_CONNECTED,
-            positionState=live_data_pb2.AssetTelemetry.PositionState(
-                gpsNumber=9,
-                rtkNumber=5,
-                quality=3,
+            wind_speed=6.2,
+            asset=live_data_types_pb2.AssetTelemetryDetails(
+                environment_temp=18.5,
+                inside_temp=21.0,
+                humidity=65.0,
+                mode=common_pb2.AssetMode.ASSET_MODE_WORKING,
+                rainfall=common_pb2.RainfallEnum.RAINFALL_LIGHT,
+                sub_asset_information=live_data_types_pb2.AssetTelemetryDetails.AssetSubAssetInformation(
+                    sn="SUB-1",
+                    model="M-1",
+                    paired=True,
+                    online=False,
+                ),
+                sub_asset_at_home=True,
+                sub_asset_charging=False,
+                sub_asset_percentage=77.5,
+                debug_mode_open=True,
+                has_active_manual_control_session=True,
+                cover_state=common_pb2.AssetCoverStateEnum.COVER_STATE_OPENED,
+                working_voltage=24,
+                working_current=3,
+                supply_voltage=12,
+                position_valid=True,
+                network_information=live_data_types_pb2.AssetTelemetryDetails.AssetNetworkInformation(
+                    type=common_pb2.NetworkTypeEnum.NETWORK_TYPE_4_G,
+                    rate=42.5,
+                    quality=common_pb2.NetworkStateQualityEnum.NETWORK_STATE_QUALITY_GOOD,
+                ),
+                air_conditioner=live_data_types_pb2.AssetTelemetryDetails.AssetAirConditioner(
+                    state=common_pb2.AssetAirConditionerStateEnum.AIR_CONDITIONER_COOL,
+                    switch_time=15,
+                ),
+                manual_control_state=common_pb2.ManualControlStateEnum.MANUAL_CONTROL_STATE_CONNECTED,
+                position_state=live_data_types_pb2.AssetTelemetryDetails.PositionState(
+                    gps_number=9,
+                    rtk_number=5,
+                    quality=3,
+                ),
+                wireless_link=live_data_types_pb2.AssetTelemetryDetails.AssetWirelessLinkInformation(
+                    fourth_generation_freq_band=2.4,
+                    fourth_generation_gnd_quality=88,
+                    fourth_generation_link_state=True,
+                    fourth_generation_quality=77,
+                    fourth_generation_uav_quality=66,
+                    dongle_number=2,
+                    link_workmode="AUTO",
+                    sdr_freq_band=5.8,
+                    sdr_link_state=False,
+                    sdr_quality=44,
+                ),
+                sdr_state=live_data_types_pb2.AssetTelemetryDetails.AssetSdrState(
+                    down_quality=91,
+                    up_quality=73,
+                    frequency_band=5.2,
+                ),
             ),
         ),
     )
 
 
-class _FakeProto:
-    def __init__(self, _which_oneofs: dict[str, str] | None = None, **fields: Any) -> None:
-        self._fields = set(fields)
-        self._which_oneofs = _which_oneofs or {}
-        for key, value in fields.items():
-            setattr(self, key, value)
-
-    def HasField(self, name: str) -> bool:  # noqa: N802 - protobuf API
-        return name in self._fields and getattr(self, name) is not None
-
-    def WhichOneof(self, name: str) -> str | None:  # noqa: N802 - protobuf API
-        return self._which_oneofs.get(name)
-
-
-def _fake_extended_telemetry_frame() -> Any:
-    asset = _FakeProto(
-        id="AST-9",
-        timestamp=timestamp_pb2.Timestamp(),
-        sn="SN-9",
-        latitude=12.34,
-        longitude=56.78,
-        absoluteAltitude=123.4,
-        relativeAltitude=23.4,
-        environmentTemp=18.5,
-        insideTemp=21.0,
-        humidity=65.0,
-        mode=common_pb2.AssetMode.ASSET_MODE_WORKING,
-        rainfall=common_pb2.RainfallEnum.RAINFALL_LIGHT,
-        subAssetInformation=_FakeProto(
-            sn="SUB-1",
-            model="M-1",
-            paired=True,
-            online=False,
-        ),
-        subAssetAtHome=True,
-        subAssetCharging=False,
-        subAssetPercentage=77.5,
-        heading=182.5,
-        debugModeOpen=True,
-        hasActiveManualControlSession=True,
-        coverState=common_pb2.AssetCoverStateEnum.COVER_STATE_OPENED,
-        workingVoltage=24,
-        workingCurrent=3,
-        supplyVoltage=12,
-        windSpeed=6.2,
-        positionValid=True,
-        networkInformation=_FakeProto(
-            type=common_pb2.NetworkTypeEnum.NETWORK_TYPE_4_G,
-            rate=42.5,
-            quality=common_pb2.NetworkStateQualityEnum.NETWORK_STATE_QUALITY_GOOD,
-        ),
-        airConditioner=_FakeProto(
-            state=common_pb2.AssetAirConditionerStateEnum.AIR_CONDITIONER_COOL,
-            switchTime=15,
-        ),
-        manualControlState=common_pb2.ManualControlStateEnum.MANUAL_CONTROL_STATE_CONNECTED,
-        positionState=_FakeProto(
-            gpsNumber=9,
-            rtkNumber=5,
-            quality=3,
-        ),
-        wirelessLink=_FakeProto(
-            fourthGenerationFreqBand=2.4,
-            fourthGenerationGndQuality=88,
-            fourthGenerationLinkState=True,
-            fourthGenerationQuality=77,
-            fourthGenerationUavQuality=66,
-            dongleNumber=2,
-            linkWorkmode="AUTO",
-            sdrFreqBand=5.8,
-            sdrLinkState=False,
-            sdrQuality=44,
-        ),
-        sdrState=_FakeProto(
-            downQuality=91,
-            upQuality=73,
-            frequencyBand=5.2,
-        ),
-    )
-    return _FakeProto(
-        _which_oneofs={"telemetry": "assetTelemetry"},
-        tid="tid-stream",
-        sn="DOCK-1",
-        timestamp=timestamp_pb2.Timestamp(),
-        hasErrors=False,
-        assetId="AST-9",
-        assetTelemetry=asset,
-    )
-
-
-def _notification_asset_status_frame() -> live_data_pb2.LiveDataNotificationResponse:
-    return live_data_pb2.LiveDataNotificationResponse(
+def _notification_asset_status_frame() -> events_pb2.NotificationResponse:
+    return events_pb2.NotificationResponse(
         tid="tid-notify",
         sn="DOCK-1",
-        hasErrors=False,
-        assetId="AST-1",
-        assetStatus=live_data_pb2.AssetStatusEvent(
-            sn="DOCK-1",
-            assetId="AST-1",
-            online=True,
-            message="online",
+        has_errors=False,
+        asset_id="AST-1",
+        event=events_pb2.NotificationEvent(
+            asset_status=events_pb2.AssetStatusEvent(
+                sn="DOCK-1",
+                asset_id="AST-1",
+                online=True,
+                message="online",
+            ),
         ),
     )
 
 
-def _notification_task_frame() -> live_data_pb2.LiveDataNotificationResponse:
-    return live_data_pb2.LiveDataNotificationResponse(
+def _notification_command_execution_frame() -> events_pb2.NotificationResponse:
+    return events_pb2.NotificationResponse(
         tid="tid-notify",
         sn="DOCK-1",
-        hasErrors=False,
-        taskEvent=live_data_pb2.TaskEvent(
-            taskId="task-1",
-            taskType=common_pb2.TaskTypeProto.TASK_TYPE_WAYPOINT,
-            status=common_pb2.TaskStatus.TASK_RUNNING,
-            progress=0.5,
-            message="running",
+        has_errors=False,
+        event=events_pb2.NotificationEvent(
+            command_execution=events_pb2.CommandExecutionEvent(
+                external_execution_id="exec-1",
+                command_id="dock.open_cover",
+                status=events_pb2.CommandExecutionStatus.COMMAND_EXECUTION_STATUS_SUCCEEDED,
+                progress=1.0,
+                message="done",
+            ),
         ),
     )
 
@@ -395,7 +328,7 @@ async def test_stream_telemetry_pumps_frames_into_callback() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_telemetry_decodes_extended_asset_fields() -> None:
-    stub = _StreamStub([_fake_extended_telemetry_frame()])
+    stub = _StreamStub([_extended_telemetry_frame()])
     client = _build_client(stub)
 
     received: list[Any] = []
@@ -474,7 +407,7 @@ async def test_stream_telemetry_decodes_extended_asset_fields() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_notifications_pumps_frames_into_callback() -> None:
-    stub = _StreamStub([_notification_asset_status_frame(), _notification_task_frame()])
+    stub = _StreamStub([_notification_asset_status_frame(), _notification_command_execution_frame()])
     client = _build_client(stub)
 
     received: list[Any] = []
@@ -485,7 +418,7 @@ async def test_stream_notifications_pumps_frames_into_callback() -> None:
     handle = client.stream_notifications(
         StreamNotificationRequest(
             sn="DOCK-1",
-            event_types=[NotificationEventType.ASSET_STATUS, NotificationEventType.TASK],
+            event_types=[NotificationEventType.ASSET_STATUS, NotificationEventType.COMMAND_EXECUTION],
         ),
         on_data,
     )
@@ -497,11 +430,15 @@ async def test_stream_notifications_pumps_frames_into_callback() -> None:
     assert received[0].event_type == "NOTIFICATION_EVENT_ASSET_STATUS"
     assert received[0].asset_status is not None
     assert received[0].asset_status.online is True
-    assert received[1].event_type == "NOTIFICATION_EVENT_TASK"
-    assert received[1].task_event is not None
-    assert received[1].task_event.status == "TASK_RUNNING"
+    assert received[1].event_type == "NOTIFICATION_EVENT_COMMAND_EXECUTION"
+    assert received[1].command_execution_event is not None
+    assert received[1].command_execution_event.status == "COMMAND_EXECUTION_STATUS_SUCCEEDED"
+    assert received[1].command_execution_event.command_id == "dock.open_cover"
     sent_request = stub.last_request
-    assert sent_request.eventTypes == [NotificationEventType.ASSET_STATUS, NotificationEventType.TASK]
+    assert sent_request.event_types == [
+        NotificationEventType.ASSET_STATUS,
+        NotificationEventType.COMMAND_EXECUTION,
+    ]
     assert handle.is_stopped is True
 
 

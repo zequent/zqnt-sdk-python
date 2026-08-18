@@ -234,6 +234,7 @@ class AssetTelemetry:
 class SubAssetTelemetry:
     id: str
     timestamp: datetime | None = None
+    sn: str | None = None
     latitude: float | None = None
     longitude: float | None = None
     absolute_altitude: float | None = None
@@ -288,21 +289,28 @@ class NotificationAssetStatus:
 
 
 @dataclass(slots=True)
-class NotificationTaskEvent:
-    task_id: str
-    task_type: str | None = None
-    status: str | None = None
-    progress: float | None = None
-    message: str | None = None
-    external_task_type: str | None = None
-
-
-@dataclass(slots=True)
 class NotificationOperationEvent:
+    """Backed by ``MissionEvent`` (the ``mission`` branch of ``NotificationEvent``)."""
+
     operation_id: str
     mission_type: str | None = None
     status: str | None = None
     message: str | None = None
+
+
+@dataclass(slots=True)
+class NotificationCommandExecutionEvent:
+    """Backed by ``CommandExecutionEvent`` (the ``command_execution`` branch of
+    ``NotificationEvent``) — vendor-neutral lifecycle feedback for one physical
+    command dispatched to an edge adapter. Replaces the retired task-event
+    notifications."""
+
+    external_execution_id: str
+    command_id: str | None = None
+    status: str | None = None
+    progress: float | None = None
+    message: str | None = None
+    error: ErrorInfo | None = None
 
 
 @dataclass(slots=True)
@@ -316,6 +324,6 @@ class StreamNotificationResponse:
     asset_id: str | None = None
     event_type: str | None = None
     asset_status: NotificationAssetStatus | None = None
-    task_event: NotificationTaskEvent | None = None
     operation_event: NotificationOperationEvent | None = None
+    command_execution_event: NotificationCommandExecutionEvent | None = None
     error: ErrorInfo | None = None

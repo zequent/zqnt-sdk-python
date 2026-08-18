@@ -99,7 +99,7 @@ class LiveDataClient:
         proto = await self._resilience_helper.execute(
             lambda: self._stub.StartLiveStream(start_live_stream_to_proto(request), timeout=self._timeout)
         )
-        return proto_to_live_data_response(proto)
+        return proto_to_live_data_response(proto, request.sn)
 
     async def stop_live_stream(self, request: LiveDataStopLiveStreamRequest) -> LiveDataResponse:
         validate_sn(request.sn)
@@ -109,7 +109,7 @@ class LiveDataClient:
         proto = await self._resilience_helper.execute(
             lambda: self._stub.StopLiveStream(stop_live_stream_to_proto(request), timeout=self._timeout)
         )
-        return proto_to_live_data_response(proto)
+        return proto_to_live_data_response(proto, request.sn)
 
     async def change_lens(self, request: ChangeLensRequest) -> LiveDataResponse:
         validate_sn(request.sn)
@@ -119,7 +119,7 @@ class LiveDataClient:
         proto = await self._resilience_helper.execute(
             lambda: self._stub.ChangeLens(change_lens_to_proto(request), timeout=self._timeout)
         )
-        return proto_to_live_data_response(proto)
+        return proto_to_live_data_response(proto, request.sn)
 
     async def change_zoom(self, request: ChangeZoomRequest) -> LiveDataResponse:
         validate_sn(request.sn)
@@ -130,7 +130,7 @@ class LiveDataClient:
         proto = await self._resilience_helper.execute(
             lambda: self._stub.ChangeZoom(change_zoom_to_proto(request), timeout=self._timeout)
         )
-        return proto_to_live_data_response(proto)
+        return proto_to_live_data_response(proto, request.sn)
 
     # ------------------------------------------------------------------
     # Server-streaming subscription

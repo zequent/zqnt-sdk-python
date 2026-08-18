@@ -50,12 +50,19 @@ class LiveDataServiceCommand(IntEnum):
 
 
 class NotificationEventType(IntEnum):
-    """Mirrors ``live-data.proto`` :proto:`NotificationEventType`."""
+    """Mirrors ``events.proto`` :proto:`NotificationEventType`.
+
+    Value 2 (``TASK``) is permanently reserved on the wire — the legacy Task/Mission
+    model retired it in favor of ``COMMAND_EXECUTION`` events; it is intentionally
+    absent here rather than kept as a dead member.
+    """
 
     UNSPECIFIED = 0
     ASSET_STATUS = 1
-    TASK = 2
-    OPERATION = 3
+    MISSION = 3
+    ASSET_RUNTIME = 4
+    CAPABILITY_EXECUTION = 5
+    COMMAND_EXECUTION = 6
 
 
 class NotificationSeverity(IntEnum):
@@ -112,9 +119,9 @@ class MissionStatus(IntEnum):
 
 
 class SchedulerType(IntEnum):
-    """Mirrors ``common.proto`` :proto:`SchedulerType`."""
+    """Mirrors ``mission-autonomy-types.proto`` :proto:`SchedulerType`."""
 
-    OPERATION = 0
+    MISSION = 0
     TASK = 1
     SYSTEM_JOBS = 2
     ORGANIZATION = 3

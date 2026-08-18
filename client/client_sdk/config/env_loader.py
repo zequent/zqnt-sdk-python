@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 
 _DEFAULT_PORTS = {
+    "connector": 8010,
     "remote-control": 8002,
     "live-data": 8003,
     "mission-autonomy": 8004,
@@ -63,6 +64,7 @@ def _resilience() -> ResilienceConfig:
 
 def load_from_env(cls: "Type[ZequentClient]") -> "ZequentClient":
     return cls(
+        connector_config=_service("CONNECTOR_SERVICE", "connector"),
         remote_control_config=_service("REMOTE_CONTROL_SERVICE", "remote-control"),
         mission_autonomy_config=_service("MISSION_AUTONOMY_SERVICE", "mission-autonomy"),
         live_data_config=_service("LIVE_DATA_SERVICE", "live-data"),

@@ -1,4 +1,4 @@
-"""MissionAutonomy sub-client (mission / task / scheduler CRUD)."""
+"""MissionAutonomy sub-client (Application / SkillExecution / Scheduler)."""
 
 from .client import MissionAutonomyClient
 
