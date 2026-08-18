@@ -65,6 +65,26 @@ async def test_start_task_returns_ok(server_port):
     assert resp.has_errors is False or resp.has_errors is None
 
 
+@pytest.mark.asyncio
+async def test_start_task_reports_external_execution_id(server_port):
+    """EdgeResponse.external_execution_id must reach meta.external_id on the wire —
+    it's what mission-autonomy correlates later cancellation/completion events by."""
+    async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
+        stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
+        resp = await stub.StartTask(common_pb2.TaskCommandRequest(base=_base(), task_id="task-42"))
+    assert resp.meta.external_id == "vendor-task-42"
+
+
+@pytest.mark.asyncio
+async def test_send_custom_command_reports_external_execution_id(server_port):
+    async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
+        stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
+        resp = await stub.SendCustomCommand(
+            common_pb2.CustomCommandRequest(base=_base(), command_id="mission.waypoint.execute")
+        )
+    assert resp.meta.external_id == "vendor-mission.waypoint.execute"
+
+
 # ---------------------------------------------------------------------------
 # Not-overridden method → UNIMPLEMENTED gRPC status
 # ---------------------------------------------------------------------------

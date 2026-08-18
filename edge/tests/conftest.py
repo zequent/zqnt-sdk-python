@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import pytest_asyncio
 
 from edge_sdk import AssetType, EdgeAdapter, EdgeResponse, EdgeServer
-from edge_sdk.models.common import Capabilities, RequestContext
+from edge_sdk.models.common import Capabilities, CustomCommandRequest, CustomCommandResponse, RequestContext
 
 # ---------------------------------------------------------------------------
 # Minimal adapter used across all tests
@@ -34,10 +34,18 @@ class _TestAdapter(EdgeAdapter):
         return self._auto_capabilities(sn, AssetType.SENSOR)
 
     async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
-        return EdgeResponse.ok(ctx.tid, ctx.sn, f"started:{task_id}")
+        return EdgeResponse.ok(ctx.tid, ctx.sn, f"started:{task_id}", external_execution_id=f"vendor-{task_id}")
 
     async def stop_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         return EdgeResponse.ok(ctx.tid, ctx.sn, f"stopped:{task_id}")
+
+    async def send_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
+        return CustomCommandResponse.ok(
+            ctx.tid,
+            ctx.sn,
+            request.command_type,
+            external_execution_id=f"vendor-{request.command_type}",
+        )
 
 
 class _CrashingAdapter(_TestAdapter):

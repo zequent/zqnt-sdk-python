@@ -850,6 +850,8 @@ def edge_response_to_proto(response: EdgeResponse, edge_pb2, timestamp_pb2, empt
         meta_kwargs["asset_id"] = response.asset_id
     if response.message:
         meta_kwargs["response_message"] = response.message
+    if response.external_execution_id:
+        meta_kwargs["external_id"] = response.external_execution_id
 
     kwargs: dict = {
         "has_errors": not response.success,
@@ -899,6 +901,8 @@ def custom_command_response_to_proto(
     }
     if response.message:
         meta_kwargs["response_message"] = response.message
+    if response.external_execution_id:
+        meta_kwargs["external_id"] = response.external_execution_id
 
     kwargs: dict = {
         "has_errors": not response.success,

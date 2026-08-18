@@ -305,6 +305,14 @@ class EdgeResponse:
     # Populated only for StartLiveStream responses
     stream_url: str | None = None
     video_id: str | None = None
+    # The id mission-autonomy should track this dispatch by for later correlation — physical
+    # cancellation (StopTask with task_id = this value, not a Connector Task id — that model is
+    # retired) and async CommandExecutionEvent completion binding both key off it. Prefer your own
+    # vendor execution id when you have one (e.g. a DJI flightId); otherwise leave unset and the
+    # platform falls back to its own internally-generated correlation id, which still works for
+    # cancellation but only if your adapter's own completion/cancel handling doesn't need to
+    # distinguish between concurrent executions on the same asset.
+    external_execution_id: str | None = None
 
     @classmethod
     def ok(
@@ -317,6 +325,7 @@ class EdgeResponse:
         stream_url: str | None = None,
         video_id: str | None = None,
         progress: CommandProgress | None = None,
+        external_execution_id: str | None = None,
     ) -> "EdgeResponse":
         return cls(
             tid=tid,
@@ -327,6 +336,7 @@ class EdgeResponse:
             stream_url=stream_url,
             video_id=video_id,
             progress=progress,
+            external_execution_id=external_execution_id,
         )
 
     @classmethod
@@ -503,6 +513,11 @@ class CustomCommandResponse:
     result: dict | None = None
     message: str | None = None
     error: ErrorMessage | None = None
+    # Same purpose as EdgeResponse.external_execution_id — set this when the command you just
+    # accepted keeps running asynchronously (e.g. a waypoint mission) so mission-autonomy can
+    # later cancel it (StopTask) and correlate CommandExecutionEvent notifications back to this
+    # execution. Leave unset for commands that are already fully done by the time you return.
+    external_execution_id: str | None = None
 
     @classmethod
     def ok(
@@ -512,8 +527,18 @@ class CustomCommandResponse:
         command_type: str,
         result: dict | None = None,
         message: str | None = None,
+        *,
+        external_execution_id: str | None = None,
     ) -> "CustomCommandResponse":
-        return cls(tid=tid, sn=sn, success=True, command_type=command_type, result=result, message=message)
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=True,
+            command_type=command_type,
+            result=result,
+            message=message,
+            external_execution_id=external_execution_id,
+        )
 
     @classmethod
     def fail(
