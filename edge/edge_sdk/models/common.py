@@ -63,6 +63,7 @@ class AssetType(IntEnum):
     JAMMER = 6
     CYBER_ATTACK = 7
     SAPIENT = 8
+    RNS = 9
 
 
 class AssetVendor(IntEnum):
@@ -73,6 +74,11 @@ class AssetVendor(IntEnum):
     RTMP_RTSP = 4
     SAPIENT = 5
     BETAFLIGHT = 6
+    RNS = 7
+    # Non-hardware bridge/integration assets (e.g. the Integration Hub platform bridge) that
+    # register themselves as an EdgeAdapterService endpoint without owning a physical vendor
+    # protocol -- matches asset.proto's ASSET_VENDOR_ZQNT exactly.
+    ZQNT = 8
 
 
 class AssetConnection(IntEnum):

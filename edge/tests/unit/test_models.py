@@ -2,7 +2,15 @@
 Unit tests for EdgeResponse factory methods and CacheKeys.
 """
 
-from edge_sdk.models.common import CustomCommandResponse, EdgeResponse, ErrorCode, ErrorMessage
+from edge_sdk.models.common import (
+    AssetType,
+    AssetVendor,
+    CustomCommandResponse,
+    EdgeResponse,
+    ErrorCode,
+    ErrorMessage,
+    proto_enum_lookup,
+)
 
 # ---------------------------------------------------------------------------
 # EdgeResponse
@@ -87,3 +95,51 @@ def test_custom_command_response_ok_sets_external_execution_id():
     )
     assert resp.result == {"task_id": "task-42"}
     assert resp.external_execution_id == "task-42"
+
+
+# ---------------------------------------------------------------------------
+# AssetType / AssetVendor parity with the real proto enums (zqnt-utils)
+#
+# This SDK carries its own plain-Python IntEnum mirrors of asset.proto's AssetTypeEnum/
+# AssetVendor rather than depending on the generated protobuf classes directly (see this module's
+# own docstring: "No protobuf types are exposed here"). That means every time a new value is added
+# proto-side it has to be added here by hand too -- and it wasn't: this SDK's AssetType/AssetVendor
+# were missing RNS (added when the RNS adapter shipped) and AssetVendor was also missing ZQNT
+# (added 2026-09-02 for the Integration Hub platform bridge) until fixed alongside this test.
+# Found live: rns-adapter's own RegistrationConfig.from_env() -- the only place that resolves
+# ASSET_TYPE/ASSET_VENDOR env vars into these enums -- would have failed (KeyError, caught and
+# logged as a skipped registration, not a crash) for exactly the values rns-adapter itself needs.
+#
+# These two tests compare against the real generated proto enums directly (not a hardcoded name
+# list) so they catch the *next* drift automatically, not just today's.
+# ---------------------------------------------------------------------------
+
+
+def test_asset_type_has_every_proto_value():
+    from zqnt_utils.generated.zqnt.common_pb2 import AssetTypeEnum
+
+    proto_names = {name.removeprefix("ASSET_TYPE_") for name in AssetTypeEnum.keys()}
+    sdk_names = {member.name for member in AssetType}
+    assert proto_names == sdk_names
+
+
+def test_asset_vendor_has_every_proto_value():
+    from zqnt_utils.generated.zqnt.common_pb2 import AssetVendor as ProtoAssetVendor
+
+    proto_names = {name.removeprefix("ASSET_VENDOR_") for name in ProtoAssetVendor.keys()}
+    sdk_names = {member.name for member in AssetVendor}
+    assert proto_names == sdk_names
+
+
+def test_proto_enum_lookup_resolves_every_asset_type():
+    from zqnt_utils.generated.zqnt.common_pb2 import AssetTypeEnum
+
+    for proto_name in AssetTypeEnum.keys():
+        proto_enum_lookup(AssetType, proto_name)  # must not raise
+
+
+def test_proto_enum_lookup_resolves_every_asset_vendor():
+    from zqnt_utils.generated.zqnt.common_pb2 import AssetVendor as ProtoAssetVendor
+
+    for proto_name in ProtoAssetVendor.keys():
+        proto_enum_lookup(AssetVendor, proto_name)  # must not raise
