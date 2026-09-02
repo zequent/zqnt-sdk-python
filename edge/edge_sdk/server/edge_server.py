@@ -81,7 +81,7 @@ class RegistrationConfig:
 
     Redis key format (matches Java CacheKeys.EDGE_ENDPOINTS)::
 
-        edge-endpoints:{VENDOR}   e.g. "edge-endpoints:DJI"
+        zqnt:edge-endpoints:{VENDOR}   e.g. "zqnt:edge-endpoints:DJI"
 
     Environment variable alternative — use :meth:`from_env` to read everything
     from environment variables (recommended for Kubernetes deployments)::
@@ -579,7 +579,7 @@ class EdgeServer:
         """
         Write (or update) the EdgeEndpointDTO in Redis via CachingService.
 
-        Uses key ``edge-endpoints:{vendor}`` — matches Java CacheKeys.EDGE_ENDPOINTS
+        Uses key ``zqnt:edge-endpoints:{vendor}`` — matches Java CacheKeys.EDGE_ENDPOINTS
         so the platform's client-side load balancer can resolve the endpoint.
         Falls back to a direct redis call if zqnt-utils is not installed.
         """
@@ -615,7 +615,7 @@ class EdgeServer:
                 )
                 return
 
-            key = f"edge-endpoints:{vendor}"
+            key = f"zqnt:edge-endpoints:{vendor}"
             dto_json = json.dumps(
                 {
                     "endpoint": cfg.endpoint,

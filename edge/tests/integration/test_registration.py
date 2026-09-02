@@ -2,7 +2,7 @@
 Integration tests for edge endpoint registration.
 
 Uses fakeredis so no real Redis instance is needed.
-Validates that the correct CacheKey format (edge-endpoints:{vendor})
+Validates that the correct CacheKey format (zqnt:edge-endpoints:{vendor})
 and JSON structure (compatible with Java EdgeEndpointDTO) are used.
 """
 
@@ -38,20 +38,20 @@ async def fake_cache():
 def test_edge_endpoints_key_format():
     from zqnt_utils.caching import CacheKeys
 
-    assert CacheKeys.EDGE_ENDPOINTS.build(vendor="DJI") == "edge-endpoints:DJI"
-    assert CacheKeys.EDGE_ENDPOINTS.build(vendor="ROS") == "edge-endpoints:ROS"
+    assert CacheKeys.EDGE_ENDPOINTS.build(vendor="DJI") == "zqnt:edge-endpoints:DJI"
+    assert CacheKeys.EDGE_ENDPOINTS.build(vendor="ROS") == "zqnt:edge-endpoints:ROS"
 
 
 def test_edge_vendor_key_format():
     from zqnt_utils.caching import CacheKeys
 
-    assert CacheKeys.EDGE_VENDOR.build(sn="SENSOR-001") == "edge-vendor:SENSOR-001"
+    assert CacheKeys.EDGE_VENDOR.build(sn="SENSOR-001") == "zqnt:edge-vendor:SENSOR-001"
 
 
 def test_asset_dto_key_format():
     from zqnt_utils.caching import CacheKeys
 
-    assert CacheKeys.ASSET_DTO.build(sn="DOCK-007") == "asset-dto:DOCK-007"
+    assert CacheKeys.ASSET_DTO.build(sn="DOCK-007") == "zqnt:asset-dto:DOCK-007"
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ async def test_register_endpoint_writes_correct_key(fake_cache):
     dto = EdgeEndpointDTO("grpc://sensor:50051", True, "SENSOR", "ROS")
     await fake_cache.register_edge_endpoint("ROS", dto)
 
-    raw = await fake_cache._client.get("edge-endpoints:ROS")
+    raw = await fake_cache._client.get("zqnt:edge-endpoints:ROS")
     assert raw is not None
     parsed = json.loads(raw)
     assert parsed["online"] is True
