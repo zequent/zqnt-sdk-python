@@ -1,10 +1,11 @@
 """
 MissionAutonomyClient – thin wrapper around the MissionAutonomyService gRPC stub.
 
-Mirrors :java:`com.zqnt.sdk.edge.missionautonomy.application.MissionAutonomyService` — the
-edge-side surface is deliberately tiny. Mission/Task CRUD was retired from MissionAutonomyService
-in favor of the capability-execution model (Application/SkillExecution); the underlying gRPC
-methods no longer exist, so only Scheduler lookup remains here, matching the Java interface::
+This branch tracks the 1.3.0 wire contract, where MissionAutonomyService's edge-facing surface
+is just Scheduler lookup (Mission/Task CRUD, retired on main/2.0.0 in favor of the
+capability-execution model, still exist as real RPCs on ConnectorService at 1.3.0 -- see
+:class:`~edge_sdk.client.connector_client.ConnectorClient`'s get_mission/get_task methods for
+those, unchanged from main's tiny-surface precedent for *this* service specifically::
 
     client = MissionAutonomyClient(host="platform.example.com", port=50054)
     await client.connect()
@@ -155,23 +156,13 @@ def _proto_to_scheduler(s) -> SchedulerDTO:
     from ..models.common import SchedulerType
     from ..server._converters import _opt_field  # reuse the shared optional-field helper
 
-    execution_parameters = None
-    if s.HasField("execution_parameters"):
-        from google.protobuf import json_format
-
-        execution_parameters = json_format.MessageToDict(s.execution_parameters)
-
     return SchedulerDTO(
         id=_opt_field(s, "id"),
         name=s.name,
         cron_expression=s.cron_expression,
         type=SchedulerType(s.type),
+        mission_id=_opt_field(s, "mission_id"),
+        task_id=_opt_field(s, "task_id"),
         active=_opt_field(s, "active"),
         client_time_zone=_opt_field(s, "client_time_zone"),
-        asset_sn=_opt_field(s, "asset_sn"),
-        command_id=_opt_field(s, "command_id"),
-        application_id=_opt_field(s, "application_id"),
-        skill_id=_opt_field(s, "skill_id"),
-        execution_parameters=execution_parameters,
-        auto_start=_opt_field(s, "auto_start"),
     )

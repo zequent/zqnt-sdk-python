@@ -1,14 +1,15 @@
 """
-Plain-Python notification models mirroring ``events.proto`` ``NotificationEvent`` variants.
+Plain-Python notification models mirroring ``events.proto`` ``NotificationEvent`` variants,
+as they exist at the 1.3.0 wire contract.
 
-``TaskEvent`` is gone — ``NotificationEvent.task`` (field 2) is permanently reserved on the wire,
-retired in favor of :class:`CommandExecutionEvent` (vendor-neutral command lifecycle feedback).
-``OperationEvent`` is renamed :class:`MissionEvent` to match the proto's own ``mission`` branch.
+This branch keeps :class:`TaskEvent` (retired on main/2.0.0 in favor of the vendor-neutral
+``CommandExecutionEvent``, which doesn't exist in events.proto until after the 1.3.0 tag) --
+see zqnt-protos' README "Versioning" section.
 """
 
 from dataclasses import dataclass
 
-from .common import CommandExecutionStatus, MissionStatus, MissionType
+from .common import MissionStatus, MissionType, TaskStatus, TaskType
 
 
 @dataclass
@@ -22,6 +23,19 @@ class AssetStatusEvent:
 
 
 @dataclass
+class TaskEvent:
+    """Task lifecycle event."""
+
+    task_id: str
+    task_type: TaskType
+    status: TaskStatus
+    sn: str = ""  # asset serial number – required for multi-asset adapters
+    progress: float | None = None
+    message: str | None = None
+    external_task_type: str | None = None
+
+
+@dataclass
 class MissionEvent:
     """Mission lifecycle event."""
 
@@ -29,16 +43,4 @@ class MissionEvent:
     mission_type: MissionType
     status: MissionStatus
     sn: str = ""  # asset serial number – required for multi-asset adapters
-    message: str | None = None
-
-
-@dataclass
-class CommandExecutionEvent:
-    """Vendor-neutral lifecycle feedback for one physical command dispatched to an edge adapter."""
-
-    external_execution_id: str
-    status: CommandExecutionStatus
-    sn: str = ""  # asset serial number – required for multi-asset adapters
-    command_id: str | None = None
-    progress: float | None = None  # 0.0 – 1.0, present when RUNNING
     message: str | None = None

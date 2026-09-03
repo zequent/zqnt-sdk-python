@@ -75,10 +75,9 @@ class AssetVendor(IntEnum):
     SAPIENT = 5
     BETAFLIGHT = 6
     RNS = 7
-    # Non-hardware bridge/integration assets (e.g. the Integration Hub platform bridge) that
-    # register themselves as an EdgeAdapterService endpoint without owning a physical vendor
-    # protocol -- matches asset.proto's ASSET_VENDOR_ZQNT exactly.
-    ZQNT = 8
+    # No ZQNT member on this branch -- ASSET_VENDOR_ZQNT was added to asset.proto after the 1.3.0
+    # tag (see zqnt-protos' README Versioning section); this branch tracks 1.3.0 exactly, so this
+    # enum mirrors the 1.3.0 proto's AssetVendor one-to-one, not main's.
 
 
 class AssetConnection(IntEnum):
@@ -203,17 +202,9 @@ class SchedulerType(IntEnum):
     CONNECTORS = 5
 
 
-class CommandExecutionStatus(IntEnum):
-    """Mirrors ``events.proto`` :proto:`CommandExecutionStatus` — vendor-neutral lifecycle
-    feedback for one physical command dispatched to an edge adapter. Replaces the retired
-    task-event notification model."""
-
-    UNSPECIFIED = 0
-    ACCEPTED = 1
-    RUNNING = 2
-    SUCCEEDED = 3
-    FAILED = 4
-    CANCELLED = 5
+# No CommandExecutionStatus on this branch -- events.proto's CommandExecutionEvent/
+# CommandExecutionStatus don't exist at the 1.3.0 contract (added later, replacing the
+# TaskEvent-based model TaskStatus above still serves here). See models/notification.py.
 
 
 class ErrorCode(IntEnum):

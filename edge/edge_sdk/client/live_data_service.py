@@ -22,7 +22,7 @@ hiccup doesn't interrupt telemetry) — this only unifies lifecycle and gives PO
 
 import logging
 
-from ..models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
+from ..models.notification import AssetStatusEvent, MissionEvent, TaskEvent
 from ..models.telemetry import AssetTelemetry, SubAssetTelemetry
 from .detection_publisher import DetectionPublisher
 from .notification_publisher import NotificationPublisher
@@ -101,12 +101,12 @@ class LiveDataService:
     # Notification
     # ------------------------------------------------------------------
 
-    async def produce_notification(self, event: AssetStatusEvent | MissionEvent | CommandExecutionEvent) -> None:
+    async def produce_notification(self, event: AssetStatusEvent | MissionEvent | TaskEvent) -> None:
         if isinstance(event, AssetStatusEvent):
             await self.notification.publish_asset_status(event)
         elif isinstance(event, MissionEvent):
             await self.notification.publish_mission_event(event)
-        elif isinstance(event, CommandExecutionEvent):
-            await self.notification.publish_command_execution_event(event)
+        elif isinstance(event, TaskEvent):
+            await self.notification.publish_task_event(event)
         else:
             raise TypeError(f"Unknown notification event type: {type(event).__name__}")

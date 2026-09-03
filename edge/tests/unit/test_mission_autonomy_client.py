@@ -1,4 +1,10 @@
-"""Unit tests for ``MissionAutonomyClient`` (edge-side — Scheduler lookup only)."""
+"""Unit tests for ``MissionAutonomyClient`` (edge-side — Scheduler lookup only).
+
+This branch tracks the 1.3.0 SchedulerProtoDTO shape (mission_id/task_id) -- main/2.0.0
+replaced it with a mission-free scheduler target (asset_sn/command_id/application_id/skill_id)
+as part of the Missions/Tasks -> Skills/Applications refactor; see this file's own main-branch
+counterpart and models/scheduler.py's docstring.
+"""
 
 from __future__ import annotations
 
@@ -45,8 +51,9 @@ async def test_get_scheduler_found() -> None:
         id="s1",
         name="daily",
         cron_expression="0 0 * * *",
-        asset_sn="DOCK-1",
-        command_id="dock.open_cover",
+        mission_id="m1",
+        task_id="t1",
+        type=1,  # SchedulerType.TASK
     )
     stub = _FakeStub(mac.SchedulerResponse(has_errors=False, scheduler=scheduler))
     client = _client(stub)
@@ -55,8 +62,9 @@ async def test_get_scheduler_found() -> None:
 
     assert result is not None
     assert result.id == "s1"
-    assert result.command_id == "dock.open_cover"
-    assert result.type == SchedulerType.MISSION
+    assert result.mission_id == "m1"
+    assert result.task_id == "t1"
+    assert result.type == SchedulerType.TASK
     sent = stub.calls["GetScheduler"]
     assert sent.scheduler_id == "s1"
     assert sent.base.sn == "DOCK-1"

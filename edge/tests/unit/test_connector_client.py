@@ -196,7 +196,88 @@ async def test_watch_assets_yields_snapshots() -> None:
     assert snapshots[0][0].sn == "DOCK-1"
 
 
-def test_connector_client_has_no_legacy_mission_task_methods() -> None:
-    assert not hasattr(ConnectorClient, "get_mission")
-    assert not hasattr(ConnectorClient, "get_task")
-    assert not hasattr(ConnectorClient, "get_task_by_flight_id")
+def test_connector_client_has_mission_task_methods() -> None:
+    """This branch tracks the 1.3.0 contract, where GetMission/GetTask/GetTaskByFlightId are
+    still real ConnectorService RPCs (retired on main/2.0.0 in favor of the capability-execution
+    model -- see this file's own main-branch counterpart)."""
+    assert hasattr(ConnectorClient, "get_mission")
+    assert hasattr(ConnectorClient, "get_task")
+    assert hasattr(ConnectorClient, "get_task_by_flight_id")
+
+
+# ---------------------------------------------------------------------------
+# Mission / Task — real RPC wrapper coverage (MissionProtoDTO/TaskProtoDTO themselves are
+# unchanged between 1.3.0 and main -- see server/_converters.py's proto_to_mission/proto_to_task,
+# already covered elsewhere; these tests are about get_mission/get_task/get_task_by_flight_id's
+# own request/response wiring, the part that's actually different at 1.3.0).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_mission_found() -> None:
+    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2, mission_autonomy_dto_pb2
+
+    mission = mission_autonomy_dto_pb2.MissionProtoDTO(id="m1", name="Perimeter sweep")
+    stub = _FakeStub({"GetMission": mission_autonomy_contracts_pb2.MissionResponse(mission=mission)})
+    client = _client(stub)
+
+    result = await client.get_mission("m1", sn="DOCK-1")
+
+    assert result is not None
+    assert result.id == "m1"
+    assert result.name == "Perimeter sweep"
+    sent = stub.calls["GetMission"]
+    assert sent.mission_id == "m1"
+    assert sent.base.sn == "DOCK-1"
+
+
+@pytest.mark.asyncio
+async def test_get_mission_not_found() -> None:
+    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
+
+    stub = _FakeStub({"GetMission": mission_autonomy_contracts_pb2.MissionResponse(has_errors=True)})
+    client = _client(stub)
+    assert await client.get_mission("missing") is None
+
+
+@pytest.mark.asyncio
+async def test_get_task_found() -> None:
+    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2, mission_autonomy_dto_pb2
+
+    task = mission_autonomy_dto_pb2.TaskProtoDTO(id="t1", name="Waypoint run", asset_id="a1")
+    stub = _FakeStub({"GetTask": mission_autonomy_contracts_pb2.TaskResponse(task=task)})
+    client = _client(stub)
+
+    result = await client.get_task("t1", sn="DOCK-1")
+
+    assert result is not None
+    assert result.id == "t1"
+    assert result.name == "Waypoint run"
+    sent = stub.calls["GetTask"]
+    assert sent.task_id == "t1"
+    assert sent.base.sn == "DOCK-1"
+
+
+@pytest.mark.asyncio
+async def test_get_task_by_flight_id_found() -> None:
+    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2, mission_autonomy_dto_pb2
+
+    task = mission_autonomy_dto_pb2.TaskProtoDTO(id="t1", external_task_id="flight-42")
+    stub = _FakeStub({"GetTaskByFlightId": mission_autonomy_contracts_pb2.TaskResponse(task=task)})
+    client = _client(stub)
+
+    result = await client.get_task_by_flight_id("flight-42", sn="DOCK-1")
+
+    assert result is not None
+    assert result.id == "t1"
+    sent = stub.calls["GetTaskByFlightId"]
+    assert sent.flight_id == "flight-42"
+
+
+@pytest.mark.asyncio
+async def test_get_task_by_flight_id_not_found() -> None:
+    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
+
+    stub = _FakeStub({"GetTaskByFlightId": mission_autonomy_contracts_pb2.TaskResponse(has_errors=True)})
+    client = _client(stub)
+    assert await client.get_task_by_flight_id("missing") is None

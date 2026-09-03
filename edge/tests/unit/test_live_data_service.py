@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from edge_sdk.client.live_data_service import LiveDataService
-from edge_sdk.models.common import CommandExecutionStatus, MissionStatus, MissionType
-from edge_sdk.models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
+from edge_sdk.models.common import MissionStatus, MissionType, TaskStatus, TaskType
+from edge_sdk.models.notification import AssetStatusEvent, MissionEvent, TaskEvent
 from edge_sdk.models.telemetry import AssetTelemetry, SubAssetTelemetry
 
 
@@ -25,7 +25,7 @@ def _service() -> LiveDataService:
     svc.notification.close = AsyncMock()
     svc.notification.publish_asset_status = AsyncMock()
     svc.notification.publish_mission_event = AsyncMock()
-    svc.notification.publish_command_execution_event = AsyncMock()
+    svc.notification.publish_task_event = AsyncMock()
     return svc
 
 
@@ -80,9 +80,9 @@ async def test_produce_notification_dispatches_by_type() -> None:
     await svc.produce_notification(mission)
     svc.notification.publish_mission_event.assert_awaited_once_with(mission)
 
-    cmd = CommandExecutionEvent(external_execution_id="exec-1", status=CommandExecutionStatus.SUCCEEDED)
-    await svc.produce_notification(cmd)
-    svc.notification.publish_command_execution_event.assert_awaited_once_with(cmd)
+    task = TaskEvent(task_id="t1", task_type=TaskType.WAYPOINT, status=TaskStatus.RUNNING)
+    await svc.produce_notification(task)
+    svc.notification.publish_task_event.assert_awaited_once_with(task)
 
 
 @pytest.mark.asyncio
