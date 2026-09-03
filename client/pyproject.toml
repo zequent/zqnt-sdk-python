@@ -48,12 +48,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["client_sdk"]
 [tool.uv.sources]
-# 2.0.0 isn't cut as a real zqnt-utils-python release yet, so this floats on its `main` branch
-# (whatever is currently pushed there) rather than a tag that doesn't exist -- matches this
-# repo's own main being the floating "2.0.0-track" counterpart to feature/v1.3.0-proto (see
-# zqnt-protos' README "Versioning" section). A bare local editable path here would also just
-# break for any external consumer entirely (found the same bug on edge-python-sdk's main while
-# pointing mavlink-adapter at it as a real git dependency -- the relative path doesn't resolve
-# outside this specific monorepo checkout layout).
-zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
+# Local editable path is the preferred default for day-to-day monorepo development (offline-
+# friendly, picks up sibling edits immediately, no push-then-pull round trip). Swap to the git
+# line below only when you actually need standalone/external resolution -- verifying this repo
+# installs correctly outside the monorepo, CI that doesn't check out the whole monorepo, etc.
+# 2.0.0 isn't cut as a real zqnt-utils-python release yet, so that alternative floats on its
+# `main` branch rather than a tag that doesn't exist.
+#zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
+zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
 
