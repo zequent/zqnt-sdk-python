@@ -45,5 +45,9 @@ build-backend = "hatchling.build"
 packages = ["edge_sdk"]
 
 [tool.uv.sources]
-#zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", rev = "v2.0.0" }
-zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
+# 2.0.0 isn't cut as a real zqnt-utils-python release yet, so this floats on its `main` branch
+# (whatever is currently pushed there) rather than a tag that doesn't exist -- matches this
+# repo's own main being the floating "2.0.0-track" counterpart to feature/v1.3.0-proto (see
+# zqnt-protos' README "Versioning" section). Re-run `uv lock -P zqnt-utils` to pick up a newer
+# main once one lands, or repoint this at a real tag once zqnt-utils-python cuts one.
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
