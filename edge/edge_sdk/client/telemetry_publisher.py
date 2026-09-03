@@ -234,25 +234,48 @@ class TelemetryPublisher:
 
     def _build_asset_request(self, t: AssetTelemetry):
         from google.protobuf import timestamp_pb2
-        from zqnt_utils.generated.zqnt import live_data_pb2
+
+        # Telemetry/AssetTelemetryDetails/ProduceTelemetryRequest all live in
+        # live_data_types_pb2 (generated from live-data-types.proto) -- live_data_pb2 (generated
+        # from live-data.proto) holds only the LiveDataService RPC stub, no message classes of its
+        # own. Using the wrong module here was the actual root cause of the original
+        # AttributeError, and would have kept failing (just with a different missing-attribute
+        # error) even after fixing the message names alone.
+        from zqnt_utils.generated.zqnt import live_data_types_pb2 as live_data_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
 
-        kwargs: dict = {"id": t.id, "timestamp": ts}
+        # Telemetry (the envelope wrapped by ProduceTelemetryRequest.data) carries id/timestamp
+        # and the position/motion fields shared by asset and sub-asset telemetry alike;
+        # AssetTelemetryDetails (Telemetry's `asset` oneof member, built below as `kwargs`) carries
+        # everything asset-specific. Splitting these was the actual bug here -- they used to be
+        # merged into one flat dict and handed to a message called `AssetTelemetry`, which hasn't
+        # existed since live-data-types.proto was regenerated from the canonical monorepo source;
+        # the real message is `AssetTelemetryDetails`, nested inside `Telemetry.asset`, not a
+        # dedicated field on ProduceTelemetryRequest.
+        envelope_kwargs: dict = {"id": t.id, "timestamp": ts}
         _set_optional(
-            kwargs,
+            envelope_kwargs,
             t,
             {
                 "latitude": "latitude",
                 "longitude": "longitude",
                 "absolute_altitude": "absolute_altitude",
                 "relative_altitude": "relative_altitude",
+                "heading": "heading",
+                "wind_speed": "wind_speed",
+            },
+        )
+
+        kwargs: dict = {}
+        _set_optional(
+            kwargs,
+            t,
+            {
                 "environment_temp": "environment_temp",
                 "inside_temp": "inside_temp",
                 "humidity": "humidity",
-                "heading": "heading",
-                "wind_speed": "wind_speed",
                 "working_voltage": "working_voltage",
                 "working_current": "working_current",
                 "supply_voltage": "supply_voltage",
@@ -288,7 +311,9 @@ class TelemetryPublisher:
                 sub_kwargs["paired"] = i.paired
             if i.online is not None:
                 sub_kwargs["online"] = i.online
-            kwargs["sub_asset_information"] = live_data_pb2.AssetTelemetry.AssetSubAssetInformation(**sub_kwargs)
+            kwargs["sub_asset_information"] = live_data_pb2.AssetTelemetryDetails.AssetSubAssetInformation(
+                **sub_kwargs
+            )
         if t.network_info is not None:
             n = t.network_info
             net_kwargs: dict = {}
@@ -298,7 +323,7 @@ class TelemetryPublisher:
                 net_kwargs["rate"] = n.rate
             if n.quality is not None:
                 net_kwargs["quality"] = int(n.quality)
-            kwargs["network_information"] = live_data_pb2.AssetTelemetry.AssetNetworkInformation(**net_kwargs)
+            kwargs["network_information"] = live_data_pb2.AssetTelemetryDetails.AssetNetworkInformation(**net_kwargs)
         if t.air_conditioner is not None:
             a = t.air_conditioner
             ac_kwargs: dict = {}
@@ -306,7 +331,7 @@ class TelemetryPublisher:
                 ac_kwargs["state"] = int(a.state)
             if a.switch_time is not None:
                 ac_kwargs["switch_time"] = a.switch_time
-            kwargs["air_conditioner"] = live_data_pb2.AssetTelemetry.AssetAirConditioner(**ac_kwargs)
+            kwargs["air_conditioner"] = live_data_pb2.AssetTelemetryDetails.AssetAirConditioner(**ac_kwargs)
         if t.position_state is not None:
             p = t.position_state
             ps_kwargs: dict = {}
@@ -316,35 +341,46 @@ class TelemetryPublisher:
                 ps_kwargs["rtk_number"] = p.rtk_number
             if p.quality is not None:
                 ps_kwargs["quality"] = p.quality
-            kwargs["position_state"] = live_data_pb2.AssetTelemetry.PositionState(**ps_kwargs)
+            kwargs["position_state"] = live_data_pb2.AssetTelemetryDetails.PositionState(**ps_kwargs)
 
+        envelope_kwargs["asset"] = live_data_pb2.AssetTelemetryDetails(**kwargs)
         return live_data_pb2.ProduceTelemetryRequest(
             base=self._base(sn=t.id),
-            type=0,  # ASSET_TELEMETRY
-            asset_telemetry=live_data_pb2.AssetTelemetry(**kwargs),
+            data=live_data_pb2.Telemetry(**envelope_kwargs),
         )
 
     def _build_subasset_request(self, t: SubAssetTelemetry):
         from google.protobuf import timestamp_pb2
-        from zqnt_utils.generated.zqnt import live_data_pb2
+
+        # See _build_asset_request's comment -- same module correction applies here.
+        from zqnt_utils.generated.zqnt import live_data_types_pb2 as live_data_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
 
-        kwargs: dict = {"id": t.id, "timestamp": ts}
+        # Same envelope/details split as _build_asset_request -- see its comment.
+        envelope_kwargs: dict = {"id": t.id, "timestamp": ts}
         _set_optional(
-            kwargs,
+            envelope_kwargs,
             t,
             {
                 "latitude": "latitude",
                 "longitude": "longitude",
                 "absolute_altitude": "absolute_altitude",
                 "relative_altitude": "relative_altitude",
+                "wind_speed": "wind_speed",
+                "heading": "heading",
+            },
+        )
+
+        kwargs: dict = {}
+        _set_optional(
+            kwargs,
+            t,
+            {
                 "horizontal_speed": "horizontal_speed",
                 "vertical_speed": "vertical_speed",
-                "wind_speed": "wind_speed",
                 "wind_direction": "wind_direction",
-                "heading": "heading",
                 "gear": "gear",
                 "height_limit": "height_limit",
                 "home_distance": "home_distance",
@@ -359,12 +395,16 @@ class TelemetryPublisher:
             b = t.battery
             bat_kwargs: dict = {}
             if b.percentage is not None:
-                bat_kwargs["percentage"] = b.percentage
+                # SubAssetBatteryInformation.percentage is `optional string` in the wire contract
+                # (not a number) -- a bare float here raises a protobuf TypeError.
+                bat_kwargs["percentage"] = str(b.percentage)
             if b.remaining_time is not None:
                 bat_kwargs["remaining_time"] = b.remaining_time
             if b.return_to_home_power is not None:
                 bat_kwargs["return_to_home_power"] = b.return_to_home_power
-            kwargs["battery_information"] = live_data_pb2.SubAssetTelemetry.SubAssetBatteryInformation(**bat_kwargs)
+            kwargs["battery_information"] = live_data_pb2.SubAssetTelemetryDetails.SubAssetBatteryInformation(
+                **bat_kwargs
+            )
         if t.payload is not None:
             p = t.payload
             pay_kwargs: dict = {"id": p.id, "name": p.name}
@@ -405,10 +445,10 @@ class TelemetryPublisher:
                 )
             kwargs["payload_telemetry"] = live_data_pb2.PayloadTelemetry(**pay_kwargs)
 
+        envelope_kwargs["sub_asset"] = live_data_pb2.SubAssetTelemetryDetails(**kwargs)
         return live_data_pb2.ProduceTelemetryRequest(
             base=self._base(sn=t.id),
-            type=1,  # SUBASSET_TELEMETRY
-            sub_asset_telemetry=live_data_pb2.SubAssetTelemetry(**kwargs),
+            data=live_data_pb2.Telemetry(**envelope_kwargs),
         )
 
 

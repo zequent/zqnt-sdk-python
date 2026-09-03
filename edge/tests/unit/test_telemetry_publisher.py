@@ -11,7 +11,16 @@ from unittest.mock import patch
 import pytest
 
 from edge_sdk.client.telemetry_publisher import _SENTINEL, TelemetryPublisher
-from edge_sdk.models.telemetry import AssetTelemetry, SubAssetTelemetry
+from edge_sdk.models.telemetry import (
+    AssetAirConditioner,
+    AssetNetworkInfo,
+    AssetPositionState,
+    AssetSubAssetInfo,
+    AssetTelemetry,
+    PayloadTelemetry,
+    SubAssetBatteryInfo,
+    SubAssetTelemetry,
+)
 
 
 class _FakePublisher(TelemetryPublisher):
@@ -178,3 +187,76 @@ async def test_stream_generator_restores_sentinel_to_queue():
     # Sentinel must have been restored
     item = pub._queue.get_nowait()
     assert item is _SENTINEL
+
+
+# ---------------------------------------------------------------------------
+# Real proto construction -- every other test in this file mocks
+# _build_asset_request/_build_subasset_request out entirely, which is exactly how a wrong
+# message/module reference in them (AssetTelemetry vs. AssetTelemetryDetails, live_data_pb2 vs.
+# live_data_types_pb2 -- both real bugs, only ever caught live against a running platform, never
+# by this suite) went unnoticed. These call the real builders and inspect the resulting proto.
+# ---------------------------------------------------------------------------
+
+
+def test_build_asset_request_flat_fields():
+    pub = TelemetryPublisher(host="localhost", sn="TEST-001")
+    req = pub._build_asset_request(
+        AssetTelemetry(id="DOCK001", latitude=47.5, longitude=9.7, environment_temp=21.5)
+    )
+    assert req.base.sn == "DOCK001"
+    # latitude/longitude live on the Telemetry envelope, not on AssetTelemetryDetails.
+    assert req.data.id == "DOCK001"
+    assert req.data.latitude == pytest.approx(47.5)
+    assert req.data.longitude == pytest.approx(9.7)
+    assert req.data.HasField("asset")
+    assert req.data.asset.environment_temp == pytest.approx(21.5)
+
+
+def test_build_asset_request_nested_fields():
+    pub = TelemetryPublisher(host="localhost", sn="TEST-001")
+    req = pub._build_asset_request(
+        AssetTelemetry(
+            id="DOCK001",
+            sub_asset_info=AssetSubAssetInfo(sn="DRONE001", model="M30", paired=True, online=True),
+            network_info=AssetNetworkInfo(rate=12.5),
+            air_conditioner=AssetAirConditioner(switch_time=30),
+            position_state=AssetPositionState(gps_number=9, rtk_number=2, quality=1),
+        )
+    )
+    details = req.data.asset
+    assert details.sub_asset_information.sn == "DRONE001"
+    assert details.sub_asset_information.paired is True
+    assert details.network_information.rate == pytest.approx(12.5)
+    assert details.air_conditioner.switch_time == 30
+    assert details.position_state.gps_number == 9
+
+
+def test_build_subasset_request_flat_and_battery():
+    pub = TelemetryPublisher(host="localhost", sn="TEST-001")
+    req = pub._build_subasset_request(
+        SubAssetTelemetry(
+            id="DRONE001",
+            latitude=47.5,
+            horizontal_speed=5.0,
+            battery=SubAssetBatteryInfo(percentage=88.5, remaining_time=1200),
+        )
+    )
+    assert req.base.sn == "DRONE001"
+    assert req.data.id == "DRONE001"
+    assert req.data.latitude == pytest.approx(47.5)
+    assert req.data.HasField("sub_asset")
+    details = req.data.sub_asset
+    assert details.horizontal_speed == pytest.approx(5.0)
+    # SubAssetBatteryInformation.percentage is a proto `string`, not a number.
+    assert details.battery_information.percentage == "88.5"
+    assert details.battery_information.remaining_time == 1200
+
+
+def test_build_subasset_request_payload():
+    pub = TelemetryPublisher(host="localhost", sn="TEST-001")
+    req = pub._build_subasset_request(
+        SubAssetTelemetry(id="DRONE001", payload=PayloadTelemetry(id="CAM1", name="Zenmuse H20"))
+    )
+    payload = req.data.sub_asset.payload_telemetry
+    assert payload.id == "CAM1"
+    assert payload.name == "Zenmuse H20"
