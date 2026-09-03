@@ -299,18 +299,18 @@ class NotificationOperationEvent:
 
 
 @dataclass(slots=True)
-class NotificationCommandExecutionEvent:
-    """Backed by ``CommandExecutionEvent`` (the ``command_execution`` branch of
-    ``NotificationEvent``) — vendor-neutral lifecycle feedback for one physical
-    command dispatched to an edge adapter. Replaces the retired task-event
-    notifications."""
+class NotificationTaskEvent:
+    """Backed by ``TaskEvent`` (the ``task`` branch of ``NotificationEvent``) at the 1.3.0 wire
+    contract this branch tracks. Main/2.0.0 retires this in favor of the vendor-neutral
+    ``CommandExecutionEvent`` (``NotificationCommandExecutionEvent`` there), which doesn't exist
+    in events.proto at 1.3.0. See zqnt-protos' README "Versioning" section."""
 
-    external_execution_id: str
-    command_id: str | None = None
+    task_id: str
+    task_type: str | None = None
     status: str | None = None
     progress: float | None = None
     message: str | None = None
-    error: ErrorInfo | None = None
+    external_task_type: str | None = None
 
 
 @dataclass(slots=True)
@@ -325,5 +325,5 @@ class StreamNotificationResponse:
     event_type: str | None = None
     asset_status: NotificationAssetStatus | None = None
     operation_event: NotificationOperationEvent | None = None
-    command_execution_event: NotificationCommandExecutionEvent | None = None
+    task_event: NotificationTaskEvent | None = None
     error: ErrorInfo | None = None
