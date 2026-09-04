@@ -311,9 +311,7 @@ class TelemetryPublisher:
                 sub_kwargs["paired"] = i.paired
             if i.online is not None:
                 sub_kwargs["online"] = i.online
-            kwargs["sub_asset_information"] = live_data_pb2.AssetTelemetryDetails.AssetSubAssetInformation(
-                **sub_kwargs
-            )
+            kwargs["sub_asset_information"] = live_data_pb2.AssetTelemetryDetails.AssetSubAssetInformation(**sub_kwargs)
         if t.network_info is not None:
             n = t.network_info
             net_kwargs: dict = {}
