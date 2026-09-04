@@ -51,11 +51,12 @@ packages = ["edge_sdk"]
 # project's [tool.uv.sources] override reach into a git-fetched dependency's own nested source
 # declaration, confirmed by trying it and watching it fail.
 #
-# zqnt-utils-python's real v2.0.0 tag exists but is stale (3 commits behind its own main --
-# missing the CacheKeys zqnt: prefix fix and the AssetVendor.ZQNT regen, both real shipped
-# bugfixes) -- pinning to it would silently reintroduce both. Floating on main instead until a
-# fresh tag is cut; re-pin to a real tag once one exists.
-zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
+# zqnt-utils-python's own main is now the 1.3.0 line (matching the Java repos' convention: main
+# == their v1.3.0 tag) -- its 2.0.0-track content (AssetVendor.ZQNT, Theatre/Event Trigger, the
+# CommandExecutionEvent notification shape this repo's own code actually needs) lives on
+# refactoring/refactoring-ecosystem-v2 instead. zqnt-utils-python's real v2.0.0 tag is also stale
+# regardless (predates that branch). Float on the branch until a fresh 2.0.0-track tag is cut.
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "refactoring/refactoring-ecosystem-v2" }
 # Swap to this for day-to-day monorepo development (offline-friendly, picks up sibling edits
 # immediately, no push-then-pull round trip) -- but keep it local-only; don't commit it back to
 # main, or every downstream adapter's CI breaks again the same way this fix closes.

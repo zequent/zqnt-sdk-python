@@ -44,8 +44,8 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-utils", git = "https://github.com/zequent/zqnt-utils-python?branch=main" },
-    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/zequent/zqnt-utils-python?branch=main" },
+    { name = "zqnt-utils", git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2" },
+    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2" },
 ]
 provides-extras = ["redis", "dev"]
 
@@ -251,7 +251,7 @@ wheels = [
 [[package]]
 name = "zqnt-utils"
 version = "2.0.0"
-source = { git = "https://github.com/zequent/zqnt-utils-python?branch=main#6789639c938549bc4c60b7ca7829aaade300d743" }
+source = { git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2#6789639c938549bc4c60b7ca7829aaade300d743" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
