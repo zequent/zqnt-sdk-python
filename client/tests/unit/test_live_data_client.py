@@ -246,18 +246,18 @@ def _notification_asset_status_frame() -> events_pb2.NotificationResponse:
     )
 
 
-def _notification_command_execution_frame() -> events_pb2.NotificationResponse:
+def _notification_task_frame() -> events_pb2.NotificationResponse:
     return events_pb2.NotificationResponse(
         tid="tid-notify",
         sn="DOCK-1",
         has_errors=False,
         event=events_pb2.NotificationEvent(
-            command_execution=events_pb2.CommandExecutionEvent(
-                external_execution_id="exec-1",
-                command_id="dock.open_cover",
-                status=events_pb2.CommandExecutionStatus.COMMAND_EXECUTION_STATUS_SUCCEEDED,
-                progress=1.0,
-                message="done",
+            task=events_pb2.TaskEvent(
+                task_id="t1",
+                task_type=common_pb2.TaskTypeProto.TASK_TYPE_WAYPOINT,
+                status=common_pb2.TaskStatus.TASK_RUNNING,
+                progress=0.5,
+                message="en route",
             ),
         ),
     )
@@ -407,7 +407,7 @@ async def test_stream_telemetry_decodes_extended_asset_fields() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_notifications_pumps_frames_into_callback() -> None:
-    stub = _StreamStub([_notification_asset_status_frame(), _notification_command_execution_frame()])
+    stub = _StreamStub([_notification_asset_status_frame(), _notification_task_frame()])
     client = _build_client(stub)
 
     received: list[Any] = []
@@ -418,7 +418,7 @@ async def test_stream_notifications_pumps_frames_into_callback() -> None:
     handle = client.stream_notifications(
         StreamNotificationRequest(
             sn="DOCK-1",
-            event_types=[NotificationEventType.ASSET_STATUS, NotificationEventType.COMMAND_EXECUTION],
+            event_types=[NotificationEventType.ASSET_STATUS, NotificationEventType.TASK],
         ),
         on_data,
     )
@@ -430,14 +430,14 @@ async def test_stream_notifications_pumps_frames_into_callback() -> None:
     assert received[0].event_type == "NOTIFICATION_EVENT_ASSET_STATUS"
     assert received[0].asset_status is not None
     assert received[0].asset_status.online is True
-    assert received[1].event_type == "NOTIFICATION_EVENT_COMMAND_EXECUTION"
-    assert received[1].command_execution_event is not None
-    assert received[1].command_execution_event.status == "COMMAND_EXECUTION_STATUS_SUCCEEDED"
-    assert received[1].command_execution_event.command_id == "dock.open_cover"
+    assert received[1].event_type == "NOTIFICATION_EVENT_TASK"
+    assert received[1].task_event is not None
+    assert received[1].task_event.status == "TASK_RUNNING"
+    assert received[1].task_event.task_id == "t1"
     sent_request = stub.last_request
     assert sent_request.event_types == [
         NotificationEventType.ASSET_STATUS,
-        NotificationEventType.COMMAND_EXECUTION,
+        NotificationEventType.TASK,
     ]
     assert handle.is_stopped is True
 
