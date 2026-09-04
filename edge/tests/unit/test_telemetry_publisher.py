@@ -200,9 +200,7 @@ async def test_stream_generator_restores_sentinel_to_queue():
 
 def test_build_asset_request_flat_fields():
     pub = TelemetryPublisher(host="localhost", sn="TEST-001")
-    req = pub._build_asset_request(
-        AssetTelemetry(id="DOCK001", latitude=47.5, longitude=9.7, environment_temp=21.5)
-    )
+    req = pub._build_asset_request(AssetTelemetry(id="DOCK001", latitude=47.5, longitude=9.7, environment_temp=21.5))
     assert req.base.sn == "DOCK001"
     # latitude/longitude live on the Telemetry envelope, not on AssetTelemetryDetails.
     assert req.data.id == "DOCK001"
