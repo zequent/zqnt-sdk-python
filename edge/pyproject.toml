@@ -45,11 +45,9 @@ build-backend = "hatchling.build"
 packages = ["edge_sdk"]
 
 [tool.uv.sources]
-# Local editable path is the preferred default for day-to-day monorepo development (offline-
-# friendly, picks up sibling edits immediately, no push-then-pull round trip). Swap to the git
-# line below only when you actually need standalone/external resolution -- verifying this repo
-# installs correctly outside the monorepo, CI that doesn't check out the whole monorepo, etc.
-# 2.0.0 isn't cut as a real zqnt-utils-python release yet, so that alternative floats on its
-# `main` branch rather than a tag that doesn't exist.
-#zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
-zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
+# 2.0.0 isn't cut as a real zqnt-utils-python release yet, so this floats on its `main` branch
+# (whatever is currently pushed there) rather than a tag that doesn't exist -- matches this
+# repo's own main being the floating "2.0.0-track" counterpart to feature/v1.3.0-proto (see
+# zqnt-protos' README "Versioning" section). Re-run `uv lock -P zqnt-utils` to pick up a newer
+# main once one lands, or repoint this at a real tag once zqnt-utils-python cuts one.
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
