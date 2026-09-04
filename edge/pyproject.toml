@@ -45,11 +45,18 @@ build-backend = "hatchling.build"
 packages = ["edge_sdk"]
 
 [tool.uv.sources]
-# Local editable path is the preferred default for day-to-day monorepo development (offline-
-# friendly, picks up sibling edits immediately, no push-then-pull round trip). Swap to the git
-# line below only when you actually need standalone/external resolution -- verifying this repo
-# installs correctly outside the monorepo, CI that doesn't check out the whole monorepo, etc.
-# 2.0.0 isn't cut as a real zqnt-utils-python release yet, so that alternative floats on its
-# `main` branch rather than a tag that doesn't exist.
-#zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
-zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
+# main must stay externally consumable: any adapter that git-fetches this repo (required for
+# Docker/CI builds, where a local-editable path can't resolve outside the monorepo checkout)
+# needs edge-python-sdk's OWN dependency sources to resolve too -- uv does not let a downstream
+# project's [tool.uv.sources] override reach into a git-fetched dependency's own nested source
+# declaration, confirmed by trying it and watching it fail.
+#
+# zqnt-utils-python's real v2.0.0 tag exists but is stale (3 commits behind its own main --
+# missing the CacheKeys zqnt: prefix fix and the AssetVendor.ZQNT regen, both real shipped
+# bugfixes) -- pinning to it would silently reintroduce both. Floating on main instead until a
+# fresh tag is cut; re-pin to a real tag once one exists.
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "main" }
+# Swap to this for day-to-day monorepo development (offline-friendly, picks up sibling edits
+# immediately, no push-then-pull round trip) -- but keep it local-only; don't commit it back to
+# main, or every downstream adapter's CI breaks again the same way this fix closes.
+#zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
