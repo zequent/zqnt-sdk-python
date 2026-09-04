@@ -1,13 +1,13 @@
 [project]
 name = "edge-python-sdk"
-version = "1.2.3"
-description = "Python SDK for implementing ZQNT Edge Adapters"
+version = "1.3.0"
+description = "Python SDK for implementing ZQNT Edge Adapters — pinned to the 1.3.0 wire contract"
 requires-python = ">=3.12"
 dependencies = [
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
     "grpcio-health-checking>=1.60.0",
-    "zqnt-utils>=2.0.0",
+    "zqnt-utils>=1.3.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -45,5 +45,8 @@ build-backend = "hatchling.build"
 packages = ["edge_sdk"]
 
 [tool.uv.sources]
-#zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", rev = "v2.0.0" }
-zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
+# This branch is the Python counterpart of zqnt-utils-golang's feature/v1.3.0-proto: pinned to
+# the 1.3.0 wire contract specifically, not the current (2.0.0) line -- see
+# utils/zqnt-utils-python's own v1.3.0 tag and zqnt-protos' README "Versioning" section.
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", tag = "v1.3.0" }
+#zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }

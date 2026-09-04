@@ -69,8 +69,6 @@ from .models import (
     Capability,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
-    CommandExecutionEvent,
-    CommandExecutionStatus,
     CommandProgress,
     Coordinates,
     DetectionParameter,
@@ -107,6 +105,7 @@ from .models import (
     SubAssetMode,
     SubAssetTelemetry,
     Task,
+    TaskEvent,
     TaskStatus,
     TaskType,
     TrackTaskConfig,
@@ -142,7 +141,6 @@ __all__ = [
     "MissionType",
     "MissionStatus",
     "ErrorCode",
-    "CommandExecutionStatus",
     "SchedulerType",
     "Rainfall",
     "NetworkType",
@@ -171,7 +169,7 @@ __all__ = [
     # notification
     "AssetStatusEvent",
     "MissionEvent",
-    "CommandExecutionEvent",
+    "TaskEvent",
     # scheduler
     "SchedulerDTO",
     # task

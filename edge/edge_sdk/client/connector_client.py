@@ -28,6 +28,7 @@ from collections.abc import AsyncIterator
 from typing import Any, Callable
 
 from ..models.asset import Asset
+from ..models.task import Mission, Task
 
 logger = logging.getLogger(__name__)
 
@@ -157,100 +158,75 @@ class ConnectorClient:
     # which dropped the equivalent methods outright rather than keeping stubs.
 
     # ------------------------------------------------------------------
-    # Skill Registry — the persisted, de-duplicated capability catalog (independent of which
-    # devices are currently connected). Methods here work with the raw generated
-    # ``SkillContractProtoDTO`` rather than a plain-Python model — the same scope decision
-    # ``client-python-sdk``'s ``ConnectorClient`` makes for this RPC group: the contract shape
-    # (input/output schema, errors, events, requirements, source) is large and already typed;
-    # wrapping it a second time buys little for what is normally a write-once-per-command call.
+    # Mission / Task — retired on main/2.0.0 in favor of the capability-execution model
+    # (Application/SkillExecution), but still real RPCs at the 1.3.0 contract this branch
+    # tracks; MissionProtoDTO/TaskProtoDTO themselves are unchanged between 1.3.0 and 2.0.0
+    # (byte-identical), so the existing Mission/Task models and proto_to_mission/proto_to_task
+    # converters in models/task.py + server/_converters.py are reused as-is here -- only the
+    # request/response message names differ from what a naive "just re-add the old wrapper
+    # calls" pass would guess (GetMissionRequest/MissionResponse, not a ConnectorXxx-prefixed
+    # pair -- verified directly against zqnt-protos' own 1.3.0 tag, not assumed).
     # ------------------------------------------------------------------
 
-    async def observe_skill_contract(self, contract):
-        """Upsert ``contract`` — new for a never-seen (command_id, schema_version) pair, or
-        refreshed content/last-seen for one already known."""
-        from zqnt_utils.generated.zqnt import connector_pb2
+    async def get_mission(self, mission_id: str, sn: str = "") -> Mission | None:
+        """Fetch a mission by ID."""
+        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
+
+        from ..server._converters import proto_to_mission
 
         tid = str(uuid.uuid4())
         resp = await self._call(
-            "ObserveSkillContract",
+            "GetMission",
             tid,
-            "",
-            lambda: self._stub.ObserveSkillContract(
-                connector_pb2.UpsertSkillContractRequest(base=self._base(tid), contract=contract),
+            sn,
+            lambda: self._stub.GetMission(
+                mission_autonomy_contracts_pb2.GetMissionRequest(base=self._base(tid, sn), mission_id=mission_id),
                 timeout=self._call_timeout,
             ),
         )
-        if resp.has_errors:
-            logger.error("ObserveSkillContract failed [tid=%s]: %s", tid, resp.error.error_message)
-            return None
-        return resp.contract
+        if resp.WhichOneof("response") == "mission":
+            return proto_to_mission(resp.mission)
+        return None
 
-    async def list_skill_contracts(self, status=None, command_id: str | None = None) -> list:
-        """List the whole registry, optionally filtered by ``status`` (a ``SkillContractStatus``
-        enum value). When ``command_id`` is set, returns that one command's full version history
-        instead (``status`` is then ignored, matching the RPC's own semantics)."""
-        from zqnt_utils.generated.zqnt import connector_pb2
+    async def get_task(self, task_id: str, sn: str = "") -> Task | None:
+        """Fetch a task by ID."""
+        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
 
-        kwargs: dict = {"base": self._base()}
-        if status is not None:
-            kwargs["status"] = status
-        if command_id:
-            kwargs["command_id"] = command_id
+        from ..server._converters import proto_to_task
 
         tid = str(uuid.uuid4())
         resp = await self._call(
-            "ListSkillContracts",
+            "GetTask",
             tid,
-            "",
-            lambda: self._stub.ListSkillContracts(
-                connector_pb2.ListSkillContractsRequest(**kwargs),
+            sn,
+            lambda: self._stub.GetTask(
+                mission_autonomy_contracts_pb2.GetTaskRequest(base=self._base(tid, sn), task_id=task_id),
                 timeout=self._call_timeout,
             ),
         )
-        if resp.has_errors:
-            logger.error("ListSkillContracts failed [tid=%s]: %s", tid, resp.error.error_message)
-            return []
-        return list(resp.contracts)
+        if resp.WhichOneof("response") == "task":
+            return proto_to_task(resp.task)
+        return None
 
-    async def set_skill_contract_status(self, contract_id: str, status):
-        """Set a skill contract's lifecycle status (a ``SkillContractStatus`` enum value)."""
-        from zqnt_utils.generated.zqnt import connector_pb2
+    async def get_task_by_flight_id(self, flight_id: str, sn: str = "") -> Task | None:
+        """Fetch a task by its flight ID (waypoint config flightId)."""
+        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
+
+        from ..server._converters import proto_to_task
 
         tid = str(uuid.uuid4())
         resp = await self._call(
-            "SetSkillContractStatus",
+            "GetTaskByFlightId",
             tid,
-            "",
-            lambda: self._stub.SetSkillContractStatus(
-                connector_pb2.SetSkillContractStatusRequest(base=self._base(tid), id=contract_id, status=status),
+            sn,
+            lambda: self._stub.GetTaskByFlightId(
+                mission_autonomy_contracts_pb2.GetTaskByFlightIdRequest(base=self._base(tid, sn), flight_id=flight_id),
                 timeout=self._call_timeout,
             ),
         )
-        if resp.has_errors:
-            logger.error("SetSkillContractStatus failed [tid=%s]: %s", tid, resp.error.error_message)
-            return None
-        return resp.contract
-
-    async def set_skill_contract_permissions(self, contract_id: str, required_permissions: list[str]):
-        """Full replacement, not a merge. Declarative only — nothing currently enforces this."""
-        from zqnt_utils.generated.zqnt import connector_pb2
-
-        tid = str(uuid.uuid4())
-        resp = await self._call(
-            "SetSkillContractPermissions",
-            tid,
-            "",
-            lambda: self._stub.SetSkillContractPermissions(
-                connector_pb2.SetSkillContractPermissionsRequest(
-                    base=self._base(tid), id=contract_id, required_permissions=list(required_permissions)
-                ),
-                timeout=self._call_timeout,
-            ),
-        )
-        if resp.has_errors:
-            logger.error("SetSkillContractPermissions failed [tid=%s]: %s", tid, resp.error.error_message)
-            return None
-        return resp.contract
+        if resp.WhichOneof("response") == "task":
+            return proto_to_task(resp.task)
+        return None
 
     # ------------------------------------------------------------------
     # Internal helpers

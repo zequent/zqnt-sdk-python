@@ -11,7 +11,6 @@ from .common import (
     Capability,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
-    CommandExecutionStatus,
     CommandProgress,
     Coordinates,
     DetectionBatch,
@@ -38,7 +37,7 @@ from .common import (
     TaskStatus,
     TaskType,
 )
-from .notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
+from .notification import AssetStatusEvent, MissionEvent, TaskEvent
 from .scheduler import SchedulerDTO
 from .task import (
     AreaMappingTaskConfig,
@@ -86,7 +85,6 @@ __all__ = [
     "MissionType",
     "MissionStatus",
     "ErrorCode",
-    "CommandExecutionStatus",
     "SchedulerType",
     "Rainfall",
     "NetworkType",
@@ -113,7 +111,7 @@ __all__ = [
     # notification
     "AssetStatusEvent",
     "MissionEvent",
-    "CommandExecutionEvent",
+    "TaskEvent",
     # scheduler
     "SchedulerDTO",
     # task
