@@ -419,31 +419,16 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "python-dotenv", marker = "extra == 'dotenv'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-utils", editable = "../../../utils/zqnt-utils-python" },
+    { name = "zqnt-utils", git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2" },
 ]
 provides-extras = ["dotenv", "dev"]
 
 [[package]]
 name = "zqnt-utils"
 version = "2.0.0"
-source = { editable = "../../../utils/zqnt-utils-python" }
+source = { git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2#639360293c7d4f5e0073e0e538a9b4febeec9a16" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
     { name = "redis" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "grpcio", specifier = ">=1.60.0" },
-    { name = "protobuf", specifier = ">=4.25.0" },
-    { name = "redis", extras = ["asyncio"], specifier = ">=8.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "grpcio-tools", specifier = ">=1.60.0" },
-    { name = "mypy-protobuf", specifier = ">=3.5.0" },
-    { name = "pytest", specifier = ">=9.0.3" },
-    { name = "ruff", specifier = ">=0.15.15" },
 ]

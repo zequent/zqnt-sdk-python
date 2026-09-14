@@ -27,7 +27,8 @@ After installation you can verify the version:
 
 ```python
 import client_sdk
-print(client_sdk.__version__)  # "1.0.0"
+
+print(client_sdk.__version__)  # "1.0.1"
 ```
 
 ---
@@ -37,6 +38,7 @@ print(client_sdk.__version__)  # "1.0.0"
 ```python
 import asyncio
 from client_sdk import ZequentClient, TakeoffRequest
+
 
 async def main():
     async with ZequentClient.from_env() as client:
@@ -50,6 +52,7 @@ async def main():
         # Live Data (server-streaming)
         async for telemetry in client.live_data.stream_telemetry(asset_sn="DOCK-1"):
             print(telemetry)
+
 
 asyncio.run(main())
 ```
@@ -70,14 +73,14 @@ You can also build a client manually:
 
 ```python
 from client_sdk import ZequentClient
-from client_sdk.config import ZequentClientConfig
+from client_sdk.config import ServiceConfig
 
-config = ZequentClientConfig(
-    remote_control_host="rc.example.com", remote_control_port=8002,
-    mission_autonomy_host="ma.example.com", mission_autonomy_port=8004,
-    live_data_host="ld.example.com", live_data_port=8003,
-)
-async with ZequentClient(config) as client:
+async with ZequentClient(
+    connector_config=ServiceConfig("connector", host="connector.example.com", port=8010),
+    remote_control_config=ServiceConfig("remote-control", host="rc.example.com", port=8002),
+    mission_autonomy_config=ServiceConfig("mission-autonomy", host="ma.example.com", port=8004),
+    live_data_config=ServiceConfig("live-data", host="ld.example.com", port=8003),
+) as client:
     ...
 ```
 
