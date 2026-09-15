@@ -567,16 +567,23 @@ class EdgeAdapter(ABC):
 # Python and Java SDKs (see edge-java-sdk's BuiltInCommandDispatch, which does this in Java).
 # The two streaming commands are absent on purpose: routing a frame per round trip would be a real
 # performance regression, so ManualControlInput/GetDetections stay typed-only.
-def _num(params: dict, key: str) -> float | None:
+def _num(params: dict, key: str, default: float | None = None) -> float | None:
     value = params.get(key)
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    return float(value)
 
 
 def _coords(params: dict) -> Coordinates:
+    # An absent component becomes NaN, not 0.0 — the platform's own convention for "not provided,
+    # use the current position or your default" (see mission-autonomy's
+    # EdgeExecutionNodeDispatcher#number). 0.0 would be Null Island, a real place off the coast of
+    # Ghana, and adapters cannot tell it apart from an omitted value.
+    missing = float("nan")
     return Coordinates(
-        latitude=_num(params, "latitude") or 0.0,
-        longitude=_num(params, "longitude") or 0.0,
-        altitude=_num(params, "altitude") or 0.0,
+        latitude=_num(params, "latitude", missing),
+        longitude=_num(params, "longitude", missing),
+        altitude=_num(params, "altitude", missing),
     )
 
 
