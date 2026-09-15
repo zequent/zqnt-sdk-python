@@ -174,8 +174,6 @@ CATALOG: dict[str, CommandSpec] = {
         _spec("asset.boot_sub_asset", "Power the sub-asset on or off", schema({"enabled": _BOOL}, ["enabled"])),
         _spec("asset.remote_debug", "Enable or disable remote debug mode", schema({"enabled": _BOOL}, ["enabled"])),
         _spec("asset.change_ac_mode", "Change air conditioning mode", schema({"mode": _STRING}, ["mode"])),
-        _spec("asset.register", "Register the asset on the platform", schema({})),
-        _spec("asset.deregister", "Deregister the asset from the platform", schema({})),
         # Mission
         _spec(
             "mission.waypoint.execute",

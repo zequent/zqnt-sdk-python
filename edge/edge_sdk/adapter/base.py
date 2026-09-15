@@ -37,7 +37,7 @@ Minimal example (drone-only adapter, no dock operations)::
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import AsyncIterator
+from typing import AsyncIterator, Awaitable, Callable
 
 from ..models.asset import Asset
 from ..models.common import (
@@ -58,6 +58,7 @@ from ..models.common import (
     ErrorMessage,
     LiveStreamStartRequest,
     LiveStreamStopRequest,
+    LiveStreamType,
     ManualControlInput,
     ManualControlRequest,
     RequestContext,
@@ -98,8 +99,10 @@ _METHOD_COMMANDS: dict[str, str] = {
     "boot_down_sub_asset": "asset.boot_sub_asset",
     "enter_or_close_remote_debug_mode": "asset.remote_debug",
     "change_ac_mode": "asset.change_ac_mode",
-    "register_asset": "asset.register",
-    "deregister_asset": "asset.deregister",
+    # register_asset/deregister_asset are deliberately absent: they are lifecycle callbacks the
+    # platform makes when an asset is added or removed, not commands anyone invokes from a
+    # capability graph. Advertising them would put two un-runnable blocks in the console's command
+    # palette. edge-dji, the reference adapter, does not advertise them either.
     "prepare_task": "mission.prepare",
     "start_task": "mission.start",
     "stop_task": "mission.stop",
@@ -282,6 +285,34 @@ class EdgeAdapter(ABC):
         if registered is None or registered.handler is None:
             return None
         return await registered.handler(ctx, params)
+
+    async def _dispatch_typed(self, ctx: RequestContext, command_id: str, params: dict) -> CustomCommandResponse | None:
+        """
+        Run a built-in command id against the typed method that implements it.
+
+        The mirror image of :meth:`_delegate`, and the reason both exist: an adapter may declare a
+        command either way round. A new adapter registers handlers and the typed RPCs delegate into
+        them; an adapter that already implements the typed methods (which is every adapter that
+        predates the registry) gets its advertised ids routed the other way, here. Either way the
+        rule holds -- everything advertised is executable by id, which is what lets core's
+        hand-maintained dotted-id-to-typed-stub table eventually go away.
+
+        Returns ``None`` when *command_id* is not a built-in, so the caller keeps routing.
+        """
+        builder = _TYPED_DISPATCH.get(command_id)
+        if builder is None:
+            return None
+        response = await builder(self, ctx, params)
+        if response.success:
+            return CustomCommandResponse.ok(
+                ctx.tid, ctx.sn, command_id, external_execution_id=response.external_execution_id
+            )
+        return CustomCommandResponse.fail(
+            ctx.tid,
+            ctx.sn,
+            command_id,
+            response.error or ErrorMessage(message=f"{command_id} failed", code=ErrorCode.ASSET_ERROR),
+        )
 
     async def _delegate(self, ctx: RequestContext, command_id: str, params: dict) -> EdgeResponse:
         """
@@ -521,7 +552,92 @@ class EdgeAdapter(ABC):
         ``await super().send_custom_command(ctx, request)`` first to let registered handlers win,
         then fall back to your own routing.
         """
-        response = await self._dispatch_registered(ctx, request.command_type, request.params or {})
+        params = request.params or {}
+        response = await self._dispatch_registered(ctx, request.command_type, params)
         if response is not None:
             return response
+        typed = await self._dispatch_typed(ctx, request.command_type, params)
+        if typed is not None:
+            return typed
         return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, request.command_type)
+
+
+# Built-in command id → how to call the typed method that implements it. Params follow the same
+# JSON Schemas the catalog publishes for these commands, so one id means one thing across the
+# Python and Java SDKs (see edge-java-sdk's BuiltInCommandDispatch, which does this in Java).
+# The two streaming commands are absent on purpose: routing a frame per round trip would be a real
+# performance regression, so ManualControlInput/GetDetections stay typed-only.
+def _num(params: dict, key: str) -> float | None:
+    value = params.get(key)
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _coords(params: dict) -> Coordinates:
+    return Coordinates(
+        latitude=_num(params, "latitude") or 0.0,
+        longitude=_num(params, "longitude") or 0.0,
+        altitude=_num(params, "altitude") or 0.0,
+    )
+
+
+def _ac_mode(params: dict) -> AssetAirConditionerState:
+    mode = params.get("mode")
+    if isinstance(mode, str):
+        try:
+            return AssetAirConditionerState[mode.upper()]
+        except KeyError:
+            return AssetAirConditionerState.IDLE
+    return AssetAirConditionerState(int(mode)) if isinstance(mode, int) else AssetAirConditionerState.IDLE
+
+
+_TYPED_DISPATCH: dict[str, Callable[["EdgeAdapter", RequestContext, dict], Awaitable[EdgeResponse]]] = {
+    "flight.takeoff": lambda a, ctx, p: a.take_off(ctx, _coords(p)),
+    "navigation.go_to": lambda a, ctx, p: a.go_to(ctx, _coords(p)),
+    "flight.return_to_home": lambda a, ctx, p: a.return_to_home(ctx, ReturnToHomeRequest(altitude=_num(p, "altitude"))),
+    "flight.manual.enter": lambda a, ctx, p: a.enter_manual_control(ctx, _manual_request(p)),
+    "flight.manual.exit": lambda a, ctx, p: a.exit_manual_control(ctx, _manual_request(p)),
+    "gimbal.look_at": lambda a, ctx, p: a.look_at(ctx, _coords(p), p.get("payloadIndex"), p.get("locked")),
+    "gimbal.tracking": lambda a, ctx, p: a.enable_gimbal_tracking(ctx, bool(p.get("enabled"))),
+    "camera.take_photo": lambda a, ctx, p: a.take_photo(ctx),
+    "camera.capture_photo": lambda a, ctx, p: a.capture_photo(ctx),
+    "camera.change_lens": lambda a, ctx, p: a.change_lens(ctx, ChangeCameraLensRequest(lens=p.get("lens"))),
+    "camera.change_zoom": lambda a, ctx, p: a.change_zoom(
+        ctx, ChangeCameraZoomRequest(lens=p.get("lens"), zoom=int(_num(p, "zoom") or 0))
+    ),
+    "camera.start_recording": lambda a, ctx, p: a.start_recording(ctx),
+    "camera.stop_recording": lambda a, ctx, p: a.stop_recording(ctx),
+    "stream.start": lambda a, ctx, p: a.start_live_stream(ctx, _live_stream_start(p)),
+    "stream.stop": lambda a, ctx, p: a.stop_live_stream(ctx, LiveStreamStopRequest(video_id=p.get("videoId", ""))),
+    "dock.open_cover": lambda a, ctx, p: a.open_cover(ctx),
+    "dock.close_cover": lambda a, ctx, p: a.close_cover(ctx, bool(p.get("force"))),
+    "dock.start_charging": lambda a, ctx, p: a.start_charging(ctx),
+    "dock.stop_charging": lambda a, ctx, p: a.stop_charging(ctx),
+    "asset.reboot": lambda a, ctx, p: a.reboot_asset(ctx),
+    # One id, two typed methods — the params decide which, exactly as the published schema says.
+    "asset.boot_sub_asset": lambda a, ctx, p: (
+        a.boot_up_sub_asset(ctx) if p.get("enabled") else a.boot_down_sub_asset(ctx)
+    ),
+    "asset.remote_debug": lambda a, ctx, p: a.enter_or_close_remote_debug_mode(ctx, bool(p.get("enabled"))),
+    "asset.change_ac_mode": lambda a, ctx, p: a.change_ac_mode(ctx, _ac_mode(p)),
+    "mission.prepare": lambda a, ctx, p: a.prepare_task(ctx, str(p.get("taskId", ""))),
+    "mission.start": lambda a, ctx, p: a.start_task(ctx, str(p.get("taskId", ""))),
+    "mission.stop": lambda a, ctx, p: a.stop_task(ctx, str(p.get("taskId", ""))),
+}
+
+
+def _manual_request(params: dict) -> ManualControlRequest:
+    return ManualControlRequest(
+        client_id=str(params.get("clientId", "")),
+        user_id=str(params.get("userId", "")),
+        session_id=str(params.get("sessionId", "")),
+        reason=params.get("reason"),
+    )
+
+
+def _live_stream_start(params: dict) -> LiveStreamStartRequest:
+    return LiveStreamStartRequest(
+        video_id=str(params.get("videoId", "")),
+        stream_server=str(params.get("streamServer", "")),
+        stream_type=LiveStreamType.RTMP,
+        asset_type=AssetType.AIRCRAFT,
+    )

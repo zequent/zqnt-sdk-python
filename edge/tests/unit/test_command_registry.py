@@ -203,3 +203,120 @@ async def test_overriding_a_typed_method_still_wins():
 
     assert response.success
     assert _caps(adapter)["flight.takeoff"].state is CapabilityState.AVAILABLE
+
+
+# ---------------------------------------------------------------------------
+# The other direction: an adapter that implements the typed methods must also
+# answer the id it advertises, or "advertised but not executable" survives in
+# the Python SDK exactly as it did in edge-dji.
+# ---------------------------------------------------------------------------
+
+
+class _TypedOnlyAdapter(EdgeAdapter):
+    """No registrations at all — just typed overrides, like every pre-2.0 adapter."""
+
+    def __init__(self):
+        self.calls: list[str] = []
+
+    async def get_capabilities(self, sn, asset_id):
+        return self._auto_capabilities(sn, AssetType.AIRCRAFT)
+
+    async def take_off(self, ctx, coordinates):
+        self.calls.append(f"take_off:{coordinates.latitude},{coordinates.altitude}")
+        return EdgeResponse.ok(ctx.tid, ctx.sn)
+
+    async def boot_up_sub_asset(self, ctx):
+        self.calls.append("boot_up")
+        return EdgeResponse.ok(ctx.tid, ctx.sn)
+
+    async def boot_down_sub_asset(self, ctx):
+        self.calls.append("boot_down")
+        return EdgeResponse.ok(ctx.tid, ctx.sn)
+
+    async def close_cover(self, ctx, force):
+        self.calls.append(f"close_cover:{force}")
+        return EdgeResponse.ok(ctx.tid, ctx.sn)
+
+
+@pytest.mark.asyncio
+async def test_a_typed_only_adapter_answers_the_id_it_advertises():
+    adapter = _TypedOnlyAdapter()
+
+    response = await adapter.send_custom_command(
+        make_ctx(),
+        CustomCommandRequest(
+            command_type="flight.takeoff", params={"latitude": 47.1, "longitude": 8.5, "altitude": 30.0}
+        ),
+    )
+
+    assert response.success
+    assert adapter.calls == ["take_off:47.1,30.0"]
+
+
+@pytest.mark.asyncio
+async def test_typed_dispatch_picks_the_method_from_the_params():
+    up, down = _TypedOnlyAdapter(), _TypedOnlyAdapter()
+
+    await up.send_custom_command(
+        make_ctx(), CustomCommandRequest(command_type="asset.boot_sub_asset", params={"enabled": True})
+    )
+    await down.send_custom_command(
+        make_ctx(), CustomCommandRequest(command_type="asset.boot_sub_asset", params={"enabled": False})
+    )
+
+    assert up.calls == ["boot_up"]
+    assert down.calls == ["boot_down"]
+
+
+@pytest.mark.asyncio
+async def test_typed_dispatch_reports_an_unimplemented_command_as_unsupported():
+    """Routable id, no implementation — must fail, not pretend to have run."""
+    response = await _TypedOnlyAdapter().send_custom_command(
+        make_ctx(), CustomCommandRequest(command_type="dock.open_cover", params={})
+    )
+
+    assert not response.success
+
+
+@pytest.mark.asyncio
+async def test_a_registered_handler_still_wins_over_the_typed_method():
+    class _Both(_TypedOnlyAdapter):
+        def __init__(self):
+            super().__init__()
+            self.register_command("flight.takeoff", self._registered)
+
+        async def _registered(self, ctx, params):
+            self.calls.append("registered")
+            return CustomCommandResponse.ok(ctx.tid, ctx.sn, "flight.takeoff")
+
+    adapter = _Both()
+    await adapter.send_custom_command(
+        make_ctx(), CustomCommandRequest(command_type="flight.takeoff", params={"latitude": 1.0})
+    )
+
+    assert adapter.calls == ["registered"]
+
+
+@pytest.mark.asyncio
+async def test_every_advertised_command_is_routable_by_id():
+    """
+    The cross-SDK invariant: nothing may be advertised that cannot be reached by its id.
+
+    Checked against the routing tables rather than by calling each command, because an
+    unimplemented command and an unknown one both come back as a plain failure — routability is
+    the property that actually matters here, and the only one the two can be told apart by.
+    """
+    from edge_sdk.adapter.base import _STREAMING_COMMANDS, _TYPED_DISPATCH
+
+    adapter = _TypedOnlyAdapter()
+    caps = await adapter.get_capabilities("SN-1", None)
+
+    unroutable = [
+        c.command_id
+        for c in caps.capabilities
+        if c.command_id not in _TYPED_DISPATCH
+        and c.command_id not in adapter.registered_commands()
+        and c.command_id not in _STREAMING_COMMANDS
+    ]
+
+    assert not unroutable, f"advertised but not routable by id: {unroutable}"
