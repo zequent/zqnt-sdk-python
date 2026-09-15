@@ -36,6 +36,8 @@ except PackageNotFoundError:
     __version__ = "1.0.0"
 
 from .adapter.base import EdgeAdapter
+from .adapter.commands import CATALOG as COMMAND_CATALOG
+from .adapter.commands import CommandSpec, RegisteredCommand, schema
 from .client.connector_client import ConnectorClient
 from .client.live_data_service import LiveDataService
 from .client.mission_autonomy_client import MissionAutonomyClient
@@ -67,6 +69,10 @@ from .models import (
     CameraData,
     Capabilities,
     Capability,
+    CapabilitySource,
+    CapabilityState,
+    CapabilityTarget,
+    CapabilityTargetType,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
     CommandExecutionEvent,
@@ -154,7 +160,15 @@ __all__ = [
     "ErrorMessage",
     "CommandProgress",
     "Capabilities",
+    "COMMAND_CATALOG",
+    "CommandSpec",
+    "RegisteredCommand",
+    "schema",
     "Capability",
+    "CapabilitySource",
+    "CapabilityState",
+    "CapabilityTarget",
+    "CapabilityTargetType",
     "ReturnToHomeRequest",
     "ManualControlRequest",
     "ManualControlInput",

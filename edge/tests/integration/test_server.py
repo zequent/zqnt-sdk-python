@@ -47,9 +47,9 @@ async def test_get_capabilities_start_task_available(server_port):
     caps_by_command = {
         c.command_id: c.state == common_pb2.CAPABILITY_STATE_AVAILABLE for c in resp.capabilities.capabilities
     }
-    assert caps_by_command.get("StartTask") is True
-    assert caps_by_command.get("TakeOff") is False
-    assert caps_by_command.get("OpenCover") is False
+    assert caps_by_command.get("mission.start") is True
+    assert caps_by_command.get("flight.takeoff") is False
+    assert caps_by_command.get("dock.open_cover") is False
 
 
 # ---------------------------------------------------------------------------

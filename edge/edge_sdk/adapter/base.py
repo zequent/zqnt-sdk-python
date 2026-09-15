@@ -45,6 +45,8 @@ from ..models.common import (
     AssetType,
     Capabilities,
     Capability,
+    CapabilityState,
+    CapabilityTarget,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
     Coordinates,
@@ -52,6 +54,8 @@ from ..models.common import (
     CustomCommandResponse,
     DetectionResponse,
     EdgeResponse,
+    ErrorCode,
+    ErrorMessage,
     LiveStreamStartRequest,
     LiveStreamStopRequest,
     ManualControlInput,
@@ -59,45 +63,61 @@ from ..models.common import (
     RequestContext,
     ReturnToHomeRequest,
 )
+from .commands import CATALOG, CommandHandler, RegisteredCommand, spec_for
 
-# Maps Python method name → (RPC command name, human description)
-_CAPABILITY_MAP: dict[str, tuple[str, str]] = {
-    "take_off": ("TakeOff", "Launch drone"),
-    "go_to": ("GoTo", "Fly to coordinates"),
-    "return_to_home": ("ReturnToHome", "Return to home position"),
-    "enter_manual_control": ("EnterManualControl", "Enter manual control mode"),
-    "exit_manual_control": ("ExitManualControl", "Exit manual control mode"),
-    "manual_control_input": ("ManualControlInput", "Send manual control inputs"),
-    "look_at": ("LookAt", "Point gimbal at coordinates"),
-    "take_photo": ("TakePhoto", "Capture a photo"),
-    "enable_gimbal_tracking": ("EnableGimbalTracking", "Enable gimbal auto-tracking"),
-    "get_detections": ("GetDetections", "Stream AI detections"),
-    "open_cover": ("OpenCover", "Open dock cover"),
-    "close_cover": ("CloseCover", "Close dock cover"),
-    "start_charging": ("StartCharging", "Start charging drone"),
-    "stop_charging": ("StopCharging", "Stop charging drone"),
-    "reboot_asset": ("RebootAsset", "Reboot main asset"),
-    "boot_up_sub_asset": ("BootUpSubAsset", "Power on sub-asset"),
-    "boot_down_sub_asset": ("BootDownSubAsset", "Power off sub-asset"),
-    "register_asset": ("RegisterAsset", "Register asset on platform"),
-    "deregister_asset": ("DeRegisterAsset", "Deregister asset from platform"),
-    "enter_or_close_remote_debug_mode": (
-        "EnterOrCloseRemoteDebugMode",
-        "Toggle remote debug mode",
-    ),
-    "change_ac_mode": ("ChangeAcMode", "Change air conditioner mode"),
-    "start_live_stream": ("StartLiveStream", "Start video stream"),
-    "stop_live_stream": ("StopLiveStream", "Stop video stream"),
-    "change_lens": ("ChangeLens", "Switch camera lens"),
-    "change_zoom": ("ChangeZoom", "Change camera zoom"),
-    "capture_photo": ("CapturePhoto", "Capture photo to storage"),
-    "start_recording": ("StartRecording", "Start video recording"),
-    "stop_recording": ("StopRecording", "Stop video recording"),
-    "prepare_task": ("PrepareTask", "Prepare task for execution"),
-    "start_task": ("StartTask", "Start task execution"),
-    "stop_task": ("StopTask", "Stop task execution"),
-    "send_custom_command": ("SendCustomCommand", "Send a vendor-specific custom command"),
+# Maps Python method name → the dotted command id that method implements.
+#
+# These are the platform's own ids (see edge_sdk.adapter.commands.CATALOG): the same strings
+# core's EdgeExecutionNodeDispatcher routes and ExecutionSafetyGate checks an asset for. Before
+# 2.0 this map held PascalCase RPC names ("TakeOff"), which nothing on the platform side ever
+# matched -- an adapter built on this SDK advertised capabilities no Application could reference.
+_METHOD_COMMANDS: dict[str, str] = {
+    "take_off": "flight.takeoff",
+    "go_to": "navigation.go_to",
+    "return_to_home": "flight.return_to_home",
+    "enter_manual_control": "flight.manual.enter",
+    "exit_manual_control": "flight.manual.exit",
+    "manual_control_input": "flight.manual.input",
+    "look_at": "gimbal.look_at",
+    "enable_gimbal_tracking": "gimbal.tracking",
+    "take_photo": "camera.take_photo",
+    "capture_photo": "camera.capture_photo",
+    "change_lens": "camera.change_lens",
+    "change_zoom": "camera.change_zoom",
+    "start_recording": "camera.start_recording",
+    "stop_recording": "camera.stop_recording",
+    "start_live_stream": "stream.start",
+    "stop_live_stream": "stream.stop",
+    "get_detections": "detections.stream",
+    "open_cover": "dock.open_cover",
+    "close_cover": "dock.close_cover",
+    "start_charging": "dock.start_charging",
+    "stop_charging": "dock.stop_charging",
+    "reboot_asset": "asset.reboot",
+    "boot_up_sub_asset": "asset.boot_sub_asset",
+    "boot_down_sub_asset": "asset.boot_sub_asset",
+    "enter_or_close_remote_debug_mode": "asset.remote_debug",
+    "change_ac_mode": "asset.change_ac_mode",
+    "register_asset": "asset.register",
+    "deregister_asset": "asset.deregister",
+    "prepare_task": "mission.prepare",
+    "start_task": "mission.start",
+    "stop_task": "mission.stop",
 }
+
+# Streaming RPCs are advertised like any other capability but are never dispatched through
+# send_custom_command -- collapsing them into the command envelope would cost a round trip per
+# frame, which is why the 2.0 plan deliberately leaves ManualControlInput/GetDetections typed.
+_STREAMING_COMMANDS = frozenset({"flight.manual.input", "detections.stream"})
+
+
+def _coordinate_params(coordinates: Coordinates) -> dict:
+    """Params shape shared by the coordinate-taking commands, matching their catalog schema."""
+    return {
+        "latitude": coordinates.latitude,
+        "longitude": coordinates.longitude,
+        "altitude": coordinates.altitude,
+    }
 
 
 class EdgeAdapter(ABC):
@@ -131,26 +151,158 @@ class EdgeAdapter(ABC):
         """
         ...
 
+    def register_command(
+        self,
+        command_id: str,
+        handler: CommandHandler | None = None,
+        *,
+        description: str | None = None,
+        input_schema: dict | None = None,
+        output_schema: dict | None = None,
+        schema_version: str | None = None,
+        target: CapabilityTarget | None = None,
+        skill_id: str | None = None,
+        state: CapabilityState = CapabilityState.AVAILABLE,
+        unavailable_reason: str | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> None:
+        """
+        Declare one command this adapter can run.
+
+        A single registration produces BOTH halves of the contract: the command appears in
+        :meth:`_auto_capabilities` (so the platform can discover it, render a parameter form
+        from ``input_schema`` and let the safety gate verify the asset advertises it) and, when
+        *handler* is given, :meth:`send_custom_command` dispatches to it. That is the whole
+        point -- advertising and executing can no longer drift apart, because they are no longer
+        two lists maintained by hand.
+
+        ``description``/``input_schema``/``output_schema``/``schema_version`` default to the
+        platform catalog entry for *command_id* when there is one, so registering a well-known
+        command is a one-liner::
+
+            self.register_command("mission.waypoint.execute", self._fly_mission)
+
+        A hardware-specific command supplies its own contract and belongs under a ``vendor.``
+        prefix, which the catalog deliberately leaves free::
+
+            self.register_command(
+                "vendor.acme.spray",
+                self._spray,
+                description="Run the spray boom for N seconds",
+                input_schema=schema({"seconds": {"type": "number"}}, ["seconds"]),
+            )
+
+        Registering the same id twice replaces the earlier entry, so an adapter can re-register
+        with a narrower state (for example TEMPORARILY_UNAVAILABLE while a payload is detached).
+        """
+        spec = spec_for(command_id)
+        self._commands[command_id] = RegisteredCommand(
+            command_id=command_id,
+            description=description if description is not None else (spec.description if spec else ""),
+            handler=handler,
+            input_schema=input_schema if input_schema is not None else (spec.input_schema if spec else None),
+            output_schema=output_schema if output_schema is not None else (spec.output_schema if spec else None),
+            schema_version=schema_version if schema_version is not None else (spec.schema_version if spec else None),
+            target=target,
+            skill_id=skill_id if skill_id is not None else (spec.skill_id if spec else None),
+            state=state,
+            unavailable_reason=unavailable_reason,
+            metadata=dict(metadata or {}),
+        )
+
+    @property
+    def _commands(self) -> dict[str, RegisteredCommand]:
+        """Commands registered through :meth:`register_command`, keyed by command id."""
+        registry = self.__dict__.get("_registered_commands")
+        if registry is None:
+            registry = {}
+            self.__dict__["_registered_commands"] = registry
+        return registry
+
+    def registered_commands(self) -> dict[str, RegisteredCommand]:
+        """Read-only view of what this adapter has registered (useful in tests)."""
+        return dict(self._commands)
+
     def _auto_capabilities(self, sn: str, asset_type: AssetType) -> Capabilities:
         """
-        Build a :class:`Capabilities` object by inspecting which methods this
-        adapter has overridden.  Any method that has been overridden is marked
-        ``available=True``; everything else is ``available=False``.
+        Build a :class:`Capabilities` snapshot from what this adapter actually implements.
+
+        Two sources, merged: every typed SDK method the subclass has overridden (mapped to its
+        dotted command id through :data:`_METHOD_COMMANDS`) and everything passed to
+        :meth:`register_command`. A registration wins over the derived entry for the same id, so
+        an adapter can attach a richer contract to a command it also implements typed.
+
+        Commands that are neither overridden nor registered are reported UNSUPPORTED rather than
+        omitted, which is what lets the platform tell "this asset cannot do that" apart from
+        "this asset has not reported yet".
         """
-        caps = [
-            Capability(
-                command=command,
-                description=description,
-                available=self._is_overridden(method_name),
+        derived: dict[str, Capability] = {}
+        for method_name, command_id in _METHOD_COMMANDS.items():
+            spec = CATALOG.get(command_id)
+            overridden = self._is_overridden(method_name)
+            # boot_up_sub_asset/boot_down_sub_asset share one command id: available if either is.
+            if command_id in derived and not overridden:
+                continue
+            derived[command_id] = Capability(
+                command_id=command_id,
+                description=spec.description if spec else "",
+                state=CapabilityState.AVAILABLE if overridden else CapabilityState.UNSUPPORTED,
+                input_schema=spec.input_schema if spec else None,
+                output_schema=spec.output_schema if spec else None,
+                schema_version=spec.schema_version if spec else None,
+                target=CapabilityTarget(),
             )
-            for method_name, (command, description) in _CAPABILITY_MAP.items()
-        ]
+
+        for command_id, registered in self._commands.items():
+            derived[command_id] = Capability(
+                command_id=command_id,
+                description=registered.description,
+                state=registered.state,
+                unavailable_reason=registered.unavailable_reason,
+                metadata=dict(registered.metadata),
+                input_schema=registered.input_schema,
+                output_schema=registered.output_schema,
+                target=registered.target or CapabilityTarget(),
+                schema_version=registered.schema_version,
+                skill_id=registered.skill_id,
+            )
+
         return Capabilities(
             asset_sn=sn,
             asset_type=asset_type,
-            capabilities=caps,
+            capabilities=list(derived.values()),
             timestamp=datetime.now(tz=timezone.utc),
         )
+
+    async def _dispatch_registered(
+        self, ctx: RequestContext, command_id: str, params: dict
+    ) -> CustomCommandResponse | None:
+        """Run the handler registered for *command_id*, or return None if there is none."""
+        registered = self._commands.get(command_id)
+        if registered is None or registered.handler is None:
+            return None
+        return await registered.handler(ctx, params)
+
+    async def _delegate(self, ctx: RequestContext, command_id: str, params: dict) -> EdgeResponse:
+        """
+        Default body for a typed RPC: run the registered handler for the equivalent command id.
+
+        This is what keeps the two surfaces in step while the typed RPCs still exist. An adapter
+        that registers ``flight.takeoff`` serves both ``TakeOff`` and
+        ``SendCustomCommand{command_id: "flight.takeoff"}`` without writing either twice, so
+        adapters can convert one command at a time and the typed RPCs can later be deleted as a
+        pure proto change rather than a flag day.
+        """
+        response = await self._dispatch_registered(ctx, command_id, params)
+        if response is None:
+            return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        if not response.success:
+            return EdgeResponse.fail(
+                ctx.tid,
+                ctx.sn,
+                response.error or ErrorMessage(message=f"{command_id} failed", code=ErrorCode.ASSET_ERROR),
+            )
+        return EdgeResponse.ok(ctx.tid, ctx.sn, external_execution_id=response.external_execution_id)
 
     def _is_overridden(self, method_name: str) -> bool:
         """Return True if *method_name* has been overridden in a subclass."""
@@ -164,15 +316,15 @@ class EdgeAdapter(ABC):
 
     async def take_off(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Command the drone to take off to *coordinates*."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "flight.takeoff", _coordinate_params(coordinates))
 
     async def go_to(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Command the drone to fly to *coordinates*."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "navigation.go_to", _coordinate_params(coordinates))
 
     async def return_to_home(self, ctx: RequestContext, request: ReturnToHomeRequest) -> EdgeResponse:
         """Command the drone to return to home."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "flight.return_to_home", {"altitude": request.altitude})
 
     # ------------------------------------------------------------------
     # Manual control
@@ -180,11 +332,11 @@ class EdgeAdapter(ABC):
 
     async def enter_manual_control(self, ctx: RequestContext, request: ManualControlRequest) -> EdgeResponse:
         """Establish a manual-control session for the given client."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "flight.manual.enter", {})
 
     async def exit_manual_control(self, ctx: RequestContext, request: ManualControlRequest) -> EdgeResponse:
         """Terminate the manual-control session."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "flight.manual.exit", {})
 
     async def manual_control_input(
         self,
@@ -213,15 +365,23 @@ class EdgeAdapter(ABC):
         locked: bool | None,
     ) -> EdgeResponse:
         """Point the gimbal/camera at *coordinates*."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(
+            ctx,
+            "gimbal.look_at",
+            {
+                **_coordinate_params(coordinates),
+                "payloadIndex": payload_index,
+                "locked": locked,
+            },
+        )
 
     async def take_photo(self, ctx: RequestContext) -> EdgeResponse:
         """Trigger a single photo capture."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "camera.take_photo", {})
 
     async def enable_gimbal_tracking(self, ctx: RequestContext, enabled: bool) -> EdgeResponse:
         """Enable or disable gimbal auto-tracking."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "gimbal.tracking", {"enabled": enabled})
 
     # ------------------------------------------------------------------
     # Detection  (server-streaming – optional)
@@ -249,19 +409,19 @@ class EdgeAdapter(ABC):
 
     async def open_cover(self, ctx: RequestContext) -> EdgeResponse:
         """Open the dock cover."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "dock.open_cover", {})
 
     async def close_cover(self, ctx: RequestContext, force: bool | None) -> EdgeResponse:
         """Close the dock cover. *force=True* maps to ForceCloseCover."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "dock.close_cover", {"force": bool(force)})
 
     async def start_charging(self, ctx: RequestContext) -> EdgeResponse:
         """Start charging the drone inside the dock."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "dock.start_charging", {})
 
     async def stop_charging(self, ctx: RequestContext) -> EdgeResponse:
         """Stop charging the drone inside the dock."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "dock.stop_charging", {})
 
     # ------------------------------------------------------------------
     # Asset management
@@ -269,15 +429,15 @@ class EdgeAdapter(ABC):
 
     async def reboot_asset(self, ctx: RequestContext) -> EdgeResponse:
         """Reboot the main asset (dock)."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "asset.reboot", {})
 
     async def boot_up_sub_asset(self, ctx: RequestContext) -> EdgeResponse:
         """Power on the sub-asset (drone)."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "asset.boot_sub_asset", {"enabled": True})
 
     async def boot_down_sub_asset(self, ctx: RequestContext) -> EdgeResponse:
         """Power off the sub-asset (drone)."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "asset.boot_sub_asset", {"enabled": False})
 
     async def register_asset(self, ctx: RequestContext, asset: Asset) -> EdgeResponse:
         """Notify the adapter that an asset has been registered on the platform."""
@@ -293,11 +453,11 @@ class EdgeAdapter(ABC):
 
     async def enter_or_close_remote_debug_mode(self, ctx: RequestContext, enabled: bool) -> EdgeResponse:
         """Toggle remote debug mode. Override if your hardware supports it."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "asset.remote_debug", {"enabled": enabled})
 
     async def change_ac_mode(self, ctx: RequestContext, mode: AssetAirConditionerState) -> EdgeResponse:
         """Change the dock air-conditioner mode. Override if your hardware supports it."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "asset.change_ac_mode", {"mode": mode.name})
 
     # ------------------------------------------------------------------
     # Live stream
@@ -305,31 +465,33 @@ class EdgeAdapter(ABC):
 
     async def start_live_stream(self, ctx: RequestContext, request: LiveStreamStartRequest) -> EdgeResponse:
         """Start a live video stream."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(
+            ctx, "stream.start", {"videoId": request.video_id, "streamServer": request.stream_server}
+        )
 
     async def stop_live_stream(self, ctx: RequestContext, request: LiveStreamStopRequest) -> EdgeResponse:
         """Stop the live stream identified by ``request.video_id``."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "stream.stop", {"videoId": request.video_id})
 
     async def change_lens(self, ctx: RequestContext, request: ChangeCameraLensRequest) -> EdgeResponse:
         """Switch the active camera lens."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "camera.change_lens", {"lens": request.lens})
 
     async def change_zoom(self, ctx: RequestContext, request: ChangeCameraZoomRequest) -> EdgeResponse:
         """Change the camera zoom level."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "camera.change_zoom", {"lens": request.lens, "zoom": request.zoom})
 
     async def capture_photo(self, ctx: RequestContext) -> EdgeResponse:
         """Capture a photo and save it to storage."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "camera.capture_photo", {})
 
     async def start_recording(self, ctx: RequestContext) -> EdgeResponse:
         """Start video recording."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "camera.start_recording", {})
 
     async def stop_recording(self, ctx: RequestContext) -> EdgeResponse:
         """Stop video recording."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "camera.stop_recording", {})
 
     # ------------------------------------------------------------------
     # Task operations
@@ -337,22 +499,29 @@ class EdgeAdapter(ABC):
 
     async def prepare_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         """Prepare a task for execution (pre-flight checks, upload waypoints, etc.)."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "mission.prepare", {"taskId": task_id})
 
     async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         """Start executing the previously prepared task."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "mission.start", {"taskId": task_id})
 
     async def stop_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         """Stop / abort the currently running task."""
-        return EdgeResponse.not_supported(ctx.tid, ctx.sn)
+        return await self._delegate(ctx, "mission.stop", {"taskId": task_id})
 
     async def send_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
-        """Send a vendor-specific custom command.
+        """Run the command identified by ``request.command_type``.
 
-        Override this method to handle arbitrary commands identified by
-        ``request.command_type``.  Parameters are passed as a plain dict in
-        ``request.params``.  Return a :class:`CustomCommandResponse` with an
-        optional ``result`` dict to send structured data back to the caller.
+        The default implementation dispatches to whatever :meth:`register_command` has been
+        given a handler for, so most adapters never override this method — they register their
+        commands and get advertisement and dispatch from the one declaration.
+
+        Overriding is still supported for an adapter that routes commands dynamically (a
+        protocol bridge forwarding an arbitrary id downstream, say). Call
+        ``await super().send_custom_command(ctx, request)`` first to let registered handlers win,
+        then fall back to your own routing.
         """
+        response = await self._dispatch_registered(ctx, request.command_type, request.params or {})
+        if response is not None:
+            return response
         return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, request.command_type)

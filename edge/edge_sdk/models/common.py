@@ -380,13 +380,79 @@ class EdgeResponse:
 # ---------------------------------------------------------------------------
 
 
+class CapabilityState(IntEnum):
+    UNSPECIFIED = 0
+    AVAILABLE = 1
+    TEMPORARILY_UNAVAILABLE = 2
+    UNSUPPORTED = 3
+    REQUIRES_AUTHORIZATION = 4
+
+
+class CapabilityTargetType(IntEnum):
+    UNSPECIFIED = 0
+    ASSET = 1
+    SUB_ASSET = 2
+    PAYLOAD = 3
+    COMPONENT = 4
+
+
+class CapabilitySource(IntEnum):
+    UNSPECIFIED = 0
+    BUILT_IN = 1
+    EDGE_ADAPTER = 2
+    RUNTIME = 3
+    USER = 4
+    APPLICATION = 5
+    INTEGRATION = 6
+    AI_GENERATED = 7
+
+
+@dataclass
+class CapabilityTarget:
+    """What a command acts on. ``target_ref`` is empty only when the type is ASSET."""
+
+    type: CapabilityTargetType = CapabilityTargetType.ASSET
+    target_ref: str | None = None
+
+
 @dataclass
 class Capability:
-    command: str
-    description: str
-    available: bool
+    """
+    One command this asset can be asked to run.
+
+    ``command_id`` is a dotted, vendor-neutral id (``flight.takeoff``, ``dock.open_cover``) —
+    the same id core's dispatcher routes and its safety gate checks for. ``input_schema`` and
+    ``output_schema`` are JSON Schema objects describing the ``params`` the command accepts and
+    the ``result`` it returns, which is what lets the console build a parameter form and lets
+    the platform validate a stored Application against contract drift.
+
+    The pre-2.0 fields ``command``/``available`` remain readable as properties so existing
+    code that only inspected those keeps working.
+    """
+
+    command_id: str
+    description: str = ""
+    state: CapabilityState = CapabilityState.AVAILABLE
+    display_name: str | None = None
     unavailable_reason: str | None = None
     metadata: dict[str, str] = field(default_factory=dict)
+    input_schema: dict | None = None
+    output_schema: dict | None = None
+    target: CapabilityTarget | None = None
+    schema_version: str | None = None
+    skill_id: str | None = None
+    source: CapabilitySource = CapabilitySource.EDGE_ADAPTER
+    provider: str | None = None
+
+    @property
+    def command(self) -> str:
+        """Backwards-compatible alias for :attr:`command_id`."""
+        return self.command_id
+
+    @property
+    def available(self) -> bool:
+        """Backwards-compatible alias: True when the state is AVAILABLE."""
+        return self.state is CapabilityState.AVAILABLE
 
 
 @dataclass
