@@ -7,6 +7,7 @@ retired in favor of :class:`CommandExecutionEvent` (vendor-neutral command lifec
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from .common import CommandExecutionStatus, MissionStatus, MissionType
 
@@ -42,3 +43,7 @@ class CommandExecutionEvent:
     command_id: str | None = None
     progress: float | None = None  # 0.0 – 1.0, present when RUNNING
     message: str | None = None
+    # When the adapter observed this, defaulting to publish time. REQUIRED on the wire: LiveData
+    # refuses an event without it ("requires external_execution_id, asset_sn and occurred_at") and
+    # the refusal is invisible here — the publish still succeeds, the event is simply dropped.
+    occurred_at: datetime | None = None

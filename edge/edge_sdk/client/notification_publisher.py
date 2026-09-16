@@ -260,12 +260,24 @@ class NotificationPublisher:
         )
 
     def _build_command_execution_event_request(self, event: CommandExecutionEvent):
+        from google.protobuf import timestamp_pb2
         from zqnt_utils.generated.zqnt import events_pb2
+
+        # occurred_at is not optional on the wire, whatever this dataclass's default suggests:
+        # CommandExecutionEventPublisher rejects the event outright without it, and because
+        # LiveData publishes fire-and-forget the adapter still sees a successful call. A skill
+        # node waiting on this execution id then sits on RUNNING until it times out.
+        occurred_at = timestamp_pb2.Timestamp()
+        if event.occurred_at is not None:
+            occurred_at.FromDatetime(event.occurred_at)
+        else:
+            occurred_at.GetCurrentTime()
 
         kwargs: dict = {
             "external_execution_id": event.external_execution_id,
             "status": int(event.status),
             "asset_sn": event.sn,
+            "occurred_at": occurred_at,
         }
         if event.command_id is not None:
             kwargs["command_id"] = event.command_id

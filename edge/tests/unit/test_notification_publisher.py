@@ -134,3 +134,47 @@ def common_status_active():
 def test_publisher_has_no_legacy_task_event_method():
     assert not hasattr(NotificationPublisher, "publish_task_event")
     assert not hasattr(NotificationPublisher, "publish_operation_event")
+
+
+def test_command_execution_event_always_carries_occurred_at():
+    """
+    LiveData's CommandExecutionEventPublisher rejects an event without occurred_at:
+
+        "Command execution event requires external_execution_id, asset_sn and occurred_at"
+
+    It does so fire-and-forget, so the adapter sees a successful publish while the event is
+    dropped before Redis — and a skill node waiting on that execution id hangs on RUNNING.
+    Every field in that precondition must therefore be populated here, not just the obvious two.
+    """
+    pub = NotificationPublisher(host="localhost", sn="DRONE-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(
+            external_execution_id="exec-1",
+            status=CommandExecutionStatus.SUCCEEDED,
+            sn="DRONE-1",
+            command_id="flight.takeoff",
+        )
+    )
+
+    event = req.event.command_execution
+    assert event.HasField("occurred_at"), "LiveData drops an event without occurred_at"
+    assert event.occurred_at.seconds > 0
+    assert event.external_execution_id
+    assert event.asset_sn
+
+
+def test_command_execution_event_preserves_an_explicit_occurred_at():
+    from datetime import datetime, timezone
+
+    observed = datetime(2026, 9, 16, 12, 30, 45, tzinfo=timezone.utc)
+    pub = NotificationPublisher(host="localhost", sn="DRONE-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(
+            external_execution_id="exec-1",
+            status=CommandExecutionStatus.RUNNING,
+            sn="DRONE-1",
+            occurred_at=observed,
+        )
+    )
+
+    assert req.event.command_execution.occurred_at.ToDatetime(tzinfo=timezone.utc) == observed
