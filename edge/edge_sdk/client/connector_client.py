@@ -55,11 +55,16 @@ class ConnectorClient:
         port: int = 50053,
         call_timeout: float = 30.0,
         max_retries: int = 3,
+        claim_code: str | None = None,
     ) -> None:
         self._host = host
         self._port = port
         self._call_timeout = call_timeout
         self._max_retries = max_retries
+        # Held here rather than passed per call so the credential lives in exactly one place and
+        # adapter code never has to carry it around. Set from ZQNT_CLAIM_CODE by
+        # EdgeAdapterRuntime.
+        self._claim_code = claim_code
         self._channel = None
         self._stub = None
 
@@ -150,6 +155,74 @@ class ConnectorClient:
             )
             return None
         return resp.id if resp.id else None
+
+    async def redeem_asset_claim(self, code: str, asset: Asset) -> Asset | None:
+        """
+        Trade a one-time claim code for an asset, and return it.
+
+        This is the one ConnectorService call an adapter makes without any platform identity: the
+        code *is* the credential. Everything about the created asset that matters — which
+        organization owns it — comes from the claim, not from *asset*, whose ``organization`` field
+        is ignored server-side. That is the point: an adapter cannot name a tenant, so it cannot
+        name the wrong one.
+
+        Returns ``None`` when the code is refused. The platform deliberately answers every refusal
+        identically — unknown, expired, revoked, exhausted, or not valid for this kind of device —
+        so that a caller cannot use it to discover which codes exist. Nothing here can tell you
+        which of those it was, and it must not guess.
+        """
+        from zqnt_utils.generated.zqnt import common_pb2, connector_pb2
+
+        from ..server._converters import asset_to_proto, proto_to_asset
+
+        tid = str(uuid.uuid4())
+        resp = await self._call(
+            "RedeemAssetClaim",
+            tid,
+            asset.sn,
+            lambda: self._stub.RedeemAssetClaim(
+                connector_pb2.RedeemAssetClaimRequest(
+                    base=self._base(tid, asset.sn),
+                    code=code,
+                    asset=asset_to_proto(asset, common_pb2),
+                ),
+                timeout=self._call_timeout,
+            ),
+        )
+        if resp.has_errors or resp.WhichOneof("response") != "asset":
+            logger.error(
+                "Claim code refused for sn=%s [tid=%s] — it may be unknown, expired, revoked, "
+                "already used up, or not valid for this kind of device; the platform does not say "
+                "which. Create a new code in the console and try again.",
+                asset.sn,
+                tid,
+            )
+            return None
+        logger.info("Claim redeemed for sn=%s — asset created [tid=%s]", asset.sn, tid)
+        return proto_to_asset(resp.asset)
+
+    async def ensure_asset(self, asset: Asset) -> Asset | None:
+        """
+        Make sure *asset*'s serial number exists on the platform, redeeming a claim if it does not.
+
+        The lookup comes first, and not merely to save a call: a claim is single-use, so on every
+        restart after the first there is nothing left to redeem, and an adapter that tried anyway
+        would log a refusal every time it came up. An asset that already exists is simply returned.
+
+        With no claim code configured this reports what it found and creates nothing — which is the
+        intended resting state for an adapter whose assets are provisioned in the console.
+        """
+        existing = await self.get_asset_by_sn(asset.sn)
+        if existing is not None:
+            return existing
+        if not self._claim_code:
+            logger.warning(
+                "No asset registered for sn=%s, and no ZQNT_CLAIM_CODE to pair one with. Create "
+                "the asset in the console, or pair this device with a code.",
+                asset.sn,
+            )
+            return None
+        return await self.redeem_asset_claim(self._claim_code, asset)
 
     # Mission/Task CRUD was retired from ConnectorService in favor of the capability-execution
     # model (Application/SkillExecution) — the underlying gRPC methods (GetMission, GetTask,

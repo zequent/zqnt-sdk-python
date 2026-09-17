@@ -103,6 +103,7 @@ class EdgeAdapterRuntime:
         self.connector = ConnectorClient(
             host=self._config.connector_host,
             port=self._config.connector_port,
+            claim_code=self._config.claim_code,
         )
         self.telemetry = TelemetryPublisher(
             host=self._config.telemetry_host,
@@ -196,6 +197,11 @@ class EdgeAdapterConfig:
     asset_type_name: str | None = None
     asset_vendor_name: str | None = None
     redis_url: str = "redis://localhost:6379"
+    # A one-time pairing code, minted in the console, that this adapter may trade for an asset the
+    # platform does not know yet (ConnectorClient.ensure_asset). It decides the organization the
+    # asset lands in, which is a decision an adapter cannot make for itself and which cannot be
+    # corrected afterwards. Unset is the normal state once the assets exist.
+    claim_code: str | None = None
 
     @classmethod
     def from_env(cls) -> "EdgeAdapterConfig":
@@ -216,6 +222,7 @@ class EdgeAdapterConfig:
             asset_type_name=os.getenv("ASSET_TYPE"),
             asset_vendor_name=os.getenv("ASSET_VENDOR"),
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"),
+            claim_code=os.getenv("ZQNT_CLAIM_CODE") or None,
         )
 
     def runtime(self) -> EdgeAdapterRuntime:

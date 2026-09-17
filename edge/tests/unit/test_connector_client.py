@@ -19,12 +19,13 @@ from edge_sdk.models.common import AssetConnection, AssetType, AssetVendor
 from edge_sdk.server._converters import asset_to_proto, proto_to_asset, proto_to_sub_asset
 
 
-def _client(stub: Any) -> ConnectorClient:
+def _client(stub: Any, claim_code: str | None = None) -> ConnectorClient:
     c = ConnectorClient.__new__(ConnectorClient)
     c._host = "localhost"
     c._port = 50053
     c._call_timeout = 5.0
     c._max_retries = 3
+    c._claim_code = claim_code
     c._channel = object()
     c._stub = stub
     return c
@@ -200,3 +201,78 @@ def test_connector_client_has_no_legacy_mission_task_methods() -> None:
     assert not hasattr(ConnectorClient, "get_mission")
     assert not hasattr(ConnectorClient, "get_task")
     assert not hasattr(ConnectorClient, "get_task_by_flight_id")
+
+
+# ---------------------------------------------------------------------------
+# Asset claims — the one call an adapter makes with no platform identity
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_redeem_asset_claim_returns_the_created_asset() -> None:
+    created = common_pb2.AssetProtoDTO(id="a1", sn="DOCK-1", organization="org-from-the-claim")
+    stub = _FakeStub({"RedeemAssetClaim": connector_pb2.ConnectorResponse(has_errors=False, asset=created)})
+    client = _client(stub)
+
+    result = await client.redeem_asset_claim("ZQ-4K7M-P2XR", _sample_asset())
+
+    assert result is not None
+    assert result.sn == "DOCK-1"
+    sent = stub.calls["RedeemAssetClaim"]
+    assert sent.code == "ZQ-4K7M-P2XR"
+    assert sent.asset.sn == "DOCK-1"
+
+
+@pytest.mark.asyncio
+async def test_a_refused_claim_is_none_and_not_an_exception() -> None:
+    # Every refusal answers alike — unknown, expired, revoked, exhausted, wrong kind of device —
+    # so there is nothing here to branch on, and an adapter must treat all of them as "no asset".
+    stub = _FakeStub({"RedeemAssetClaim": connector_pb2.ConnectorResponse(has_errors=True)})
+    client = _client(stub)
+
+    assert await client.redeem_asset_claim("ZQ-WRON-GWRO", _sample_asset()) is None
+
+
+@pytest.mark.asyncio
+async def test_ensure_asset_does_not_redeem_when_the_serial_already_exists() -> None:
+    # The restart case, and the reason the lookup comes first: the code was spent the first time
+    # this adapter came up, so redeeming again could only ever fail.
+    existing = common_pb2.AssetProtoDTO(id="a1", sn="DOCK-1")
+    stub = _FakeStub({"GetAssetBySn": connector_pb2.ConnectorResponse(has_errors=False, asset=existing)})
+    client = _client(stub, claim_code="ZQ-4K7M-P2XR")
+
+    result = await client.ensure_asset(_sample_asset())
+
+    assert result is not None
+    assert result.sn == "DOCK-1"
+    assert "RedeemAssetClaim" not in stub.calls
+
+
+@pytest.mark.asyncio
+async def test_ensure_asset_redeems_an_unknown_serial() -> None:
+    created = common_pb2.AssetProtoDTO(id="a1", sn="DOCK-1")
+    stub = _FakeStub(
+        {
+            "GetAssetBySn": connector_pb2.ConnectorResponse(has_errors=False),
+            "RedeemAssetClaim": connector_pb2.ConnectorResponse(has_errors=False, asset=created),
+        }
+    )
+    client = _client(stub, claim_code="ZQ-4K7M-P2XR")
+
+    result = await client.ensure_asset(_sample_asset())
+
+    assert result is not None
+    assert stub.calls["RedeemAssetClaim"].code == "ZQ-4K7M-P2XR"
+
+
+@pytest.mark.asyncio
+async def test_ensure_asset_creates_nothing_without_a_claim_code() -> None:
+    # The resting state for an adapter whose assets are provisioned in the console: report what is
+    # missing, invent nothing. An adapter that registered its own asset would create one with no
+    # organization, which no tenant can see and nobody can repair.
+    stub = _FakeStub({"GetAssetBySn": connector_pb2.ConnectorResponse(has_errors=False)})
+    client = _client(stub)
+
+    assert await client.ensure_asset(_sample_asset()) is None
+    assert "RedeemAssetClaim" not in stub.calls
+    assert "RegisterAsset" not in stub.calls
