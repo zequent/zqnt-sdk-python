@@ -153,26 +153,11 @@ async def test_get_asset_by_sn_not_found() -> None:
     assert result is None
 
 
-@pytest.mark.asyncio
-async def test_register_asset_success() -> None:
-    stub = _FakeStub({"RegisterAsset": connector_pb2.ConnectorResponse(has_errors=False, id="a1")})
-    client = _client(stub)
-
-    asset_id = await client.register_asset(_sample_asset())
-
-    assert asset_id == "a1"
-    sent = stub.calls["RegisterAsset"]
-    assert sent.asset.sn == "DOCK-1"
-
-
-@pytest.mark.asyncio
-async def test_register_asset_failure_returns_none() -> None:
-    stub = _FakeStub(
-        {"RegisterAsset": connector_pb2.ConnectorResponse(has_errors=True, response_message="duplicate sn")}
-    )
-    client = _client(stub)
-    result = await client.register_asset(_sample_asset())
-    assert result is None
+def test_an_adapter_cannot_create_an_asset() -> None:
+    # The structural half of the claim work: not "we stopped calling it" but "there is nothing to
+    # call". register_asset was insert-only, so its outcomes were an error for an asset that
+    # existed, or a new asset with no organization that no tenant could ever see.
+    assert not hasattr(ConnectorClient, "register_asset")
 
 
 @pytest.mark.asyncio

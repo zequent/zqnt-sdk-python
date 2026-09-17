@@ -127,34 +127,12 @@ class ConnectorClient:
             if response.HasField("assets"):
                 yield [proto_to_asset(a) for a in response.assets.assets]
 
-    async def register_asset(self, asset: Asset) -> str | None:
-        """Register an asset on the platform. Returns the asset id, or None on failure."""
-        from zqnt_utils.generated.zqnt import common_pb2, connector_pb2
-
-        from ..server._converters import asset_to_proto
-
-        tid = str(uuid.uuid4())
-        resp = await self._call(
-            "RegisterAsset",
-            tid,
-            asset.sn,
-            lambda: self._stub.RegisterAsset(
-                connector_pb2.ConnectorRegisterAssetRequest(
-                    base=self._base(tid, asset.sn),
-                    asset=asset_to_proto(asset, common_pb2),
-                ),
-                timeout=self._call_timeout,
-            ),
-        )
-        if resp.has_errors:
-            logger.error(
-                "RegisterAsset failed [tid=%s sn=%s]: %s",
-                tid,
-                asset.sn,
-                resp.response_message,
-            )
-            return None
-        return resp.id if resp.id else None
+    # register_asset is deliberately gone. Its only two outcomes were "Asset already exists" —
+    # it is insert-only — and an asset with no organization, which matches no tenant (connector's
+    # ListAssets filters on asset.organization.id) and which nobody can move afterwards, because
+    # updateAsset pins the field for good. An invisible asset is a worse outcome than a missing
+    # one, because it looks like it worked. Assets are created in the console or by redeeming a
+    # claim; an adapter binds to what already exists. See ensure_asset below.
 
     async def redeem_asset_claim(self, code: str, asset: Asset) -> Asset | None:
         """
