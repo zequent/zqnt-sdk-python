@@ -79,6 +79,9 @@ class AssetVendor(IntEnum):
     # register themselves as an EdgeAdapterService endpoint without owning a physical vendor
     # protocol -- matches asset.proto's ASSET_VENDOR_ZQNT exactly.
     ZQNT = 8
+    # The load/telemetry simulator registering as an asset of its own, so a simulated fleet is
+    # addressable exactly like a real one -- matches asset.proto's ASSET_VENDOR_SIMULATOR.
+    SIMULATOR = 9
 
 
 class AssetConnection(IntEnum):
