@@ -314,9 +314,96 @@ async def test_every_advertised_command_is_routable_by_id():
     unroutable = [
         c.command_id
         for c in caps.capabilities
-        if c.command_id not in _TYPED_DISPATCH
+        # Only what the adapter claims it can do. The snapshot also carries every catalog command
+        # it cannot, as UNSUPPORTED — that entry is itself the statement "not routable here", so
+        # requiring a route for it would contradict what it says.
+        if c.state is CapabilityState.AVAILABLE
+        and c.command_id not in _TYPED_DISPATCH
         and c.command_id not in adapter.registered_commands()
         and c.command_id not in _STREAMING_COMMANDS
     ]
 
     assert not unroutable, f"advertised but not routable by id: {unroutable}"
+
+
+# ---------------------------------------------------------------------------
+# supports_method — what the gRPC servicer gates every RPC on
+# ---------------------------------------------------------------------------
+
+
+def test_a_registered_command_makes_its_typed_rpc_supported():
+    adapter = _RegistryAdapter()
+    # Nothing is overridden on this adapter; flight.takeoff exists only as a registration.
+    assert adapter._is_overridden("take_off") is False
+    assert adapter.supports_method("take_off") is True
+
+
+def test_send_custom_command_is_always_supported():
+    """It routes registrations and built-in ids, and reports an unknown id as a failed response."""
+    assert _RegistryAdapter().supports_method("send_custom_command") is True
+
+
+def test_unregistered_command_stays_unsupported():
+    assert _RegistryAdapter().supports_method("close_cover") is False
+
+
+def test_a_declaration_without_a_handler_is_not_executable():
+    """dock.open_cover is advertised TEMPORARILY_UNAVAILABLE with no handler — a contract, not a run."""
+    adapter = _RegistryAdapter()
+    assert _caps(adapter)["dock.open_cover"].state is CapabilityState.TEMPORARILY_UNAVAILABLE
+    assert adapter.supports_method("open_cover") is False
+
+
+# ---------------------------------------------------------------------------
+# Skills and labels
+# ---------------------------------------------------------------------------
+
+
+def test_catalog_commands_carry_a_skill_and_a_label():
+    caps = _caps(_RegistryAdapter())
+    assert caps["mission.waypoint.execute"].skill_id == "mission"
+    assert caps["mission.waypoint.execute"].display_name == "Fly waypoint mission"
+    # Unsupported entries are advertised too, and are just as groupable.
+    assert caps["dock.close_cover"].skill_id == "dock"
+    assert caps["dock.close_cover"].display_name == "Close cover"
+
+
+def test_manual_control_is_its_own_skill_not_flight():
+    caps = _caps(_RegistryAdapter())
+    assert caps["flight.manual.input"].skill_id == "manual_control"
+    assert caps["flight.takeoff"].skill_id == "flight"
+
+
+def test_vendor_command_can_declare_its_skill():
+    class _Vendor(_RegistryAdapter):
+        def __init__(self):
+            super().__init__()
+            self.register_command(
+                "vendor.acme.spray",
+                self._record,
+                description="Run the spray boom",
+                display_name="Spray",
+                skill_id="spraying",
+            )
+
+    caps = _caps(_Vendor())
+    assert caps["vendor.acme.spray"].skill_id == "spraying"
+    assert caps["vendor.acme.spray"].display_name == "Spray"
+
+
+def test_the_whole_catalog_is_reported_even_when_unsupported():
+    """
+    A snapshot answers for every catalog command, not only the ones with a typed SDK method.
+
+    mission.waypoint.execute, mission.pause and mission.resume have no typed method at all: they
+    used to be absent from the snapshot of any adapter that did not register them, which reads as
+    "this asset has not reported yet" rather than "this asset cannot do that".
+    """
+    caps = _caps(_TypedOnlyAdapter())
+    for command_id in ("mission.waypoint.execute", "mission.pause", "mission.resume", "audio.play_tts"):
+        assert caps[command_id].state is CapabilityState.UNSUPPORTED
+
+
+def test_registering_one_of_them_flips_it_available():
+    adapter = _RegistryAdapter()
+    assert _caps(adapter)["mission.waypoint.execute"].state is CapabilityState.AVAILABLE

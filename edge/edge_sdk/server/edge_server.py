@@ -137,10 +137,17 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     # ------------------------------------------------------------------
 
     async def _assert_supported(self, method_name: str, context) -> None:
-        """Abort with UNIMPLEMENTED if the adapter has not overridden *method_name*."""
-        base = getattr(EdgeAdapter, method_name, None)
-        impl = getattr(type(self._adapter), method_name, None)
-        if base is impl:
+        """
+        Abort with UNIMPLEMENTED if the adapter cannot serve *method_name*.
+
+        Delegates to :meth:`EdgeAdapter.supports_method`, which counts a registered command
+        handler as an implementation. Checking only for an overridden method here is what used to
+        make every ``register_command`` declaration unreachable: the adapter advertised the
+        command through ``get_capabilities`` and then answered the call with UNIMPLEMENTED,
+        because the inherited method body that dispatches to the handler is, by definition, not
+        an override.
+        """
+        if not self._adapter.supports_method(method_name):
             await context.abort(
                 grpc.StatusCode.UNIMPLEMENTED,
                 f"{method_name} is not supported by this adapter",

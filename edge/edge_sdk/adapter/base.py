@@ -160,6 +160,7 @@ class EdgeAdapter(ABC):
         handler: CommandHandler | None = None,
         *,
         description: str | None = None,
+        display_name: str | None = None,
         input_schema: dict | None = None,
         output_schema: dict | None = None,
         schema_version: str | None = None,
@@ -197,11 +198,17 @@ class EdgeAdapter(ABC):
 
         Registering the same id twice replaces the earlier entry, so an adapter can re-register
         with a narrower state (for example TEMPORARILY_UNAVAILABLE while a payload is detached).
+
+        ``display_name``/``skill_id`` likewise default to the catalog entry. A ``vendor.*`` command
+        has no catalog entry, so pass ``skill_id`` to file it alongside the commands it belongs
+        with -- otherwise the console groups it under the literal segment ``vendor``, together with
+        every unrelated vendor command in the fleet.
         """
         spec = spec_for(command_id)
         self._commands[command_id] = RegisteredCommand(
             command_id=command_id,
             description=description if description is not None else (spec.description if spec else ""),
+            display_name=display_name if display_name is not None else (spec.display_name if spec else None),
             handler=handler,
             input_schema=input_schema if input_schema is not None else (spec.input_schema if spec else None),
             output_schema=output_schema if output_schema is not None else (spec.output_schema if spec else None),
@@ -230,8 +237,9 @@ class EdgeAdapter(ABC):
         """
         Build a :class:`Capabilities` snapshot from what this adapter actually implements.
 
-        Two sources, merged: every typed SDK method the subclass has overridden (mapped to its
-        dotted command id through :data:`_METHOD_COMMANDS`) and everything passed to
+        Two sources, merged: the platform catalog (:data:`~edge_sdk.adapter.commands.CATALOG`),
+        with each command marked available when the subclass overrides the typed method that
+        implements it (mapped through :data:`_METHOD_COMMANDS`), and everything passed to
         :meth:`register_command`. A registration wins over the derived entry for the same id, so
         an adapter can attach a richer contract to a command it also implements typed.
 
@@ -240,19 +248,27 @@ class EdgeAdapter(ABC):
         "this asset has not reported yet".
         """
         derived: dict[str, Capability] = {}
-        for method_name, command_id in _METHOD_COMMANDS.items():
-            spec = CATALOG.get(command_id)
-            overridden = self._is_overridden(method_name)
+        # Walk the whole catalog, not only the ids that have a typed method. A catalog command
+        # with no typed equivalent (mission.waypoint.execute, mission.pause, mission.resume) used
+        # to be missing from the snapshot altogether unless the adapter registered it, so the
+        # platform could not tell "this asset cannot fly a waypoint mission" from "this asset has
+        # not reported yet" -- the exact distinction this method exists to make.
+        for command_id, spec in CATALOG.items():
             # boot_up_sub_asset/boot_down_sub_asset share one command id: available if either is.
-            if command_id in derived and not overridden:
-                continue
+            overridden = any(
+                self._is_overridden(method_name)
+                for method_name, mapped in _METHOD_COMMANDS.items()
+                if mapped == command_id
+            )
             derived[command_id] = Capability(
                 command_id=command_id,
-                description=spec.description if spec else "",
+                description=spec.description,
+                display_name=spec.display_name,
                 state=CapabilityState.AVAILABLE if overridden else CapabilityState.UNSUPPORTED,
-                input_schema=spec.input_schema if spec else None,
-                output_schema=spec.output_schema if spec else None,
-                schema_version=spec.schema_version if spec else None,
+                input_schema=spec.input_schema,
+                output_schema=spec.output_schema,
+                schema_version=spec.schema_version,
+                skill_id=spec.skill_id,
                 target=CapabilityTarget(),
             )
 
@@ -260,6 +276,7 @@ class EdgeAdapter(ABC):
             derived[command_id] = Capability(
                 command_id=command_id,
                 description=registered.description,
+                display_name=registered.display_name,
                 state=registered.state,
                 unavailable_reason=registered.unavailable_reason,
                 metadata=dict(registered.metadata),
@@ -340,6 +357,33 @@ class EdgeAdapter(ABC):
         base = getattr(EdgeAdapter, method_name, None)
         impl = getattr(type(self), method_name, None)
         return base is not impl
+
+    def supports_method(self, method_name: str) -> bool:
+        """
+        Return True if this adapter can actually serve the RPC backed by *method_name*.
+
+        This is what the gRPC servicer gates on, and it is deliberately wider than
+        :meth:`_is_overridden`. A command declared through :meth:`register_command` is served by
+        the inherited method body (which delegates to the registered handler), so the method is
+        never overridden and an override check alone reports it unimplemented -- the adapter then
+        advertises a command in ``get_capabilities`` that its own server refuses with
+        UNIMPLEMENTED. That split is the exact drift the registry exists to remove, so the gate
+        has to see registrations too.
+
+        ``send_custom_command`` is always supported: its inherited body routes registered handlers
+        *and* built-in ids onto the typed methods (:meth:`_dispatch_typed`), and for an id it
+        cannot place it answers with a not-supported *response* rather than aborting the call,
+        which is what mission-autonomy's dispatcher reads (``response.getHasErrors()``).
+        """
+        if method_name == "send_custom_command":
+            return True
+        if self._is_overridden(method_name):
+            return True
+        command_id = _METHOD_COMMANDS.get(method_name)
+        if command_id is None:
+            return False
+        registered = self._commands.get(command_id)
+        return registered is not None and registered.dispatchable
 
     # ------------------------------------------------------------------
     # Flight control
