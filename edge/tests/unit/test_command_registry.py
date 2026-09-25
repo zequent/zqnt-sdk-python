@@ -400,7 +400,7 @@ def test_the_whole_catalog_is_reported_even_when_unsupported():
     "this asset has not reported yet" rather than "this asset cannot do that".
     """
     caps = _caps(_TypedOnlyAdapter())
-    for command_id in ("mission.waypoint.execute", "mission.pause", "mission.resume", "audio.play_tts"):
+    for command_id in ("mission.waypoint.execute", "mission.pause", "mission.resume"):
         assert caps[command_id].state is CapabilityState.UNSUPPORTED
 
 

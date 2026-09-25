@@ -230,8 +230,6 @@ CATALOG: dict[str, CommandSpec] = {
             schema({"enabled": _BOOL}, ["enabled"]),
             skill_id="streaming",
         ),
-        # Audio
-        _spec("audio.play_tts", "Play speech", "Play a text-to-speech message", schema({"text": _STRING}, ["text"])),
         # Dock
         _spec("dock.open_cover", "Open cover", "Open the dock cover", schema({})),
         _spec("dock.close_cover", "Close cover", "Close the dock cover", schema({"force": _BOOL})),
