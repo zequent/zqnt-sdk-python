@@ -43,6 +43,10 @@ class CommandExecutionEvent:
     command_id: str | None = None
     progress: float | None = None  # 0.0 – 1.0, present when RUNNING
     message: str | None = None
+    # What the command produced, on SUCCEEDED. mission-autonomy completes a skill node that is
+    # waiting on this execution with it as the node's output, so later nodes can map from it
+    # ($.nodes.<id>.output.<field>) — the asynchronous counterpart of CustomCommandResponse.result.
+    output: dict | None = None
     # When the adapter observed this, defaulting to publish time. REQUIRED on the wire: LiveData
     # refuses an event without it ("requires external_execution_id, asset_sn and occurred_at") and
     # the refusal is invisible here — the publish still succeeds, the event is simply dropped.

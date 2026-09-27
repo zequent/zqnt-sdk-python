@@ -117,6 +117,32 @@ def test_build_command_execution_event_request_matches_schema():
     assert req.event_type == events_pb2.NotificationEventType.NOTIFICATION_EVENT_COMMAND_EXECUTION
 
 
+def test_build_command_execution_event_carries_output():
+    """A waiting skill node takes its output from here; dropping it would complete the node empty."""
+    pub = NotificationPublisher(host="localhost", sn="AI-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(
+            external_execution_id="exec-3",
+            status=CommandExecutionStatus.SUCCEEDED,
+            sn="AI-1",
+            output={"found": True, "object_type": "person", "latitude": 52.5, "position": {"lat": 1.0}},
+        )
+    )
+    out = req.event.command_execution.output
+    assert out["found"] is True
+    assert out["object_type"] == "person"
+    assert out["latitude"] == 52.5
+    assert out["position"]["lat"] == 1.0
+
+
+def test_build_command_execution_event_without_output_leaves_it_unset():
+    pub = NotificationPublisher(host="localhost", sn="AI-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(external_execution_id="exec-4", status=CommandExecutionStatus.RUNNING, sn="AI-1")
+    )
+    assert not req.event.command_execution.HasField("output")
+
+
 def test_build_command_execution_event_uses_critical_severity_on_failure():
     pub = NotificationPublisher(host="localhost", sn="DOCK1")
     req = pub._build_command_execution_event_request(

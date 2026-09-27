@@ -285,6 +285,12 @@ class NotificationPublisher:
             kwargs["progress"] = event.progress
         if event.message is not None:
             kwargs["message"] = event.message
+        if event.output is not None:
+            from google.protobuf import struct_pb2
+
+            output = struct_pb2.Struct()
+            output.update(event.output)
+            kwargs["output"] = output
 
         severity = (
             events_pb2.NotificationSeverity.NOTIFICATION_SEVERITY_CRITICAL
