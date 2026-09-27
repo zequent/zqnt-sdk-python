@@ -541,11 +541,31 @@ class BoundingBox:
 
 
 @dataclass
+class DetectionPosition:
+    """
+    Where a detected object is, for sensors that locate what they see (a radar, RF direction
+    finding, a geolocated camera target). Degrees WGS84; range/bearing/elevation are relative to
+    the sensor, bearing clockwise from true north; speed/heading are the object's own.
+    """
+
+    latitude: float
+    longitude: float
+    altitude: float | None = None
+    range_m: float | None = None
+    bearing_deg: float | None = None
+    elevation_deg: float | None = None
+    speed_mps: float | None = None
+    heading_deg: float | None = None
+
+
+@dataclass
 class DetectionResult:
     object_id: str
     object_type: str
     confidence: float
-    bounding_box: BoundingBox
+    # Image-space box for camera detections; a radar has none.
+    bounding_box: BoundingBox | None = None
+    position: DetectionPosition | None = None
 
 
 @dataclass

@@ -251,7 +251,7 @@ wheels = [
 [[package]]
 name = "zqnt-utils"
 version = "2.0.0"
-source = { git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2#15f7d432b88cb814a48fcb36b894400b3b8ce0ba" }
+source = { git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2#3b132f8e3844a27ad7a512e160b41dd1d04da761" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },

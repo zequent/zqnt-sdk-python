@@ -80,6 +80,7 @@ from .models import (
     CommandProgress,
     Coordinates,
     DetectionParameter,
+    DetectionPosition,
     DetectionResponse,
     DetectionResult,
     DetectTaskConfig,
@@ -177,6 +178,7 @@ __all__ = [
     "ChangeCameraLensRequest",
     "ChangeCameraZoomRequest",
     "BoundingBox",
+    "DetectionPosition",
     "DetectionResult",
     "DetectionResponse",
     # asset
