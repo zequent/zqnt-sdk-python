@@ -19,6 +19,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           submodules: recursive
           token: ${{ secrets.GH_PAT }}
 
@@ -29,15 +30,15 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v2
-
-      # REQUIRED for private git dependencies
-      - name: Configure git authentication
-        run: |
-          git config --global credential.helper store
-          echo "https://x-access-token:${{ secrets.GH_PAT }}@github.com" >> ~/.git-credentials
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-
       - name: Install dependencies
+        # Private git dependencies: the token lives only in this step's environment, never in a
+        # file on the runner that later steps (tests, builds) could read.
+        env:
+          GIT_CONFIG_COUNT: "2"
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ secrets.GH_PAT }}@github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
+          GIT_CONFIG_KEY_1: url.https://x-access-token:${{ secrets.GH_PAT }}@github.com/.insteadOf
+          GIT_CONFIG_VALUE_1: "git@github.com:"
         run: |
           uv sync --all-extras
 
