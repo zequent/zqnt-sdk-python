@@ -174,8 +174,13 @@ export ZQNT_CLIENT_TOKEN=eyJhbGciOiJFZERTQSIs...   # read by ZequentClient(...) 
 ```
 
 ```python
-client = ZequentClient(connector_config=..., remote_control_config=..., mission_autonomy_config=...,
-                       live_data_config=..., client_token=token)   # or pass it explicitly
+client = ZequentClient(
+    connector_config=...,
+    remote_control_config=...,
+    mission_autonomy_config=...,
+    live_data_config=...,
+    client_token=token,
+)  # or pass it explicitly
 ```
 
 It is sent as `authorization: Bearer <token>` on every call, unary and streaming. A refusal is raised
