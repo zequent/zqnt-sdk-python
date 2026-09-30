@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Self
 
 import grpc.aio
 
+from .auth import ENV_VAR, resolve_token
 from .config.resilience import ResilienceConfig
 from .config.service_config import ServiceConfig
 from .grpc_.channel_factory import create_channel
@@ -52,19 +53,29 @@ class ZequentClient:
         mission_autonomy_config: ServiceConfig,
         live_data_config: ServiceConfig,
         resilience: ResilienceConfig | None = None,
+        client_token: str | None = None,
     ) -> None:
+        """``client_token``: the client credential issued in the console (Access & Integrations >
+        Credentials, kind "client"). When omitted, ``ZQNT_CLIENT_TOKEN`` is used; with neither, the
+        platform refuses every call."""
         self._connector_config = connector_config
         self._remote_control_config = remote_control_config
         self._mission_autonomy_config = mission_autonomy_config
         self._live_data_config = live_data_config
+        self._client_token = resolve_token(client_token)
+        if self._client_token is None:
+            logger.warning(
+                "No client credential configured (%s or client_token=...): the platform will refuse every call",
+                ENV_VAR,
+            )
         self._resilience = resilience or ResilienceConfig()
 
         # Channels are created eagerly so that connection problems surface
         # at construction time rather than on the first RPC.
-        self._connector_channel: grpc.aio.Channel = create_channel(connector_config)
-        self._remote_control_channel: grpc.aio.Channel = create_channel(remote_control_config)
-        self._mission_autonomy_channel: grpc.aio.Channel = create_channel(mission_autonomy_config)
-        self._live_data_channel: grpc.aio.Channel = create_channel(live_data_config)
+        self._connector_channel: grpc.aio.Channel = create_channel(connector_config, self._client_token)
+        self._remote_control_channel: grpc.aio.Channel = create_channel(remote_control_config, self._client_token)
+        self._mission_autonomy_channel: grpc.aio.Channel = create_channel(mission_autonomy_config, self._client_token)
+        self._live_data_channel: grpc.aio.Channel = create_channel(live_data_config, self._client_token)
         self._channels: list[grpc.aio.Channel] = [
             self._connector_channel,
             self._remote_control_channel,
@@ -100,6 +111,11 @@ class ZequentClient:
     # ------------------------------------------------------------------
     # Configuration / channel access
     # ------------------------------------------------------------------
+
+    @property
+    def has_client_token(self) -> bool:
+        """Whether a client credential is sent (the token itself is never exposed)."""
+        return self._client_token is not None
 
     @property
     def resilience(self) -> ResilienceConfig:

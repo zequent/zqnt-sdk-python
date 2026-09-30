@@ -157,6 +157,27 @@ async with client.remote_control.manual_control_session(sn="DOCK-1") as session:
 
 ---
 
+## Authentication
+
+The platform refuses every call that carries no credential. An organization administrator issues a
+**client credential** in the console under **Deploy → Access & Integrations → Credentials** (kind
+**client**). It is shown once, belongs to that one organization, and reaches only that
+organization's assets, Applications and runs — never users, organizations or other administration.
+
+```bash
+export ZQNT_CLIENT_TOKEN=eyJhbGciOiJFZERTQSIs...   # read by ZequentClient(...) and from_env()
+```
+
+```python
+client = ZequentClient(connector_config=..., remote_control_config=..., mission_autonomy_config=...,
+                       live_data_config=..., client_token=token)   # or pass it explicitly
+```
+
+It is sent as `authorization: Bearer <token>` on every call, unary and streaming. A refusal is raised
+as `client_sdk.auth.ZequentAuthError` — a `grpc.aio.AioRpcError` with the same `code()` and a
+`details()` that says what to do: `UNAUTHENTICATED` (no credential, or an expired/revoked one) or
+`PERMISSION_DENIED` (an asset of another organization, or an administrative call). Neither is retried.
+
 ## Error handling
 
 All client errors derive from `ZequentClientError`:

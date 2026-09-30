@@ -29,6 +29,7 @@ from typing import Any
 import grpc
 import grpc.aio
 
+from ..auth import explain
 from ..config.resilience import ResilienceConfig
 from ..exceptions import ConnectorError
 from ..grpc_.resilience import GrpcResilience
@@ -468,7 +469,7 @@ class ConnectorClient:
                 code = exc.code()
                 logger.warning("AssetMonitoring gRPC error: %s (%s)", code.name if code else "?", exc.details())
                 if code not in _RETRYABLE_CODES:
-                    await _maybe_call(on_error, exc)
+                    await _maybe_call(on_error, explain(exc))
                     return
             except Exception as exc:  # noqa: BLE001
                 if handle.is_stopped:

@@ -16,6 +16,7 @@ import logging
 import grpc
 import grpc.aio
 
+from ..auth import bearer_interceptors
 from ..config.service_config import LoadBalancerType, ServiceConfig
 
 logger = logging.getLogger(__name__)
@@ -51,8 +52,12 @@ def _channel_options(config: ServiceConfig) -> list[tuple[str, object]]:
     return options
 
 
-def create_channel(config: ServiceConfig) -> grpc.aio.Channel:
-    """Build a ``grpc.aio.Channel`` from a :class:`ServiceConfig`."""
+def create_channel(config: ServiceConfig, client_token: str | None = None) -> grpc.aio.Channel:
+    """Build a ``grpc.aio.Channel`` from a :class:`ServiceConfig`.
+
+    ``client_token`` is sent as ``authorization: Bearer ...`` on every call (see
+    :mod:`client_sdk.auth`); without one the platform refuses the calls.
+    """
     if config.use_stork and config.stork_service_name:
         # Stork is Java-only. In Python a Kubernetes headless Service +
         # DNS-based round-robin gives the equivalent behaviour.
@@ -66,12 +71,13 @@ def create_channel(config: ServiceConfig) -> grpc.aio.Channel:
         logger.info("Creating direct channel: %s", target)
 
     options = _channel_options(config)
+    interceptors = bearer_interceptors(client_token)
 
     if config.use_plaintext:
-        channel = grpc.aio.insecure_channel(target, options=options)
+        channel = grpc.aio.insecure_channel(target, options=options, interceptors=interceptors)
     else:
         credentials = grpc.ssl_channel_credentials()
-        channel = grpc.aio.secure_channel(target, credentials, options=options)
+        channel = grpc.aio.secure_channel(target, credentials, options=options, interceptors=interceptors)
 
     logger.info("Channel created successfully for service: %s", config.service_name)
     return channel
