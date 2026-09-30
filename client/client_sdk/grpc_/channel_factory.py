@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 
 import grpc
 import grpc.aio
@@ -52,11 +53,19 @@ def _channel_options(config: ServiceConfig) -> list[tuple[str, object]]:
     return options
 
 
-def create_channel(config: ServiceConfig, client_token: str | None = None) -> grpc.aio.Channel:
+def create_channel(
+    config: ServiceConfig,
+    client_token: str | None = None,
+    interceptors: Sequence[grpc.aio.ClientInterceptor] = (),
+) -> grpc.aio.Channel:
     """Build a ``grpc.aio.Channel`` from a :class:`ServiceConfig`.
 
     ``client_token`` is sent as ``authorization: Bearer ...`` on every call (see
     :mod:`client_sdk.auth`); without one the platform refuses the calls.
+
+    ``interceptors`` are the host application's own, in the order given (the first one sees each
+    call first). They run before the SDK's credential interceptor, so an ``authorization`` header
+    they set wins over ``client_token``.
     """
     if config.use_stork and config.stork_service_name:
         # Stork is Java-only. In Python a Kubernetes headless Service +
@@ -71,13 +80,13 @@ def create_channel(config: ServiceConfig, client_token: str | None = None) -> gr
         logger.info("Creating direct channel: %s", target)
 
     options = _channel_options(config)
-    interceptors = bearer_interceptors(client_token)
+    chain = [*interceptors, *bearer_interceptors(client_token)]
 
     if config.use_plaintext:
-        channel = grpc.aio.insecure_channel(target, options=options, interceptors=interceptors)
+        channel = grpc.aio.insecure_channel(target, options=options, interceptors=chain)
     else:
         credentials = grpc.ssl_channel_credentials()
-        channel = grpc.aio.secure_channel(target, credentials, options=options, interceptors=interceptors)
+        channel = grpc.aio.secure_channel(target, credentials, options=options, interceptors=chain)
 
     logger.info("Channel created successfully for service: %s", config.service_name)
     return channel

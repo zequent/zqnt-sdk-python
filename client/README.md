@@ -57,17 +57,22 @@ async def main():
 asyncio.run(main())
 ```
 
-`ZequentClient.from_env()` reads connection settings from environment variables.
-Defaults are shown:
+`ZequentClient.from_env()` reads connection settings from environment variables — the same names the
+Java and Go client SDKs read, so one `.env` works for every language. Nothing set is the local
+development stack (`quarkus:dev` or `docker-compose.local.yml`):
 
-| Variable                          | Default     |
-| --------------------------------- | ----------- |
-| `REMOTE_CONTROL_SERVICE_HOST`     | `localhost` |
-| `REMOTE_CONTROL_SERVICE_PORT`     | `8002`      |
-| `MISSION_AUTONOMY_SERVICE_HOST`   | `localhost` |
-| `MISSION_AUTONOMY_SERVICE_PORT`   | `8004`      |
-| `LIVE_DATA_SERVICE_HOST`          | `localhost` |
-| `LIVE_DATA_SERVICE_PORT`          | `8003`      |
+| Variable                                                        | Local default (nothing set)   |
+| --------------------------------------------------------------- | ----------------------------- |
+| `CONNECTOR_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`           | `localhost` / `8010` / `true` |
+| `REMOTE_CONTROL_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`      | `localhost` / `8002` / `true` |
+| `LIVE_DATA_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`           | `localhost` / `8003` / `true` |
+| `MISSION_AUTONOMY_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`    | `localhost` / `8004` / `true` |
+| `ZQNT_CLIENT_TOKEN`                                             | none — issue one in your local console too |
+
+A deployment sets the hosts, `_USE_PLAINTEXT=false` for TLS whenever traffic leaves a private
+network, and `ZQNT_CLIENT_TOKEN` from its secret store — never from a committed file. There is
+deliberately no built-in development credential: the local platform refuses anonymous calls too.
+`from_env(**overrides)` passes `client_token=`, `interceptors=` or a single `*_config=` through.
 
 You can also build a client manually:
 
@@ -177,6 +182,14 @@ It is sent as `authorization: Bearer <token>` on every call, unary and streaming
 as `client_sdk.auth.ZequentAuthError` — a `grpc.aio.AioRpcError` with the same `code()` and a
 `details()` that says what to do: `UNAUTHENTICATED` (no credential, or an expired/revoked one) or
 `PERMISSION_DENIED` (an asset of another organization, or an administrative call). Neither is retried.
+
+### A credential that is not one fixed token
+
+A service that forwards its own caller's token, or rotates a short-lived one, passes its own
+`grpc.aio` interceptors: `ZequentClient(..., interceptors=[...])` or
+`ZequentClient.from_env(interceptors=[...])`. They go on every channel (all four services, unary and
+streaming calls), in the order given, before the SDK's credential interceptor. An `authorization`
+header they set wins, and the fixed client token is then not sent.
 
 ## Error handling
 

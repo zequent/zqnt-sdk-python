@@ -9,6 +9,11 @@ Hand it to the SDK as ``ZequentClient(..., client_token=...)`` or through the
 ``ZQNT_CLIENT_TOKEN`` environment variable (``ZequentClient.from_env()`` and the constructor both
 read it when no token is passed). It is sent as ``authorization: Bearer <token>`` on every call.
 
+A host application whose credential is not one fixed token (a service forwarding its own caller's
+token, or rotating a short-lived one) passes its own ``grpc.aio`` interceptors instead:
+``ZequentClient(..., interceptors=[...])``. They run before the SDK's credential interceptor, and an
+``authorization`` header they set wins - the fixed token is then not sent.
+
 A refusal still raises :class:`grpc.aio.AioRpcError` (so existing ``except`` clauses keep working),
 as the subclass :class:`ZequentAuthError` whose ``details()`` says what to do about it.
 """
@@ -74,11 +79,15 @@ def explain(error: BaseException) -> BaseException:
 
 
 def _with_token(details: grpc.aio.ClientCallDetails, token: str) -> grpc.aio.ClientCallDetails:
+    # A credential already on the call - set by one of the host application's own interceptors
+    # (see ZequentClient(interceptors=...)) or passed as call metadata - wins: two authorization
+    # values would leave the platform reading whichever came last.
+    if details.metadata and any(key.lower() == _AUTHORIZATION for key, _ in details.metadata):
+        return details
     metadata = grpc.aio.Metadata()
     if details.metadata:
         for key, value in details.metadata:
-            if key.lower() != _AUTHORIZATION:
-                metadata.add(key, value)
+            metadata.add(key, value)
     metadata.add(_AUTHORIZATION, f"Bearer {token}")
     return grpc.aio.ClientCallDetails(
         method=details.method,
