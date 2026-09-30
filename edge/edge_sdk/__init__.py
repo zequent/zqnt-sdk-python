@@ -38,6 +38,7 @@ except PackageNotFoundError:
 from .adapter.base import EdgeAdapter
 from .adapter.commands import CATALOG as COMMAND_CATALOG
 from .adapter.commands import CommandSpec, RegisteredCommand, schema
+from .auth import EdgeAuthConfig, PlatformTokenVerifier, TokenVerificationError
 from .client.connector_client import ConnectorClient
 from .client.live_data_service import LiveDataService
 from .client.mission_autonomy_client import MissionAutonomyClient
@@ -128,6 +129,10 @@ __all__ = [
     "EdgeAdapter",
     "EdgeAdapterConfig",
     "EdgeAdapterRuntime",
+    # authentication (edge_sdk.auth)
+    "EdgeAuthConfig",
+    "PlatformTokenVerifier",
+    "TokenVerificationError",
     "EdgeServer",
     "RegistrationConfig",
     "TelemetryPublisher",

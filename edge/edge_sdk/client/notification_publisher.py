@@ -24,6 +24,7 @@ import asyncio
 import logging
 import uuid
 
+from ..auth import default_edge_token, platform_channel
 from ..models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
 
 logger = logging.getLogger(__name__)
@@ -55,8 +56,10 @@ class NotificationPublisher:
         port: int = 50052,
         sn: str = "",
         queue_max_size: int = 1000,
+        token: str | None = None,
     ) -> None:
         self._host = host
+        self._token = token if token is not None else default_edge_token()
         self._port = port
         self._sn = sn
         self._queue_max_size = queue_max_size
@@ -141,8 +144,6 @@ class NotificationPublisher:
     # ------------------------------------------------------------------
 
     async def _run_stream(self) -> None:
-        import grpc
-        import grpc.aio
         from zqnt_utils.generated.zqnt import live_data_pb2_grpc
 
         backoff = self._BACKOFF_INITIAL
@@ -151,7 +152,7 @@ class NotificationPublisher:
             gen_stop = asyncio.Event()
             channel = None
             try:
-                channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
+                channel = platform_channel(self._host, self._port, self._token)
                 stub = live_data_pb2_grpc.LiveDataServiceStub(channel)
                 logger.info("Notification stream connecting to %s:%d (sn=%s)", self._host, self._port, self._sn)
 

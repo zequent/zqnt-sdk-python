@@ -7,6 +7,8 @@ Design decisions:
   status codes all work exactly as they would in production.
 - fakeredis replaces a real Redis instance so registration tests run without
   any external infrastructure.
+- The behaviour fixtures run with platform authentication switched off (these tests are about
+  what the servicer does); tests/integration/test_server_auth.py covers authentication itself.
 """
 
 import asyncio
@@ -16,8 +18,11 @@ from datetime import datetime, timezone
 
 import pytest_asyncio
 
-from edge_sdk import AssetType, EdgeAdapter, EdgeResponse, EdgeServer
+from edge_sdk import AssetType, EdgeAdapter, EdgeAuthConfig, EdgeResponse, EdgeServer
 from edge_sdk.models.common import Capabilities, CustomCommandRequest, CustomCommandResponse, RequestContext
+
+#: Behaviour tests call the server without a platform token.
+NO_AUTH = EdgeAuthConfig(disabled=True)
 
 # ---------------------------------------------------------------------------
 # Minimal adapter used across all tests
@@ -118,7 +123,7 @@ async def server_port(test_adapter):
     The server is stopped after the test completes.
     """
     port = _free_port()
-    server = EdgeServer(adapter=test_adapter, port=port)
+    server = EdgeServer(adapter=test_adapter, port=port, auth=NO_AUTH)
     task = asyncio.create_task(server.serve())
     await asyncio.sleep(0.05)  # give the server time to bind
     yield port
@@ -131,7 +136,7 @@ async def server_port(test_adapter):
 async def crashing_server_port(crashing_adapter):
     """Same as server_port but uses the crashing adapter."""
     port = _free_port()
-    server = EdgeServer(adapter=crashing_adapter, port=port)
+    server = EdgeServer(adapter=crashing_adapter, port=port, auth=NO_AUTH)
     task = asyncio.create_task(server.serve())
     await asyncio.sleep(0.05)
     yield port
@@ -149,7 +154,7 @@ def registry_adapter() -> _RegistryOnlyAdapter:
 async def registry_server_port(registry_adapter):
     """Same as server_port but serves the registration-only adapter."""
     port = _free_port()
-    server = EdgeServer(adapter=registry_adapter, port=port)
+    server = EdgeServer(adapter=registry_adapter, port=port, auth=NO_AUTH)
     task = asyncio.create_task(server.serve())
     await asyncio.sleep(0.05)
     yield port

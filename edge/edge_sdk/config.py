@@ -34,6 +34,12 @@ Environment variables (all optional, sensible defaults provided):
     ASSET_TYPE          AssetType proto name, e.g. ASSET_TYPE_AIRCRAFT
     ASSET_VENDOR        AssetVendor proto name, e.g. ASSET_VENDOR_MAVLINK
     REDIS_URL           Redis URL (default: redis://localhost:6379)
+
+    Authentication (see edge_sdk.auth):
+    ZQNT_EDGE_TOKEN           Edge credential for calls into the platform (issued in the console)
+    ZQNT_PLATFORM_PUBLIC_KEY  The platform's service public key (SERVICE_AUTH_PUBLIC_KEY); commands
+                              without a token it verifies are refused. Alias: SERVICE_AUTH_PUBLIC_KEY
+    ZQNT_EDGE_AUTH_DISABLED   "true" accepts unauthenticated commands — local SITL/simulators only
 """
 
 from __future__ import annotations
@@ -43,6 +49,8 @@ import logging
 import os
 import sys
 from typing import TYPE_CHECKING
+
+from .auth import EdgeAuthConfig
 
 if TYPE_CHECKING:
     from .adapter.base import EdgeAdapter
@@ -104,15 +112,18 @@ class EdgeAdapterRuntime:
             host=self._config.connector_host,
             port=self._config.connector_port,
             claim_code=self._config.claim_code,
+            token=self._config.auth.edge_token,
         )
         self.telemetry = TelemetryPublisher(
             host=self._config.telemetry_host,
             port=self._config.telemetry_port,
             sn=self._config.adapter_sn,
+            token=self._config.auth.edge_token,
         )
         self.mission_autonomy = MissionAutonomyClient(
             host=self._config.mission_autonomy_host,
             port=self._config.mission_autonomy_port,
+            token=self._config.auth.edge_token,
         )
 
         await self.connector.connect()
@@ -167,6 +178,7 @@ class EdgeAdapterRuntime:
             port=cfg.grpc_port,
             host=cfg.grpc_host,
             registration=registration,
+            auth=cfg.auth,
         )
         await server.serve()
 
@@ -202,6 +214,8 @@ class EdgeAdapterConfig:
     # asset lands in, which is a decision an adapter cannot make for itself and which cannot be
     # corrected afterwards. Unset is the normal state once the assets exist.
     claim_code: str | None = None
+    # Both directions of the adapter's gRPC traffic are authenticated — see edge_sdk.auth.
+    auth: EdgeAuthConfig = dataclasses.field(default_factory=EdgeAuthConfig.from_env)
 
     @classmethod
     def from_env(cls) -> "EdgeAdapterConfig":
@@ -223,6 +237,7 @@ class EdgeAdapterConfig:
             asset_vendor_name=os.getenv("ASSET_VENDOR"),
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"),
             claim_code=os.getenv("ZQNT_CLAIM_CODE") or None,
+            auth=EdgeAuthConfig.from_env(),
         )
 
     def runtime(self) -> EdgeAdapterRuntime:

@@ -27,6 +27,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any, Callable
 
+from ..auth import default_edge_token, platform_channel
 from ..models.asset import Asset
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ class ConnectorClient:
         call_timeout: float = 30.0,
         max_retries: int = 3,
         claim_code: str | None = None,
+        token: str | None = None,
     ) -> None:
         self._host = host
         self._port = port
@@ -65,6 +67,8 @@ class ConnectorClient:
         # adapter code never has to carry it around. Set from ZQNT_CLAIM_CODE by
         # EdgeAdapterRuntime.
         self._claim_code = claim_code
+        # The adapter's edge credential; core refuses calls without one (see edge_sdk.auth).
+        self._token = token if token is not None else default_edge_token()
         self._channel = None
         self._stub = None
 
@@ -74,10 +78,9 @@ class ConnectorClient:
 
     async def connect(self) -> None:
         """Create the gRPC channel and initialise the stub."""
-        import grpc.aio
         from zqnt_utils.generated.zqnt import connector_pb2_grpc
 
-        self._channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
+        self._channel = platform_channel(self._host, self._port, self._token)
         self._stub = connector_pb2_grpc.ConnectorServiceStub(self._channel)
         logger.info("ConnectorClient connected to %s:%d", self._host, self._port)
 

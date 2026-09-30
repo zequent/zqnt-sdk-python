@@ -49,11 +49,14 @@ class LiveDataService:
         port: int = 50052,
         sn: str = "",
         queue_max_size: int = 1000,
+        token: str | None = None,
     ) -> None:
         self._sn = sn
-        self.telemetry = TelemetryPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size)
-        self.detection = DetectionPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size)
-        self.notification = NotificationPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size)
+        self.telemetry = TelemetryPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token)
+        self.detection = DetectionPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token)
+        self.notification = NotificationPublisher(
+            host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle

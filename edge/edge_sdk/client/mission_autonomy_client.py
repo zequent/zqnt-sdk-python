@@ -23,6 +23,7 @@ import logging
 import uuid
 from typing import Any, Callable
 
+from ..auth import default_edge_token, platform_channel
 from ..models.scheduler import SchedulerDTO
 
 logger = logging.getLogger(__name__)
@@ -48,8 +49,10 @@ class MissionAutonomyClient:
         port: int = 50054,
         call_timeout: float = 30.0,
         max_retries: int = 3,
+        token: str | None = None,
     ) -> None:
         self._host = host
+        self._token = token if token is not None else default_edge_token()
         self._port = port
         self._call_timeout = call_timeout
         self._max_retries = max_retries
@@ -62,10 +65,9 @@ class MissionAutonomyClient:
 
     async def connect(self) -> None:
         """Create the gRPC channel and initialise the stub."""
-        import grpc.aio
         from zqnt_utils.generated.zqnt import mission_autonomy_pb2_grpc
 
-        self._channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
+        self._channel = platform_channel(self._host, self._port, self._token)
         self._stub = mission_autonomy_pb2_grpc.MissionAutonomyServiceStub(self._channel)
         logger.info("MissionAutonomyClient connected to %s:%d", self._host, self._port)
 
