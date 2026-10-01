@@ -143,6 +143,33 @@ async def test_go_to_passes_through_coordinates(client_with_fake_stub) -> None:
 
 
 @pytest.mark.asyncio
+async def test_go_to_sends_no_override_unless_asked(client_with_fake_stub) -> None:
+    rc, stub = client_with_fake_stub()
+    await rc.go_to(GoToRequest(sn="DOCK-001", latitude=10.0, longitude=20.0, altitude=30.0))
+    sent, _ = stub.calls["GoTo"]
+    assert sent.HasField("no_fly_zone_override") is False
+
+    await rc.go_to(
+        GoToRequest(sn="DOCK-001", latitude=10.0, longitude=20.0, altitude=30.0),
+        no_fly_zone_override=False,
+    )
+    sent, _ = stub.calls["GoTo"]
+    assert sent.HasField("no_fly_zone_override") is False
+
+
+@pytest.mark.asyncio
+async def test_go_to_sends_the_override_when_asked(client_with_fake_stub) -> None:
+    rc, stub = client_with_fake_stub()
+    await rc.go_to(
+        GoToRequest(sn="DOCK-001", latitude=10.0, longitude=20.0, altitude=30.0),
+        no_fly_zone_override=True,
+    )
+    sent, _ = stub.calls["GoTo"]
+    assert sent.HasField("no_fly_zone_override") is True
+    assert sent.no_fly_zone_override is True
+
+
+@pytest.mark.asyncio
 async def test_return_to_home_optional_altitude(client_with_fake_stub) -> None:
     rc, stub = client_with_fake_stub()
     await rc.return_to_home(ReturnToHomeRequest(sn="DOCK-001"))

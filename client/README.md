@@ -103,7 +103,7 @@ Flight, manual control, dock and asset operations.
 | Method                         | Purpose                                  |
 | ------------------------------ | ---------------------------------------- |
 | `takeoff(req)`                 | Launch an asset                          |
-| `go_to(req)`                   | Fly-to / waypoint command                |
+| `go_to(req, *, no_fly_zone_override=False)` | Fly-to; the override (org admin / system admin only) flies through a no-fly zone that would refuse it |
 | `return_to_home(req)`          | Trigger RTH                              |
 | `look_at(req)`                 | Point camera at coordinate               |
 | `manual_control(req)`          | Send a single manual-control input       |

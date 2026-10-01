@@ -426,7 +426,7 @@ provides-extras = ["dotenv", "dev"]
 [[package]]
 name = "zqnt-utils"
 version = "2.0.0"
-source = { git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2#102447d3fa0229d3b10245f263b94aef5ab7adb5" }
+source = { git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2#7aaa8547b42057d2e644acb7be29b59a53332679" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },

@@ -84,10 +84,17 @@ class RemoteControlClient:
         proto = await self._resilience_helper.execute(lambda: self._stub.TakeOff(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
-    async def go_to(self, request: GoToRequest) -> RemoteControlResponse:
+    async def go_to(self, request: GoToRequest, *, no_fly_zone_override: bool = False) -> RemoteControlResponse:
+        """Fly to a coordinate.
+
+        ``no_fly_zone_override=True`` flies straight through a HARD_BLOCK or REQUIRE_APPROVAL
+        no-fly zone that would otherwise refuse the fly-to. The platform honours it only for an
+        organization admin or a system admin (by the caller's own token) and refuses it for
+        anybody else; it is sent only when asked for.
+        """
         validate_sn(request.sn)
         validate_coordinates(request.latitude, request.longitude, request.altitude)
-        logger.info("GoTo: sn=%s", request.sn)
+        logger.info("GoTo: sn=%s, no_fly_zone_override=%s", request.sn, no_fly_zone_override)
 
         from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
 
@@ -95,6 +102,8 @@ class RemoteControlClient:
             base=build_request_base(request.sn),
             coordinate=build_coordinates(request.latitude, request.longitude, request.altitude),
         )
+        if no_fly_zone_override:
+            proto_request.no_fly_zone_override = True
         proto = await self._resilience_helper.execute(lambda: self._stub.GoTo(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
