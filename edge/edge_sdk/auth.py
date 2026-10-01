@@ -146,12 +146,9 @@ def default_edge_token() -> str | None:
 # ---------------------------------------------------------------------------
 
 
-class _BearerClientInterceptor(
-    grpc.aio.UnaryUnaryClientInterceptor,
-    grpc.aio.UnaryStreamClientInterceptor,
-    grpc.aio.StreamUnaryClientInterceptor,
-    grpc.aio.StreamStreamClientInterceptor,
-):
+class _Bearer:
+    """Appends the edge credential to a call's metadata, keeping whatever the call already carries."""
+
     def __init__(self, token: str) -> None:
         self._header = ("authorization", f"Bearer {token}")
 
@@ -160,17 +157,42 @@ class _BearerClientInterceptor(
         metadata.append(self._header)
         return details._replace(metadata=metadata)
 
+
+# One class per call type, each inheriting exactly ONE grpc.aio base. grpc.aio files every channel
+# interceptor under a single call type with an if/elif chain on its base class (unary-unary is
+# checked first), so one class inheriting all four bases was applied to unary-unary calls only:
+# every streaming call -- ProduceTelemetry/ProduceDetection/ProduceNotification included -- went
+# out without the credential and live-data refused it (dev, 2026-10-01).
+
+
+class _BearerUnaryUnary(_Bearer, grpc.aio.UnaryUnaryClientInterceptor):
     async def intercept_unary_unary(self, continuation, client_call_details, request):
         return await continuation(self._details(client_call_details), request)
 
+
+class _BearerUnaryStream(_Bearer, grpc.aio.UnaryStreamClientInterceptor):
     async def intercept_unary_stream(self, continuation, client_call_details, request):
         return await continuation(self._details(client_call_details), request)
 
+
+class _BearerStreamUnary(_Bearer, grpc.aio.StreamUnaryClientInterceptor):
     async def intercept_stream_unary(self, continuation, client_call_details, request_iterator):
         return await continuation(self._details(client_call_details), request_iterator)
 
+
+class _BearerStreamStream(_Bearer, grpc.aio.StreamStreamClientInterceptor):
     async def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
         return await continuation(self._details(client_call_details), request_iterator)
+
+
+def bearer_interceptors(token: str) -> list:
+    """Interceptors that put ``token`` on every call type of a grpc.aio channel."""
+    return [
+        _BearerUnaryUnary(token),
+        _BearerUnaryStream(token),
+        _BearerStreamUnary(token),
+        _BearerStreamStream(token),
+    ]
 
 
 def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channel:
@@ -186,7 +208,7 @@ def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channe
             target,
         )
         return grpc.aio.insecure_channel(target)
-    return grpc.aio.insecure_channel(target, interceptors=[_BearerClientInterceptor(token)])
+    return grpc.aio.insecure_channel(target, interceptors=bearer_interceptors(token))
 
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ from edge_sdk.auth import (
     PlatformAuthServerInterceptor,
     PlatformTokenVerifier,
     TokenVerificationError,
-    _BearerClientInterceptor,
+    _BearerUnaryUnary,
 )
 from tests.auth_tokens import new_key, public_key_b64, token
 
@@ -105,6 +105,6 @@ class TestClientInterceptor:
             return "ok"
 
         details = grpc.aio.ClientCallDetails("/zqnt.LiveDataService/ProduceTelemetry", None, None, None, None)
-        result = await _BearerClientInterceptor("edge-token").intercept_unary_unary(continuation, details, object())
+        result = await _BearerUnaryUnary("edge-token").intercept_unary_unary(continuation, details, object())
         assert result == "ok"
         assert ("authorization", "Bearer edge-token") in seen["metadata"]
