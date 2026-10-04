@@ -75,9 +75,13 @@ class AssetVendor(IntEnum):
     SAPIENT = 5
     BETAFLIGHT = 6
     RNS = 7
-    # No ZQNT member on this branch -- ASSET_VENDOR_ZQNT was added to asset.proto after the 1.3.0
-    # tag (see zqnt-protos' README Versioning section); this branch tracks 1.3.0 exactly, so this
-    # enum mirrors the 1.3.0 proto's AssetVendor one-to-one, not main's.
+    # Non-hardware bridge/integration assets (e.g. the Integration Hub platform bridge) that
+    # register themselves as an EdgeAdapterService endpoint without owning a physical vendor
+    # protocol -- matches asset.proto's ASSET_VENDOR_ZQNT exactly.
+    ZQNT = 8
+    # The load/telemetry simulator registering as an asset of its own, so a simulated fleet is
+    # addressable exactly like a real one -- matches asset.proto's ASSET_VENDOR_SIMULATOR.
+    SIMULATOR = 9
 
 
 class AssetConnection(IntEnum):
@@ -202,9 +206,17 @@ class SchedulerType(IntEnum):
     CONNECTORS = 5
 
 
-# No CommandExecutionStatus on this branch -- events.proto's CommandExecutionEvent/
-# CommandExecutionStatus don't exist at the 1.3.0 contract (added later, replacing the
-# TaskEvent-based model TaskStatus above still serves here). See models/notification.py.
+class CommandExecutionStatus(IntEnum):
+    """Mirrors ``events.proto`` :proto:`CommandExecutionStatus` — vendor-neutral lifecycle
+    feedback for one physical command dispatched to an edge adapter. Replaces the retired
+    task-event notification model."""
+
+    UNSPECIFIED = 0
+    ACCEPTED = 1
+    RUNNING = 2
+    SUCCEEDED = 3
+    FAILED = 4
+    CANCELLED = 5
 
 
 class ErrorCode(IntEnum):
@@ -371,13 +383,79 @@ class EdgeResponse:
 # ---------------------------------------------------------------------------
 
 
+class CapabilityState(IntEnum):
+    UNSPECIFIED = 0
+    AVAILABLE = 1
+    TEMPORARILY_UNAVAILABLE = 2
+    UNSUPPORTED = 3
+    REQUIRES_AUTHORIZATION = 4
+
+
+class CapabilityTargetType(IntEnum):
+    UNSPECIFIED = 0
+    ASSET = 1
+    SUB_ASSET = 2
+    PAYLOAD = 3
+    COMPONENT = 4
+
+
+class CapabilitySource(IntEnum):
+    UNSPECIFIED = 0
+    BUILT_IN = 1
+    EDGE_ADAPTER = 2
+    RUNTIME = 3
+    USER = 4
+    APPLICATION = 5
+    INTEGRATION = 6
+    AI_GENERATED = 7
+
+
+@dataclass
+class CapabilityTarget:
+    """What a command acts on. ``target_ref`` is empty only when the type is ASSET."""
+
+    type: CapabilityTargetType = CapabilityTargetType.ASSET
+    target_ref: str | None = None
+
+
 @dataclass
 class Capability:
-    command: str
-    description: str
-    available: bool
+    """
+    One command this asset can be asked to run.
+
+    ``command_id`` is a dotted, vendor-neutral id (``flight.takeoff``, ``dock.open_cover``) —
+    the same id core's dispatcher routes and its safety gate checks for. ``input_schema`` and
+    ``output_schema`` are JSON Schema objects describing the ``params`` the command accepts and
+    the ``result`` it returns, which is what lets the console build a parameter form and lets
+    the platform validate a stored Application against contract drift.
+
+    The pre-2.0 fields ``command``/``available`` remain readable as properties so existing
+    code that only inspected those keeps working.
+    """
+
+    command_id: str
+    description: str = ""
+    state: CapabilityState = CapabilityState.AVAILABLE
+    display_name: str | None = None
     unavailable_reason: str | None = None
     metadata: dict[str, str] = field(default_factory=dict)
+    input_schema: dict | None = None
+    output_schema: dict | None = None
+    target: CapabilityTarget | None = None
+    schema_version: str | None = None
+    skill_id: str | None = None
+    source: CapabilitySource = CapabilitySource.EDGE_ADAPTER
+    provider: str | None = None
+
+    @property
+    def command(self) -> str:
+        """Backwards-compatible alias for :attr:`command_id`."""
+        return self.command_id
+
+    @property
+    def available(self) -> bool:
+        """Backwards-compatible alias: True when the state is AVAILABLE."""
+        return self.state is CapabilityState.AVAILABLE
 
 
 @dataclass
@@ -463,11 +541,31 @@ class BoundingBox:
 
 
 @dataclass
+class DetectionPosition:
+    """
+    Where a detected object is, for sensors that locate what they see (a radar, RF direction
+    finding, a geolocated camera target). Degrees WGS84; range/bearing/elevation are relative to
+    the sensor, bearing clockwise from true north; speed/heading are the object's own.
+    """
+
+    latitude: float
+    longitude: float
+    altitude: float | None = None
+    range_m: float | None = None
+    bearing_deg: float | None = None
+    elevation_deg: float | None = None
+    speed_mps: float | None = None
+    heading_deg: float | None = None
+
+
+@dataclass
 class DetectionResult:
     object_id: str
     object_type: str
     confidence: float
-    bounding_box: BoundingBox
+    # Image-space box for camera detections; a radar has none.
+    bounding_box: BoundingBox | None = None
+    position: DetectionPosition | None = None
 
 
 @dataclass

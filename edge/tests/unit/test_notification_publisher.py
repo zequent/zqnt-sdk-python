@@ -1,10 +1,10 @@
 """
 Unit tests for NotificationPublisher – no live gRPC connection required.
 
-Primarily regression coverage for the proto builders against the 1.3.0 ``events.proto`` schema
-this branch tracks: ``ProduceNotificationRequest.event`` is a ``NotificationEvent`` wrapper
-(``asset_status``/``task``/``mission``) -- ``task`` (``TaskEvent``) is retired on main/2.0.0 in
-favor of the vendor-neutral ``CommandExecutionEvent``, which doesn't exist at 1.3.0.
+Primarily regression coverage for the proto builders against the current ``events.proto``
+schema (``ProduceNotificationRequest.event`` is a ``NotificationEvent`` wrapper, not flat
+``asset_status``/``task_event``/``operation_event`` fields; ``task`` notifications are retired
+in favor of ``command_execution``, and ``operation`` was renamed ``mission``).
 """
 
 import asyncio
@@ -13,8 +13,8 @@ import pytest
 from zqnt_utils.generated.zqnt import events_pb2
 
 from edge_sdk.client.notification_publisher import NotificationPublisher
-from edge_sdk.models.common import MissionStatus, MissionType, TaskStatus, TaskType
-from edge_sdk.models.notification import AssetStatusEvent, MissionEvent, TaskEvent
+from edge_sdk.models.common import CommandExecutionStatus, MissionStatus, MissionType
+from edge_sdk.models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
 
 
 class _FakePublisher(NotificationPublisher):
@@ -96,34 +96,57 @@ def test_build_mission_event_request_matches_schema():
     assert req.event_type == events_pb2.NotificationEventType.NOTIFICATION_EVENT_MISSION
 
 
-def test_build_task_event_request_matches_schema():
+def test_build_command_execution_event_request_matches_schema():
     pub = NotificationPublisher(host="localhost", sn="DOCK1")
-    req = pub._build_task_event_request(
-        TaskEvent(
-            task_id="t1",
-            task_type=TaskType.WAYPOINT,
-            status=TaskStatus.RUNNING,
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(
+            external_execution_id="exec-1",
+            status=CommandExecutionStatus.SUCCEEDED,
             sn="DOCK1",
-            progress=0.5,
-            message="en route",
-            external_task_type="dji.wayline",
+            command_id="dock.open_cover",
+            progress=1.0,
+            message="done",
         )
     )
 
-    assert req.event.WhichOneof("event") == "task"
-    assert req.event.task.task_id == "t1"
-    assert req.event.task.task_type == common_task_type_waypoint()
-    assert req.event.task.status == common_task_status_running()
-    assert req.event.task.progress == pytest.approx(0.5)
-    assert req.event.task.message == "en route"
-    assert req.event.task.external_task_type == "dji.wayline"
-    assert req.event_type == events_pb2.NotificationEventType.NOTIFICATION_EVENT_TASK
+    assert req.event.WhichOneof("event") == "command_execution"
+    assert req.event.command_execution.external_execution_id == "exec-1"
+    assert req.event.command_execution.command_id == "dock.open_cover"
+    assert req.event.command_execution.asset_sn == "DOCK1"
+    assert req.event.command_execution.status == events_pb2.CommandExecutionStatus.COMMAND_EXECUTION_STATUS_SUCCEEDED
+    assert req.event_type == events_pb2.NotificationEventType.NOTIFICATION_EVENT_COMMAND_EXECUTION
 
 
-def test_build_task_event_uses_critical_severity_on_error():
+def test_build_command_execution_event_carries_output():
+    """A waiting skill node takes its output from here; dropping it would complete the node empty."""
+    pub = NotificationPublisher(host="localhost", sn="AI-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(
+            external_execution_id="exec-3",
+            status=CommandExecutionStatus.SUCCEEDED,
+            sn="AI-1",
+            output={"found": True, "object_type": "person", "latitude": 52.5, "position": {"lat": 1.0}},
+        )
+    )
+    out = req.event.command_execution.output
+    assert out["found"] is True
+    assert out["object_type"] == "person"
+    assert out["latitude"] == 52.5
+    assert out["position"]["lat"] == 1.0
+
+
+def test_build_command_execution_event_without_output_leaves_it_unset():
+    pub = NotificationPublisher(host="localhost", sn="AI-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(external_execution_id="exec-4", status=CommandExecutionStatus.RUNNING, sn="AI-1")
+    )
+    assert not req.event.command_execution.HasField("output")
+
+
+def test_build_command_execution_event_uses_critical_severity_on_failure():
     pub = NotificationPublisher(host="localhost", sn="DOCK1")
-    req = pub._build_task_event_request(
-        TaskEvent(task_id="t2", task_type=TaskType.WAYPOINT, status=TaskStatus.ERROR, sn="DOCK1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(external_execution_id="exec-2", status=CommandExecutionStatus.FAILED, sn="DOCK1")
     )
     assert req.severity == events_pb2.NotificationSeverity.NOTIFICATION_SEVERITY_CRITICAL
 
@@ -134,21 +157,50 @@ def common_status_active():
     return common_pb2.MissionStatus.MISSION_STATUS_ACTIVE
 
 
-def common_task_type_waypoint():
-    from zqnt_utils.generated.zqnt import common_pb2
-
-    return common_pb2.TaskTypeProto.TASK_TYPE_WAYPOINT
-
-
-def common_task_status_running():
-    from zqnt_utils.generated.zqnt import common_pb2
-
-    return common_pb2.TaskStatus.TASK_RUNNING
+def test_publisher_has_no_legacy_task_event_method():
+    assert not hasattr(NotificationPublisher, "publish_task_event")
+    assert not hasattr(NotificationPublisher, "publish_operation_event")
 
 
-def test_publisher_has_no_2_0_0_only_command_execution_method():
-    """This branch tracks the 1.3.0 contract, where events.proto has no CommandExecutionEvent
-    at all -- publish_task_event is the real, 1.3.0-accurate method (main/2.0.0 drops it in
-    favor of publish_command_execution_event; see this file's own main-branch counterpart)."""
-    assert hasattr(NotificationPublisher, "publish_task_event")
-    assert not hasattr(NotificationPublisher, "publish_command_execution_event")
+def test_command_execution_event_always_carries_occurred_at():
+    """
+    LiveData's CommandExecutionEventPublisher rejects an event without occurred_at:
+
+        "Command execution event requires external_execution_id, asset_sn and occurred_at"
+
+    It does so fire-and-forget, so the adapter sees a successful publish while the event is
+    dropped before Redis — and a skill node waiting on that execution id hangs on RUNNING.
+    Every field in that precondition must therefore be populated here, not just the obvious two.
+    """
+    pub = NotificationPublisher(host="localhost", sn="DRONE-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(
+            external_execution_id="exec-1",
+            status=CommandExecutionStatus.SUCCEEDED,
+            sn="DRONE-1",
+            command_id="flight.takeoff",
+        )
+    )
+
+    event = req.event.command_execution
+    assert event.HasField("occurred_at"), "LiveData drops an event without occurred_at"
+    assert event.occurred_at.seconds > 0
+    assert event.external_execution_id
+    assert event.asset_sn
+
+
+def test_command_execution_event_preserves_an_explicit_occurred_at():
+    from datetime import datetime, timezone
+
+    observed = datetime(2026, 9, 16, 12, 30, 45, tzinfo=timezone.utc)
+    pub = NotificationPublisher(host="localhost", sn="DRONE-1")
+    req = pub._build_command_execution_event_request(
+        CommandExecutionEvent(
+            external_execution_id="exec-1",
+            status=CommandExecutionStatus.RUNNING,
+            sn="DRONE-1",
+            occurred_at=observed,
+        )
+    )
+
+    assert req.event.command_execution.occurred_at.ToDatetime(tzinfo=timezone.utc) == observed

@@ -57,9 +57,9 @@ def test_auto_capabilities_marks_overridden_as_available():
     caps = adapter._auto_capabilities("DRONE-001", AssetType.AIRCRAFT)
 
     available = {c.command for c in caps.capabilities if c.available}
-    assert "TakeOff" in available
-    assert "GoTo" in available
-    assert "StartTask" in available
+    assert "flight.takeoff" in available
+    assert "navigation.go_to" in available
+    assert "mission.start" in available
 
 
 def test_auto_capabilities_marks_not_overridden_as_unavailable():
@@ -67,9 +67,9 @@ def test_auto_capabilities_marks_not_overridden_as_unavailable():
     caps = adapter._auto_capabilities("DRONE-001", AssetType.AIRCRAFT)
 
     unavailable = {c.command for c in caps.capabilities if not c.available}
-    assert "OpenCover" in unavailable
-    assert "StartCharging" in unavailable
-    assert "CloseCover" in unavailable
+    assert "dock.open_cover" in unavailable
+    assert "dock.start_charging" in unavailable
+    assert "dock.close_cover" in unavailable
 
 
 def test_auto_capabilities_drone_vs_dock_differ():
@@ -79,10 +79,10 @@ def test_auto_capabilities_drone_vs_dock_differ():
     drone_caps = {c.command for c in drone._auto_capabilities("D", AssetType.AIRCRAFT).capabilities if c.available}
     dock_caps = {c.command for c in dock._auto_capabilities("D", AssetType.DOCK).capabilities if c.available}
 
-    assert "TakeOff" in drone_caps
-    assert "TakeOff" not in dock_caps
-    assert "OpenCover" in dock_caps
-    assert "OpenCover" not in drone_caps
+    assert "flight.takeoff" in drone_caps
+    assert "flight.takeoff" not in dock_caps
+    assert "dock.open_cover" in dock_caps
+    assert "dock.open_cover" not in drone_caps
 
 
 def test_auto_capabilities_sets_correct_sn_and_type():

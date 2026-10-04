@@ -27,8 +27,8 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any, Callable
 
+from ..auth import default_edge_token, platform_channel
 from ..models.asset import Asset
-from ..models.task import Mission, Task
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +56,19 @@ class ConnectorClient:
         port: int = 50053,
         call_timeout: float = 30.0,
         max_retries: int = 3,
+        claim_code: str | None = None,
+        token: str | None = None,
     ) -> None:
         self._host = host
         self._port = port
         self._call_timeout = call_timeout
         self._max_retries = max_retries
+        # Held here rather than passed per call so the credential lives in exactly one place and
+        # adapter code never has to carry it around. Set from ZQNT_CLAIM_CODE by
+        # EdgeAdapterRuntime.
+        self._claim_code = claim_code
+        # The adapter's edge credential; core refuses calls without one (see edge_sdk.auth).
+        self._token = token if token is not None else default_edge_token()
         self._channel = None
         self._stub = None
 
@@ -70,10 +78,9 @@ class ConnectorClient:
 
     async def connect(self) -> None:
         """Create the gRPC channel and initialise the stub."""
-        import grpc.aio
         from zqnt_utils.generated.zqnt import connector_pb2_grpc
 
-        self._channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
+        self._channel = platform_channel(self._host, self._port, self._token)
         self._stub = connector_pb2_grpc.ConnectorServiceStub(self._channel)
         logger.info("ConnectorClient connected to %s:%d", self._host, self._port)
 
@@ -123,34 +130,80 @@ class ConnectorClient:
             if response.HasField("assets"):
                 yield [proto_to_asset(a) for a in response.assets.assets]
 
-    async def register_asset(self, asset: Asset) -> str | None:
-        """Register an asset on the platform. Returns the asset id, or None on failure."""
+    # register_asset is deliberately gone. Its only two outcomes were "Asset already exists" —
+    # it is insert-only — and an asset with no organization, which matches no tenant (connector's
+    # ListAssets filters on asset.organization.id) and which nobody can move afterwards, because
+    # updateAsset pins the field for good. An invisible asset is a worse outcome than a missing
+    # one, because it looks like it worked. Assets are created in the console or by redeeming a
+    # claim; an adapter binds to what already exists. See ensure_asset below.
+
+    async def redeem_asset_claim(self, code: str, asset: Asset) -> Asset | None:
+        """
+        Trade a one-time claim code for an asset, and return it.
+
+        This is the one ConnectorService call an adapter makes without any platform identity: the
+        code *is* the credential. Everything about the created asset that matters — which
+        organization owns it — comes from the claim, not from *asset*, whose ``organization`` field
+        is ignored server-side. That is the point: an adapter cannot name a tenant, so it cannot
+        name the wrong one.
+
+        Returns ``None`` when the code is refused. The platform deliberately answers every refusal
+        identically — unknown, expired, revoked, exhausted, or not valid for this kind of device —
+        so that a caller cannot use it to discover which codes exist. Nothing here can tell you
+        which of those it was, and it must not guess.
+        """
         from zqnt_utils.generated.zqnt import common_pb2, connector_pb2
 
-        from ..server._converters import asset_to_proto
+        from ..server._converters import asset_to_proto, proto_to_asset
 
         tid = str(uuid.uuid4())
         resp = await self._call(
-            "RegisterAsset",
+            "RedeemAssetClaim",
             tid,
             asset.sn,
-            lambda: self._stub.RegisterAsset(
-                connector_pb2.ConnectorRegisterAssetRequest(
+            lambda: self._stub.RedeemAssetClaim(
+                connector_pb2.RedeemAssetClaimRequest(
                     base=self._base(tid, asset.sn),
+                    code=code,
                     asset=asset_to_proto(asset, common_pb2),
                 ),
                 timeout=self._call_timeout,
             ),
         )
-        if resp.has_errors:
+        if resp.has_errors or resp.WhichOneof("response") != "asset":
             logger.error(
-                "RegisterAsset failed [tid=%s sn=%s]: %s",
-                tid,
+                "Claim code refused for sn=%s [tid=%s] — it may be unknown, expired, revoked, "
+                "already used up, or not valid for this kind of device; the platform does not say "
+                "which. Create a new code in the console and try again.",
                 asset.sn,
-                resp.response_message,
+                tid,
             )
             return None
-        return resp.id if resp.id else None
+        logger.info("Claim redeemed for sn=%s — asset created [tid=%s]", asset.sn, tid)
+        return proto_to_asset(resp.asset)
+
+    async def ensure_asset(self, asset: Asset) -> Asset | None:
+        """
+        Make sure *asset*'s serial number exists on the platform, redeeming a claim if it does not.
+
+        The lookup comes first, and not merely to save a call: a claim is single-use, so on every
+        restart after the first there is nothing left to redeem, and an adapter that tried anyway
+        would log a refusal every time it came up. An asset that already exists is simply returned.
+
+        With no claim code configured this reports what it found and creates nothing — which is the
+        intended resting state for an adapter whose assets are provisioned in the console.
+        """
+        existing = await self.get_asset_by_sn(asset.sn)
+        if existing is not None:
+            return existing
+        if not self._claim_code:
+            logger.warning(
+                "No asset registered for sn=%s, and no ZQNT_CLAIM_CODE to pair one with. Create "
+                "the asset in the console, or pair this device with a code.",
+                asset.sn,
+            )
+            return None
+        return await self.redeem_asset_claim(self._claim_code, asset)
 
     # Mission/Task CRUD was retired from ConnectorService in favor of the capability-execution
     # model (Application/SkillExecution) — the underlying gRPC methods (GetMission, GetTask,
@@ -158,75 +211,100 @@ class ConnectorClient:
     # which dropped the equivalent methods outright rather than keeping stubs.
 
     # ------------------------------------------------------------------
-    # Mission / Task — retired on main/2.0.0 in favor of the capability-execution model
-    # (Application/SkillExecution), but still real RPCs at the 1.3.0 contract this branch
-    # tracks; MissionProtoDTO/TaskProtoDTO themselves are unchanged between 1.3.0 and 2.0.0
-    # (byte-identical), so the existing Mission/Task models and proto_to_mission/proto_to_task
-    # converters in models/task.py + server/_converters.py are reused as-is here -- only the
-    # request/response message names differ from what a naive "just re-add the old wrapper
-    # calls" pass would guess (GetMissionRequest/MissionResponse, not a ConnectorXxx-prefixed
-    # pair -- verified directly against zqnt-protos' own 1.3.0 tag, not assumed).
+    # Skill Registry — the persisted, de-duplicated capability catalog (independent of which
+    # devices are currently connected). Methods here work with the raw generated
+    # ``SkillContractProtoDTO`` rather than a plain-Python model — the same scope decision
+    # ``client-python-sdk``'s ``ConnectorClient`` makes for this RPC group: the contract shape
+    # (input/output schema, errors, events, requirements, source) is large and already typed;
+    # wrapping it a second time buys little for what is normally a write-once-per-command call.
     # ------------------------------------------------------------------
 
-    async def get_mission(self, mission_id: str, sn: str = "") -> Mission | None:
-        """Fetch a mission by ID."""
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
-
-        from ..server._converters import proto_to_mission
-
-        tid = str(uuid.uuid4())
-        resp = await self._call(
-            "GetMission",
-            tid,
-            sn,
-            lambda: self._stub.GetMission(
-                mission_autonomy_contracts_pb2.GetMissionRequest(base=self._base(tid, sn), mission_id=mission_id),
-                timeout=self._call_timeout,
-            ),
-        )
-        if resp.WhichOneof("response") == "mission":
-            return proto_to_mission(resp.mission)
-        return None
-
-    async def get_task(self, task_id: str, sn: str = "") -> Task | None:
-        """Fetch a task by ID."""
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
-
-        from ..server._converters import proto_to_task
+    async def observe_skill_contract(self, contract):
+        """Upsert ``contract`` — new for a never-seen (command_id, schema_version) pair, or
+        refreshed content/last-seen for one already known."""
+        from zqnt_utils.generated.zqnt import connector_pb2
 
         tid = str(uuid.uuid4())
         resp = await self._call(
-            "GetTask",
+            "ObserveSkillContract",
             tid,
-            sn,
-            lambda: self._stub.GetTask(
-                mission_autonomy_contracts_pb2.GetTaskRequest(base=self._base(tid, sn), task_id=task_id),
+            "",
+            lambda: self._stub.ObserveSkillContract(
+                connector_pb2.UpsertSkillContractRequest(base=self._base(tid), contract=contract),
                 timeout=self._call_timeout,
             ),
         )
-        if resp.WhichOneof("response") == "task":
-            return proto_to_task(resp.task)
-        return None
+        if resp.has_errors:
+            logger.error("ObserveSkillContract failed [tid=%s]: %s", tid, resp.error.error_message)
+            return None
+        return resp.contract
 
-    async def get_task_by_flight_id(self, flight_id: str, sn: str = "") -> Task | None:
-        """Fetch a task by its flight ID (waypoint config flightId)."""
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
+    async def list_skill_contracts(self, status=None, command_id: str | None = None) -> list:
+        """List the whole registry, optionally filtered by ``status`` (a ``SkillContractStatus``
+        enum value). When ``command_id`` is set, returns that one command's full version history
+        instead (``status`` is then ignored, matching the RPC's own semantics)."""
+        from zqnt_utils.generated.zqnt import connector_pb2
 
-        from ..server._converters import proto_to_task
+        kwargs: dict = {"base": self._base()}
+        if status is not None:
+            kwargs["status"] = status
+        if command_id:
+            kwargs["command_id"] = command_id
 
         tid = str(uuid.uuid4())
         resp = await self._call(
-            "GetTaskByFlightId",
+            "ListSkillContracts",
             tid,
-            sn,
-            lambda: self._stub.GetTaskByFlightId(
-                mission_autonomy_contracts_pb2.GetTaskByFlightIdRequest(base=self._base(tid, sn), flight_id=flight_id),
+            "",
+            lambda: self._stub.ListSkillContracts(
+                connector_pb2.ListSkillContractsRequest(**kwargs),
                 timeout=self._call_timeout,
             ),
         )
-        if resp.WhichOneof("response") == "task":
-            return proto_to_task(resp.task)
-        return None
+        if resp.has_errors:
+            logger.error("ListSkillContracts failed [tid=%s]: %s", tid, resp.error.error_message)
+            return []
+        return list(resp.contracts)
+
+    async def set_skill_contract_status(self, contract_id: str, status):
+        """Set a skill contract's lifecycle status (a ``SkillContractStatus`` enum value)."""
+        from zqnt_utils.generated.zqnt import connector_pb2
+
+        tid = str(uuid.uuid4())
+        resp = await self._call(
+            "SetSkillContractStatus",
+            tid,
+            "",
+            lambda: self._stub.SetSkillContractStatus(
+                connector_pb2.SetSkillContractStatusRequest(base=self._base(tid), id=contract_id, status=status),
+                timeout=self._call_timeout,
+            ),
+        )
+        if resp.has_errors:
+            logger.error("SetSkillContractStatus failed [tid=%s]: %s", tid, resp.error.error_message)
+            return None
+        return resp.contract
+
+    async def set_skill_contract_permissions(self, contract_id: str, required_permissions: list[str]):
+        """Full replacement, not a merge. Declarative only — nothing currently enforces this."""
+        from zqnt_utils.generated.zqnt import connector_pb2
+
+        tid = str(uuid.uuid4())
+        resp = await self._call(
+            "SetSkillContractPermissions",
+            tid,
+            "",
+            lambda: self._stub.SetSkillContractPermissions(
+                connector_pb2.SetSkillContractPermissionsRequest(
+                    base=self._base(tid), id=contract_id, required_permissions=list(required_permissions)
+                ),
+                timeout=self._call_timeout,
+            ),
+        )
+        if resp.has_errors:
+            logger.error("SetSkillContractPermissions failed [tid=%s]: %s", tid, resp.error.error_message)
+            return None
+        return resp.contract
 
     # ------------------------------------------------------------------
     # Internal helpers

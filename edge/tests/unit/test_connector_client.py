@@ -19,12 +19,13 @@ from edge_sdk.models.common import AssetConnection, AssetType, AssetVendor
 from edge_sdk.server._converters import asset_to_proto, proto_to_asset, proto_to_sub_asset
 
 
-def _client(stub: Any) -> ConnectorClient:
+def _client(stub: Any, claim_code: str | None = None) -> ConnectorClient:
     c = ConnectorClient.__new__(ConnectorClient)
     c._host = "localhost"
     c._port = 50053
     c._call_timeout = 5.0
     c._max_retries = 3
+    c._claim_code = claim_code
     c._channel = object()
     c._stub = stub
     return c
@@ -152,26 +153,11 @@ async def test_get_asset_by_sn_not_found() -> None:
     assert result is None
 
 
-@pytest.mark.asyncio
-async def test_register_asset_success() -> None:
-    stub = _FakeStub({"RegisterAsset": connector_pb2.ConnectorResponse(has_errors=False, id="a1")})
-    client = _client(stub)
-
-    asset_id = await client.register_asset(_sample_asset())
-
-    assert asset_id == "a1"
-    sent = stub.calls["RegisterAsset"]
-    assert sent.asset.sn == "DOCK-1"
-
-
-@pytest.mark.asyncio
-async def test_register_asset_failure_returns_none() -> None:
-    stub = _FakeStub(
-        {"RegisterAsset": connector_pb2.ConnectorResponse(has_errors=True, response_message="duplicate sn")}
-    )
-    client = _client(stub)
-    result = await client.register_asset(_sample_asset())
-    assert result is None
+def test_an_adapter_cannot_create_an_asset() -> None:
+    # The structural half of the claim work: not "we stopped calling it" but "there is nothing to
+    # call". register_asset was insert-only, so its outcomes were an error for an asset that
+    # existed, or a new asset with no organization that no tenant could ever see.
+    assert not hasattr(ConnectorClient, "register_asset")
 
 
 @pytest.mark.asyncio
@@ -196,88 +182,82 @@ async def test_watch_assets_yields_snapshots() -> None:
     assert snapshots[0][0].sn == "DOCK-1"
 
 
-def test_connector_client_has_mission_task_methods() -> None:
-    """This branch tracks the 1.3.0 contract, where GetMission/GetTask/GetTaskByFlightId are
-    still real ConnectorService RPCs (retired on main/2.0.0 in favor of the capability-execution
-    model -- see this file's own main-branch counterpart)."""
-    assert hasattr(ConnectorClient, "get_mission")
-    assert hasattr(ConnectorClient, "get_task")
-    assert hasattr(ConnectorClient, "get_task_by_flight_id")
+def test_connector_client_has_no_legacy_mission_task_methods() -> None:
+    assert not hasattr(ConnectorClient, "get_mission")
+    assert not hasattr(ConnectorClient, "get_task")
+    assert not hasattr(ConnectorClient, "get_task_by_flight_id")
 
 
 # ---------------------------------------------------------------------------
-# Mission / Task — real RPC wrapper coverage (MissionProtoDTO/TaskProtoDTO themselves are
-# unchanged between 1.3.0 and main -- see server/_converters.py's proto_to_mission/proto_to_task,
-# already covered elsewhere; these tests are about get_mission/get_task/get_task_by_flight_id's
-# own request/response wiring, the part that's actually different at 1.3.0).
+# Asset claims — the one call an adapter makes with no platform identity
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_get_mission_found() -> None:
-    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2, mission_autonomy_dto_pb2
-
-    mission = mission_autonomy_dto_pb2.MissionProtoDTO(id="m1", name="Perimeter sweep")
-    stub = _FakeStub({"GetMission": mission_autonomy_contracts_pb2.MissionResponse(mission=mission)})
+async def test_redeem_asset_claim_returns_the_created_asset() -> None:
+    created = common_pb2.AssetProtoDTO(id="a1", sn="DOCK-1", organization="org-from-the-claim")
+    stub = _FakeStub({"RedeemAssetClaim": connector_pb2.ConnectorResponse(has_errors=False, asset=created)})
     client = _client(stub)
 
-    result = await client.get_mission("m1", sn="DOCK-1")
+    result = await client.redeem_asset_claim("ZQ-4K7M-P2XR", _sample_asset())
 
     assert result is not None
-    assert result.id == "m1"
-    assert result.name == "Perimeter sweep"
-    sent = stub.calls["GetMission"]
-    assert sent.mission_id == "m1"
-    assert sent.base.sn == "DOCK-1"
+    assert result.sn == "DOCK-1"
+    sent = stub.calls["RedeemAssetClaim"]
+    assert sent.code == "ZQ-4K7M-P2XR"
+    assert sent.asset.sn == "DOCK-1"
 
 
 @pytest.mark.asyncio
-async def test_get_mission_not_found() -> None:
-    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
-
-    stub = _FakeStub({"GetMission": mission_autonomy_contracts_pb2.MissionResponse(has_errors=True)})
+async def test_a_refused_claim_is_none_and_not_an_exception() -> None:
+    # Every refusal answers alike — unknown, expired, revoked, exhausted, wrong kind of device —
+    # so there is nothing here to branch on, and an adapter must treat all of them as "no asset".
+    stub = _FakeStub({"RedeemAssetClaim": connector_pb2.ConnectorResponse(has_errors=True)})
     client = _client(stub)
-    assert await client.get_mission("missing") is None
+
+    assert await client.redeem_asset_claim("ZQ-WRON-GWRO", _sample_asset()) is None
 
 
 @pytest.mark.asyncio
-async def test_get_task_found() -> None:
-    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2, mission_autonomy_dto_pb2
+async def test_ensure_asset_does_not_redeem_when_the_serial_already_exists() -> None:
+    # The restart case, and the reason the lookup comes first: the code was spent the first time
+    # this adapter came up, so redeeming again could only ever fail.
+    existing = common_pb2.AssetProtoDTO(id="a1", sn="DOCK-1")
+    stub = _FakeStub({"GetAssetBySn": connector_pb2.ConnectorResponse(has_errors=False, asset=existing)})
+    client = _client(stub, claim_code="ZQ-4K7M-P2XR")
 
-    task = mission_autonomy_dto_pb2.TaskProtoDTO(id="t1", name="Waypoint run", asset_id="a1")
-    stub = _FakeStub({"GetTask": mission_autonomy_contracts_pb2.TaskResponse(task=task)})
-    client = _client(stub)
-
-    result = await client.get_task("t1", sn="DOCK-1")
+    result = await client.ensure_asset(_sample_asset())
 
     assert result is not None
-    assert result.id == "t1"
-    assert result.name == "Waypoint run"
-    sent = stub.calls["GetTask"]
-    assert sent.task_id == "t1"
-    assert sent.base.sn == "DOCK-1"
+    assert result.sn == "DOCK-1"
+    assert "RedeemAssetClaim" not in stub.calls
 
 
 @pytest.mark.asyncio
-async def test_get_task_by_flight_id_found() -> None:
-    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2, mission_autonomy_dto_pb2
+async def test_ensure_asset_redeems_an_unknown_serial() -> None:
+    created = common_pb2.AssetProtoDTO(id="a1", sn="DOCK-1")
+    stub = _FakeStub(
+        {
+            "GetAssetBySn": connector_pb2.ConnectorResponse(has_errors=False),
+            "RedeemAssetClaim": connector_pb2.ConnectorResponse(has_errors=False, asset=created),
+        }
+    )
+    client = _client(stub, claim_code="ZQ-4K7M-P2XR")
 
-    task = mission_autonomy_dto_pb2.TaskProtoDTO(id="t1", external_task_id="flight-42")
-    stub = _FakeStub({"GetTaskByFlightId": mission_autonomy_contracts_pb2.TaskResponse(task=task)})
-    client = _client(stub)
-
-    result = await client.get_task_by_flight_id("flight-42", sn="DOCK-1")
+    result = await client.ensure_asset(_sample_asset())
 
     assert result is not None
-    assert result.id == "t1"
-    sent = stub.calls["GetTaskByFlightId"]
-    assert sent.flight_id == "flight-42"
+    assert stub.calls["RedeemAssetClaim"].code == "ZQ-4K7M-P2XR"
 
 
 @pytest.mark.asyncio
-async def test_get_task_by_flight_id_not_found() -> None:
-    from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
-
-    stub = _FakeStub({"GetTaskByFlightId": mission_autonomy_contracts_pb2.TaskResponse(has_errors=True)})
+async def test_ensure_asset_creates_nothing_without_a_claim_code() -> None:
+    # The resting state for an adapter whose assets are provisioned in the console: report what is
+    # missing, invent nothing. An adapter that registered its own asset would create one with no
+    # organization, which no tenant can see and nobody can repair.
+    stub = _FakeStub({"GetAssetBySn": connector_pb2.ConnectorResponse(has_errors=False)})
     client = _client(stub)
-    assert await client.get_task_by_flight_id("missing") is None
+
+    assert await client.ensure_asset(_sample_asset()) is None
+    assert "RedeemAssetClaim" not in stub.calls
+    assert "RegisterAsset" not in stub.calls

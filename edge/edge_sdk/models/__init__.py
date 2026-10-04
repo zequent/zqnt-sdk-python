@@ -9,11 +9,17 @@ from .common import (
     BoundingBox,
     Capabilities,
     Capability,
+    CapabilitySource,
+    CapabilityState,
+    CapabilityTarget,
+    CapabilityTargetType,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
+    CommandExecutionStatus,
     CommandProgress,
     Coordinates,
     DetectionBatch,
+    DetectionPosition,
     DetectionResponse,
     DetectionResult,
     EdgeResponse,
@@ -37,7 +43,7 @@ from .common import (
     TaskStatus,
     TaskType,
 )
-from .notification import AssetStatusEvent, MissionEvent, TaskEvent
+from .notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
 from .scheduler import SchedulerDTO
 from .task import (
     AreaMappingTaskConfig,
@@ -85,6 +91,7 @@ __all__ = [
     "MissionType",
     "MissionStatus",
     "ErrorCode",
+    "CommandExecutionStatus",
     "SchedulerType",
     "Rainfall",
     "NetworkType",
@@ -97,6 +104,10 @@ __all__ = [
     "CommandProgress",
     "Capabilities",
     "Capability",
+    "CapabilitySource",
+    "CapabilityState",
+    "CapabilityTarget",
+    "CapabilityTargetType",
     "ReturnToHomeRequest",
     "ManualControlRequest",
     "ManualControlInput",
@@ -105,13 +116,14 @@ __all__ = [
     "ChangeCameraLensRequest",
     "ChangeCameraZoomRequest",
     "BoundingBox",
+    "DetectionPosition",
     "DetectionResult",
     "DetectionResponse",
     "DetectionBatch",
     # notification
     "AssetStatusEvent",
     "MissionEvent",
-    "TaskEvent",
+    "CommandExecutionEvent",
     # scheduler
     "SchedulerDTO",
     # task

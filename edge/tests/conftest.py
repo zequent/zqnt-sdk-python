@@ -7,6 +7,8 @@ Design decisions:
   status codes all work exactly as they would in production.
 - fakeredis replaces a real Redis instance so registration tests run without
   any external infrastructure.
+- The behaviour fixtures run with platform authentication switched off (these tests are about
+  what the servicer does); tests/integration/test_server_auth.py covers authentication itself.
 """
 
 import asyncio
@@ -16,8 +18,11 @@ from datetime import datetime, timezone
 
 import pytest_asyncio
 
-from edge_sdk import AssetType, EdgeAdapter, EdgeResponse, EdgeServer
+from edge_sdk import AssetType, EdgeAdapter, EdgeAuthConfig, EdgeResponse, EdgeServer
 from edge_sdk.models.common import Capabilities, CustomCommandRequest, CustomCommandResponse, RequestContext
+
+#: Behaviour tests call the server without a platform token.
+NO_AUTH = EdgeAuthConfig(disabled=True)
 
 # ---------------------------------------------------------------------------
 # Minimal adapter used across all tests
@@ -45,6 +50,35 @@ class _TestAdapter(EdgeAdapter):
             ctx.sn,
             request.command_type,
             external_execution_id=f"vendor-{request.command_type}",
+        )
+
+
+class _RegistryOnlyAdapter(EdgeAdapter):
+    """
+    Declares its commands through ``register_command`` and overrides nothing else.
+
+    This is the shape every 2.0 adapter is meant to have, and the shape no test covered
+    end-to-end: ``_TestAdapter`` overrides ``send_custom_command``, which hid the fact that the
+    servicer refused the call for any adapter that does not. Served over a real gRPC server, this
+    adapter must be able to run every command it advertises.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict]] = []
+        self.register_command("mission.waypoint.execute", self._record)
+        self.register_command("flight.takeoff", self._record)
+
+    async def get_capabilities(self, sn: str, asset_id: str | None) -> Capabilities:
+        return self._auto_capabilities(sn, AssetType.AIRCRAFT)
+
+    async def _record(self, ctx: RequestContext, params: dict) -> CustomCommandResponse:
+        self.calls.append((ctx.tid, dict(params)))
+        return CustomCommandResponse.ok(
+            ctx.tid,
+            ctx.sn,
+            "recorded",
+            result={"ok": True},
+            external_execution_id=f"vendor-{ctx.tid}",
         )
 
 
@@ -89,7 +123,7 @@ async def server_port(test_adapter):
     The server is stopped after the test completes.
     """
     port = _free_port()
-    server = EdgeServer(adapter=test_adapter, port=port)
+    server = EdgeServer(adapter=test_adapter, port=port, auth=NO_AUTH)
     task = asyncio.create_task(server.serve())
     await asyncio.sleep(0.05)  # give the server time to bind
     yield port
@@ -102,7 +136,25 @@ async def server_port(test_adapter):
 async def crashing_server_port(crashing_adapter):
     """Same as server_port but uses the crashing adapter."""
     port = _free_port()
-    server = EdgeServer(adapter=crashing_adapter, port=port)
+    server = EdgeServer(adapter=crashing_adapter, port=port, auth=NO_AUTH)
+    task = asyncio.create_task(server.serve())
+    await asyncio.sleep(0.05)
+    yield port
+    await server.stop(grace=0)
+    with suppress(asyncio.CancelledError, Exception):
+        await task
+
+
+@pytest_asyncio.fixture
+def registry_adapter() -> _RegistryOnlyAdapter:
+    return _RegistryOnlyAdapter()
+
+
+@pytest_asyncio.fixture
+async def registry_server_port(registry_adapter):
+    """Same as server_port but serves the registration-only adapter."""
+    port = _free_port()
+    server = EdgeServer(adapter=registry_adapter, port=port, auth=NO_AUTH)
     task = asyncio.create_task(server.serve())
     await asyncio.sleep(0.05)
     yield port

@@ -351,6 +351,19 @@ The SDK respects the following environment variables:
 - `EDGE_TELEMETRY_HOST` - Host for telemetry (default: localhost)
 - `EDGE_TELEMETRY_PORT` - Port for telemetry (default: 50052)
 
+### Authentication
+
+Both directions of an adapter's gRPC traffic are authenticated (see `edge_sdk/auth.py`):
+
+- `ZQNT_EDGE_TOKEN` - the adapter's edge credential, attached to every call into the platform.
+  Issue one in the console (Edge Credentials, `POST /api/admin-console/edge-credentials`) or with
+  `core/scripts/mint-edge-credential.py`. The platform refuses calls without it, except claim
+  redemption (`ZQNT_CLAIM_CODE`).
+- `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) - the platform's service public key.
+  `EdgeServer` refuses every command that does not carry a token signed with it; without the key
+  it refuses everything.
+- `ZQNT_EDGE_AUTH_DISABLED=true` - accept unauthenticated commands. Local SITL/simulators only.
+
 ## API Reference
 
 Full API documentation is available in the module docstrings:

@@ -1,15 +1,15 @@
 """
-Plain-Python notification models mirroring ``events.proto`` ``NotificationEvent`` variants,
-as they exist at the 1.3.0 wire contract.
+Plain-Python notification models mirroring ``events.proto`` ``NotificationEvent`` variants.
 
-This branch keeps :class:`TaskEvent` (retired on main/2.0.0 in favor of the vendor-neutral
-``CommandExecutionEvent``, which doesn't exist in events.proto until after the 1.3.0 tag) --
-see zqnt-protos' README "Versioning" section.
+``TaskEvent`` is gone — ``NotificationEvent.task`` (field 2) is permanently reserved on the wire,
+retired in favor of :class:`CommandExecutionEvent` (vendor-neutral command lifecycle feedback).
+``OperationEvent`` is renamed :class:`MissionEvent` to match the proto's own ``mission`` branch.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 
-from .common import MissionStatus, MissionType, TaskStatus, TaskType
+from .common import CommandExecutionStatus, MissionStatus, MissionType
 
 
 @dataclass
@@ -23,19 +23,6 @@ class AssetStatusEvent:
 
 
 @dataclass
-class TaskEvent:
-    """Task lifecycle event."""
-
-    task_id: str
-    task_type: TaskType
-    status: TaskStatus
-    sn: str = ""  # asset serial number – required for multi-asset adapters
-    progress: float | None = None
-    message: str | None = None
-    external_task_type: str | None = None
-
-
-@dataclass
 class MissionEvent:
     """Mission lifecycle event."""
 
@@ -44,3 +31,23 @@ class MissionEvent:
     status: MissionStatus
     sn: str = ""  # asset serial number – required for multi-asset adapters
     message: str | None = None
+
+
+@dataclass
+class CommandExecutionEvent:
+    """Vendor-neutral lifecycle feedback for one physical command dispatched to an edge adapter."""
+
+    external_execution_id: str
+    status: CommandExecutionStatus
+    sn: str = ""  # asset serial number – required for multi-asset adapters
+    command_id: str | None = None
+    progress: float | None = None  # 0.0 – 1.0, present when RUNNING
+    message: str | None = None
+    # What the command produced, on SUCCEEDED. mission-autonomy completes a skill node that is
+    # waiting on this execution with it as the node's output, so later nodes can map from it
+    # ($.nodes.<id>.output.<field>) — the asynchronous counterpart of CustomCommandResponse.result.
+    output: dict | None = None
+    # When the adapter observed this, defaulting to publish time. REQUIRED on the wire: LiveData
+    # refuses an event without it ("requires external_execution_id, asset_sn and occurred_at") and
+    # the refusal is invisible here — the publish still succeeds, the event is simply dropped.
+    occurred_at: datetime | None = None

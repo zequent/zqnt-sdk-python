@@ -1,12 +1,9 @@
 """
-Plain-Python scheduler model mirroring ``mission-autonomy-dto.proto`` ``SchedulerProtoDTO``,
-as it exists at the 1.3.0 wire contract: Mission/Task-based (``mission_id``/``task_id``).
+Plain-Python scheduler model mirroring ``mission-autonomy-dto.proto`` ``SchedulerProtoDTO``.
 
-Main/2.0.0 replaced this with a mission-free scheduler target (``asset_sn``/``command_id``/
-``application_id``/``skill_id``/``execution_parameters``/``auto_start``) as part of the
-Missions/Tasks -> Skills/Applications refactor -- that shape doesn't exist at 1.3.0, so this
-branch keeps the original Mission/Task fields instead. See zqnt-protos' README "Versioning"
-section.
+The mission-free scheduler target: exactly one of ``command_id`` or ``application_id`` +
+``skill_id`` is expected for new schedules (``mission_id``/``task_id`` are permanently reserved
+on the wire — the legacy Mission/Task scheduling model they backed is gone).
 """
 
 from dataclasses import dataclass
@@ -21,9 +18,13 @@ class SchedulerDTO:
     name: str
     cron_expression: str
     type: SchedulerType = SchedulerType.SYSTEM_JOBS
-    mission_id: str | None = None
-    task_id: str | None = None
     active: bool | None = None
     client_time_zone: str | None = None
     created_at: datetime | None = None
     modified_at: datetime | None = None
+    asset_sn: str | None = None
+    command_id: str | None = None
+    application_id: str | None = None
+    skill_id: str | None = None
+    execution_parameters: dict | None = None
+    auto_start: bool | None = None

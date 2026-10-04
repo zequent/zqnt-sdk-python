@@ -804,26 +804,56 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
 
 
 def capabilities_to_proto(caps: Capabilities, common_pb2, timestamp_pb2):
-    # NOTE: the wire contract for capabilities grew a much richer Capability Contract model
-    # (CapabilityState enum instead of a plain bool, plus constraints/input_schema/output_schema/
-    # errors/events/schema_version — see device-control-contracts.proto). This SDK's own
-    # Capability/Capabilities dataclasses (edge_sdk/models/common.py) still only carry the old,
-    # flat fields, so this is a best-effort mapping onto the new message shape, not a full
-    # migration to the richer contract — adapters can't yet declare input_schema/output_schema/
-    # errors/events through this SDK. That's real follow-up work (same thing edge-go-sdk deferred
-    # for the same reason), not something to improvise silently here.
+    """
+    Map the SDK's Capability model onto the wire contract in device-control-contracts.proto.
+
+    Every field of that contract now has a home in the model — input_schema/output_schema carry
+    the JSON Schemas as Structs, target says what the command acts on, and schema_version lets
+    the platform detect contract drift against a stored Application. Before 2.0 this was a
+    best-effort mapping of a flat command/description/available triple, which is why adapters
+    built on this SDK could not describe their parameters at all.
+    """
+    from google.protobuf import struct_pb2
+
+    def struct(value: dict | None):
+        if not value:
+            return None
+        s = struct_pb2.Struct()
+        s.update(value)
+        return s
+
     ts = _now_ts(timestamp_pb2)
-    proto_caps = [
-        common_pb2.Capability(
-            command_id=c.command,
-            display_name=c.command,
-            description=c.description,
-            state=(common_pb2.CAPABILITY_STATE_AVAILABLE if c.available else common_pb2.CAPABILITY_STATE_UNSUPPORTED),
-            unavailable_reason=c.unavailable_reason or "",
-            metadata=c.metadata,
-        )
-        for c in caps.capabilities
-    ]
+    proto_caps = []
+    for c in caps.capabilities:
+        kwargs: dict = {
+            "command_id": c.command_id,
+            "display_name": c.display_name or c.command_id,
+            "description": c.description,
+            "state": int(c.state),
+            "metadata": c.metadata,
+            "source": int(c.source),
+        }
+        if c.unavailable_reason:
+            kwargs["unavailable_reason"] = c.unavailable_reason
+        input_schema = struct(c.input_schema)
+        if input_schema is not None:
+            kwargs["input_schema"] = input_schema
+        output_schema = struct(c.output_schema)
+        if output_schema is not None:
+            kwargs["output_schema"] = output_schema
+        if c.schema_version:
+            kwargs["schema_version"] = c.schema_version
+        if c.skill_id:
+            kwargs["skill_id"] = c.skill_id
+        if c.provider:
+            kwargs["provider"] = c.provider
+        if c.target is not None:
+            target_kwargs: dict = {"type": int(c.target.type)}
+            if c.target.target_ref:
+                target_kwargs["target_ref"] = c.target.target_ref
+            kwargs["target"] = common_pb2.CapabilityTarget(**target_kwargs)
+        proto_caps.append(common_pb2.Capability(**kwargs))
+
     return common_pb2.AssetCapabilities(
         asset_sn=caps.asset_sn,
         asset_type=caps.asset_type.name,

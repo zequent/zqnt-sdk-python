@@ -36,6 +36,9 @@ except PackageNotFoundError:
     __version__ = "1.0.0"
 
 from .adapter.base import EdgeAdapter
+from .adapter.commands import CATALOG as COMMAND_CATALOG
+from .adapter.commands import CommandSpec, RegisteredCommand, schema
+from .auth import EdgeAuthConfig, PlatformTokenVerifier, TokenVerificationError
 from .client.connector_client import ConnectorClient
 from .client.live_data_service import LiveDataService
 from .client.mission_autonomy_client import MissionAutonomyClient
@@ -67,11 +70,18 @@ from .models import (
     CameraData,
     Capabilities,
     Capability,
+    CapabilitySource,
+    CapabilityState,
+    CapabilityTarget,
+    CapabilityTargetType,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
+    CommandExecutionEvent,
+    CommandExecutionStatus,
     CommandProgress,
     Coordinates,
     DetectionParameter,
+    DetectionPosition,
     DetectionResponse,
     DetectionResult,
     DetectTaskConfig,
@@ -105,7 +115,6 @@ from .models import (
     SubAssetMode,
     SubAssetTelemetry,
     Task,
-    TaskEvent,
     TaskStatus,
     TaskType,
     TrackTaskConfig,
@@ -120,6 +129,10 @@ __all__ = [
     "EdgeAdapter",
     "EdgeAdapterConfig",
     "EdgeAdapterRuntime",
+    # authentication (edge_sdk.auth)
+    "EdgeAuthConfig",
+    "PlatformTokenVerifier",
+    "TokenVerificationError",
     "EdgeServer",
     "RegistrationConfig",
     "TelemetryPublisher",
@@ -141,6 +154,7 @@ __all__ = [
     "MissionType",
     "MissionStatus",
     "ErrorCode",
+    "CommandExecutionStatus",
     "SchedulerType",
     "Rainfall",
     "NetworkType",
@@ -152,7 +166,15 @@ __all__ = [
     "ErrorMessage",
     "CommandProgress",
     "Capabilities",
+    "COMMAND_CATALOG",
+    "CommandSpec",
+    "RegisteredCommand",
+    "schema",
     "Capability",
+    "CapabilitySource",
+    "CapabilityState",
+    "CapabilityTarget",
+    "CapabilityTargetType",
     "ReturnToHomeRequest",
     "ManualControlRequest",
     "ManualControlInput",
@@ -161,6 +183,7 @@ __all__ = [
     "ChangeCameraLensRequest",
     "ChangeCameraZoomRequest",
     "BoundingBox",
+    "DetectionPosition",
     "DetectionResult",
     "DetectionResponse",
     # asset
@@ -169,7 +192,7 @@ __all__ = [
     # notification
     "AssetStatusEvent",
     "MissionEvent",
-    "TaskEvent",
+    "CommandExecutionEvent",
     # scheduler
     "SchedulerDTO",
     # task

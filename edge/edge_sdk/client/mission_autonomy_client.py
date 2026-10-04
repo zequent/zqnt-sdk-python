@@ -1,11 +1,10 @@
 """
 MissionAutonomyClient – thin wrapper around the MissionAutonomyService gRPC stub.
 
-This branch tracks the 1.3.0 wire contract, where MissionAutonomyService's edge-facing surface
-is just Scheduler lookup (Mission/Task CRUD, retired on main/2.0.0 in favor of the
-capability-execution model, still exist as real RPCs on ConnectorService at 1.3.0 -- see
-:class:`~edge_sdk.client.connector_client.ConnectorClient`'s get_mission/get_task methods for
-those, unchanged from main's tiny-surface precedent for *this* service specifically::
+Mirrors :java:`com.zqnt.sdk.edge.missionautonomy.application.MissionAutonomyService` — the
+edge-side surface is deliberately tiny. Mission/Task CRUD was retired from MissionAutonomyService
+in favor of the capability-execution model (Application/SkillExecution); the underlying gRPC
+methods no longer exist, so only Scheduler lookup remains here, matching the Java interface::
 
     client = MissionAutonomyClient(host="platform.example.com", port=50054)
     await client.connect()
@@ -24,6 +23,7 @@ import logging
 import uuid
 from typing import Any, Callable
 
+from ..auth import default_edge_token, platform_channel
 from ..models.scheduler import SchedulerDTO
 
 logger = logging.getLogger(__name__)
@@ -49,8 +49,10 @@ class MissionAutonomyClient:
         port: int = 50054,
         call_timeout: float = 30.0,
         max_retries: int = 3,
+        token: str | None = None,
     ) -> None:
         self._host = host
+        self._token = token if token is not None else default_edge_token()
         self._port = port
         self._call_timeout = call_timeout
         self._max_retries = max_retries
@@ -63,10 +65,9 @@ class MissionAutonomyClient:
 
     async def connect(self) -> None:
         """Create the gRPC channel and initialise the stub."""
-        import grpc.aio
         from zqnt_utils.generated.zqnt import mission_autonomy_pb2_grpc
 
-        self._channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
+        self._channel = platform_channel(self._host, self._port, self._token)
         self._stub = mission_autonomy_pb2_grpc.MissionAutonomyServiceStub(self._channel)
         logger.info("MissionAutonomyClient connected to %s:%d", self._host, self._port)
 
@@ -156,13 +157,23 @@ def _proto_to_scheduler(s) -> SchedulerDTO:
     from ..models.common import SchedulerType
     from ..server._converters import _opt_field  # reuse the shared optional-field helper
 
+    execution_parameters = None
+    if s.HasField("execution_parameters"):
+        from google.protobuf import json_format
+
+        execution_parameters = json_format.MessageToDict(s.execution_parameters)
+
     return SchedulerDTO(
         id=_opt_field(s, "id"),
         name=s.name,
         cron_expression=s.cron_expression,
         type=SchedulerType(s.type),
-        mission_id=_opt_field(s, "mission_id"),
-        task_id=_opt_field(s, "task_id"),
         active=_opt_field(s, "active"),
         client_time_zone=_opt_field(s, "client_time_zone"),
+        asset_sn=_opt_field(s, "asset_sn"),
+        command_id=_opt_field(s, "command_id"),
+        application_id=_opt_field(s, "application_id"),
+        skill_id=_opt_field(s, "skill_id"),
+        execution_parameters=execution_parameters,
+        auto_start=_opt_field(s, "auto_start"),
     )

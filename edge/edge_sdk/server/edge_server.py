@@ -34,6 +34,7 @@ from google.protobuf import empty_pb2, timestamp_pb2
 from zqnt_utils.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc
 
 from ..adapter.base import EdgeAdapter
+from ..auth import EdgeAuthConfig, PlatformAuthServerInterceptor
 from ..models.common import (
     AssetAirConditionerState,
     AssetType,
@@ -137,10 +138,17 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     # ------------------------------------------------------------------
 
     async def _assert_supported(self, method_name: str, context) -> None:
-        """Abort with UNIMPLEMENTED if the adapter has not overridden *method_name*."""
-        base = getattr(EdgeAdapter, method_name, None)
-        impl = getattr(type(self._adapter), method_name, None)
-        if base is impl:
+        """
+        Abort with UNIMPLEMENTED if the adapter cannot serve *method_name*.
+
+        Delegates to :meth:`EdgeAdapter.supports_method`, which counts a registered command
+        handler as an implementation. Checking only for an overridden method here is what used to
+        make every ``register_command`` declaration unreachable: the adapter advertised the
+        command through ``get_capabilities`` and then answered the call with UNIMPLEMENTED,
+        because the inherited method body that dispatches to the handler is, by definition, not
+        an override.
+        """
+        if not self._adapter.supports_method(method_name):
             await context.abort(
                 grpc.StatusCode.UNIMPLEMENTED,
                 f"{method_name} is not supported by this adapter",
@@ -494,6 +502,9 @@ class EdgeServer:
         host:          Bind address (default ``[::]`` = all interfaces).
         registration:  Optional :class:`RegistrationConfig` for automatic
                        service-discovery registration in Redis.
+        auth:          Who may call this server (see :mod:`edge_sdk.auth`). Default: from the
+                       environment — the platform's public key, or the dev-only disable switch.
+                       Without either, every command is refused.
 
     Example::
 
@@ -516,8 +527,10 @@ class EdgeServer:
         port: int = 50051,
         host: str = "[::]",
         registration: RegistrationConfig | None = None,
+        auth: EdgeAuthConfig | None = None,
     ) -> None:
         self._adapter = adapter
+        self._auth = auth if auth is not None else EdgeAuthConfig.from_env()
         self._port = port
         self._host = host
         self._registration = registration
@@ -526,7 +539,8 @@ class EdgeServer:
 
     async def serve(self) -> None:
         """Start the server and block until it is terminated."""
-        self._server = grpc.aio.server()
+        # Only the platform may command the device: every call must carry its service token.
+        self._server = grpc.aio.server(interceptors=[PlatformAuthServerInterceptor(self._auth)])
 
         # Register EdgeAdapterService
         edge_pb2_grpc.add_EdgeAdapterServiceServicer_to_server(_EdgeAdapterServicer(self._adapter), self._server)

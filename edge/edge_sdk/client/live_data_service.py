@@ -22,7 +22,7 @@ hiccup doesn't interrupt telemetry) — this only unifies lifecycle and gives PO
 
 import logging
 
-from ..models.notification import AssetStatusEvent, MissionEvent, TaskEvent
+from ..models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
 from ..models.telemetry import AssetTelemetry, SubAssetTelemetry
 from .detection_publisher import DetectionPublisher
 from .notification_publisher import NotificationPublisher
@@ -49,11 +49,14 @@ class LiveDataService:
         port: int = 50052,
         sn: str = "",
         queue_max_size: int = 1000,
+        token: str | None = None,
     ) -> None:
         self._sn = sn
-        self.telemetry = TelemetryPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size)
-        self.detection = DetectionPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size)
-        self.notification = NotificationPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size)
+        self.telemetry = TelemetryPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token)
+        self.detection = DetectionPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token)
+        self.notification = NotificationPublisher(
+            host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -101,12 +104,12 @@ class LiveDataService:
     # Notification
     # ------------------------------------------------------------------
 
-    async def produce_notification(self, event: AssetStatusEvent | MissionEvent | TaskEvent) -> None:
+    async def produce_notification(self, event: AssetStatusEvent | MissionEvent | CommandExecutionEvent) -> None:
         if isinstance(event, AssetStatusEvent):
             await self.notification.publish_asset_status(event)
         elif isinstance(event, MissionEvent):
             await self.notification.publish_mission_event(event)
-        elif isinstance(event, TaskEvent):
-            await self.notification.publish_task_event(event)
+        elif isinstance(event, CommandExecutionEvent):
+            await self.notification.publish_command_execution_event(event)
         else:
             raise TypeError(f"Unknown notification event type: {type(event).__name__}")

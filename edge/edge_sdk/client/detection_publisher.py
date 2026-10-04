@@ -26,6 +26,7 @@ import asyncio
 import logging
 import uuid
 
+from ..auth import default_edge_token, platform_channel
 from ..models.common import DetectionBatch
 
 logger = logging.getLogger(__name__)
@@ -57,8 +58,10 @@ class DetectionPublisher:
         port: int = 50052,
         sn: str = "",
         queue_max_size: int = 1000,
+        token: str | None = None,
     ) -> None:
         self._host = host
+        self._token = token if token is not None else default_edge_token()
         self._port = port
         self._sn = sn
         self._queue_max_size = queue_max_size
@@ -123,8 +126,6 @@ class DetectionPublisher:
     # ------------------------------------------------------------------
 
     async def _run_stream(self) -> None:
-        import grpc
-        import grpc.aio
         from zqnt_utils.generated.zqnt import live_data_pb2_grpc
 
         backoff = self._BACKOFF_INITIAL
@@ -133,7 +134,7 @@ class DetectionPublisher:
             gen_stop = asyncio.Event()
             channel = None
             try:
-                channel = grpc.aio.insecure_channel(f"{self._host}:{self._port}")
+                channel = platform_channel(self._host, self._port, self._token)
                 stub = live_data_pb2_grpc.LiveDataServiceStub(channel)
                 logger.info("Detection stream connecting to %s:%d (sn=%s)", self._host, self._port, self._sn)
 
@@ -210,23 +211,32 @@ class DetectionPublisher:
     def _build_detection_request(self, batch: DetectionBatch):
         from zqnt_utils.generated.zqnt import common_pb2
 
-        detections = [
-            common_pb2.DetectionResult(
-                object_id=d.object_id,
-                object_type=d.object_type,
-                confidence=d.confidence,
-                bounding_box=common_pb2.BoundingBox(
-                    x=d.bounding_box.x,
-                    y=d.bounding_box.y,
-                    width=d.bounding_box.width,
-                    height=d.bounding_box.height,
-                ),
-            )
-            for d in batch.detections
-        ]
+        detections = [_detection_to_proto(common_pb2, d) for d in batch.detections]
 
         kwargs: dict = {"base": self._base(sn=batch.sn or None), "detections": detections}
         if batch.stream_url is not None:
             kwargs["stream_url"] = batch.stream_url
 
         return common_pb2.DetectionBatch(**kwargs)
+
+
+_POSITION_OPTIONALS = ("altitude", "range_m", "bearing_deg", "elevation_deg", "speed_mps", "heading_deg")
+
+
+def _detection_to_proto(common_pb2, d):
+    """One SDK DetectionResult as the wire message; box and position only when present."""
+    result = common_pb2.DetectionResult(object_id=d.object_id, object_type=d.object_type, confidence=d.confidence)
+    if d.bounding_box is not None:
+        result.bounding_box.CopyFrom(
+            common_pb2.BoundingBox(
+                x=d.bounding_box.x, y=d.bounding_box.y, width=d.bounding_box.width, height=d.bounding_box.height
+            )
+        )
+    if d.position is not None:
+        position = common_pb2.DetectionPosition(latitude=d.position.latitude, longitude=d.position.longitude)
+        for name in _POSITION_OPTIONALS:
+            value = getattr(d.position, name)
+            if value is not None:
+                setattr(position, name, value)
+        result.position.CopyFrom(position)
+    return result
