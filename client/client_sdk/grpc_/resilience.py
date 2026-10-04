@@ -21,6 +21,7 @@ from typing import TypeVar
 
 import grpc
 
+from ..auth import explain
 from ..config.resilience import ResilienceConfig
 from ..exceptions import ZequentClientError, ZequentRetryExhaustedError
 
@@ -101,6 +102,9 @@ class GrpcResilience:
                         f"All {attempt + 1} attempts failed: {_short_exc(exc)}",
                         attempts=attempt + 1,
                     ) from exc
+                explained = explain(exc)
+                if explained is not exc:
+                    raise explained from exc
                 raise
 
         # Defensive – should be unreachable thanks to raise inside the loop.

@@ -50,19 +50,19 @@ class LiveDataServiceCommand(IntEnum):
 
 
 class NotificationEventType(IntEnum):
-    """Mirrors ``events.proto`` :proto:`NotificationEventType` at the 1.3.0 wire contract this
-    branch tracks.
+    """Mirrors ``events.proto`` :proto:`NotificationEventType`.
 
-    Value 2 (``TASK``) is real here -- main/2.0.0 reserves it, retiring it in favor of
-    ``COMMAND_EXECUTION`` (which doesn't exist at 1.3.0); ``CAPABILITY_EXECUTION`` (5) is
-    likewise main/2.0.0-only. See zqnt-protos' README "Versioning" section.
+    Value 2 (``TASK``) is permanently reserved on the wire — the legacy Task/Mission
+    model retired it in favor of ``COMMAND_EXECUTION`` events; it is intentionally
+    absent here rather than kept as a dead member.
     """
 
     UNSPECIFIED = 0
     ASSET_STATUS = 1
-    TASK = 2
     MISSION = 3
     ASSET_RUNTIME = 4
+    CAPABILITY_EXECUTION = 5
+    COMMAND_EXECUTION = 6
 
 
 class NotificationSeverity(IntEnum):

@@ -1,23 +1,23 @@
 """Connector sub-client — the system-of-record RPCs over ConnectorService.
 
-This branch tracks the 1.3.0 wire contract. Mirrors :java:`com.zqnt.sdk.client.connector.
-application.Connector` for the same RPC set, adapted for ``asyncio`` + ``grpc.aio``: asset/
-sub-asset CRUD, asset payloads, organization lookup, Scheduler CRUD (shared with
-MissionAutonomyService — identical wire messages), policies, technical config, asset-monitoring
-server-streaming, and the three batch upload sessions (telemetry/detection/notification).
+Mirrors :java:`com.zqnt.sdk.client.connector.application.Connector` for the same RPC set,
+adapted for ``asyncio`` + ``grpc.aio``: asset/sub-asset CRUD, asset payloads, organization
+lookup, Scheduler CRUD (shared with MissionAutonomyService — identical wire messages), policies,
+technical config, the Skill Registry, asset-monitoring server-streaming, and the three batch
+upload sessions (telemetry/detection/notification).
 
-Every method here works with raw generated proto DTOs (``AssetProtoDTO``, ...) rather than a
+Like ``MissionAutonomyClient``'s Application/SkillExecution surface, and matching
+``client-go-sdk``'s ``connector`` package for the RPCs it does cover, every method here works
+with raw generated proto DTOs (``AssetProtoDTO``, ``SkillContractProtoDTO``, ...) rather than a
 parallel dataclass hierarchy — Connector's domain model is large and already has a typed
 representation; wrapping it a second time buys little. Methods raise
 :class:`~client_sdk.exceptions.ConnectorError` on ``has_errors`` since there is no response
 dataclass to carry a ``success`` flag on the happy path.
 
-No Skill Registry here (main/2.0.0-only — ``ObserveSkillContract``/``ListSkillContracts``/
-``SetSkillContractStatus``/``SetSkillContractPermissions`` don't exist in connector.proto at
-1.3.0) and no ``PersistApplication``/``PersistSkillExecution``/``AppendSkillExecutionEvent``/
-``SetAssetProperty``/``ListAssetProperties``/``DeleteAssetProperty`` either — not part of the
-Java client SDK's ``Connector`` interface even on main (the Persist* trio is Mission Autonomy's
-own internal write path; the asset-property RPCs postdate 1.3.0 too).
+``PersistApplication``/``PersistSkillExecution``/``AppendSkillExecutionEvent``/
+``SetAssetProperty``/``ListAssetProperties``/``DeleteAssetProperty`` are intentionally not
+covered — not part of the Java client SDK's ``Connector`` interface (the Persist* trio is
+Mission Autonomy's own internal write path; the asset-property RPCs postdate it).
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from typing import Any
 import grpc
 import grpc.aio
 
+from ..auth import explain
 from ..config.resilience import ResilienceConfig
 from ..exceptions import ConnectorError
 from ..grpc_.resilience import GrpcResilience
@@ -364,6 +365,64 @@ class ConnectorClient:
         return list(result.configs)
 
     # ------------------------------------------------------------------
+    # Skill Registry
+    # ------------------------------------------------------------------
+
+    async def observe_skill_contract(self, contract):
+        """Upsert ``contract`` (a ``SkillContractProtoDTO``) — new for a never-seen
+        (command_id, schema_version) pair, or refreshed content/last-seen for one already known."""
+        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+
+        logger.info("ObserveSkillContract: command_id=%s", getattr(contract, "command_id", None))
+        proto = await self._call(
+            "ObserveSkillContract",
+            connector_pb2.UpsertSkillContractRequest(base=build_request_base(_DEFAULT_SN), contract=contract),
+        )
+        return self._unwrap("ObserveSkillContract", proto, "contract")
+
+    async def list_skill_contracts(self, status=None, command_id: str | None = None) -> list:
+        """``status`` is a ``SkillContractStatus`` enum value (int). ``command_id``, when set,
+        returns that command's full version history instead of the whole registry."""
+        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+
+        kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN)}
+        if status is not None:
+            kwargs["status"] = status
+        if command_id:
+            kwargs["command_id"] = command_id
+        logger.info("ListSkillContracts")
+        proto = await self._call("ListSkillContracts", connector_pb2.ListSkillContractsRequest(**kwargs))
+        return list(self._unwrap("ListSkillContracts", proto, "contracts"))
+
+    async def set_skill_contract_status(self, contract_id: str, status):
+        """``status`` is a ``SkillContractStatus`` enum value (int)."""
+        validate_non_blank("id", contract_id)
+        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+
+        logger.info("SetSkillContractStatus: id=%s", contract_id)
+        proto = await self._call(
+            "SetSkillContractStatus",
+            connector_pb2.SetSkillContractStatusRequest(
+                base=build_request_base(_DEFAULT_SN), id=contract_id, status=status
+            ),
+        )
+        return self._unwrap("SetSkillContractStatus", proto, "contract")
+
+    async def set_skill_contract_permissions(self, contract_id: str, required_permissions: list[str]):
+        """Full replacement, not a merge. Declarative only — nothing currently enforces this."""
+        validate_non_blank("id", contract_id)
+        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+
+        logger.info("SetSkillContractPermissions: id=%s", contract_id)
+        proto = await self._call(
+            "SetSkillContractPermissions",
+            connector_pb2.SetSkillContractPermissionsRequest(
+                base=build_request_base(_DEFAULT_SN), id=contract_id, required_permissions=list(required_permissions)
+            ),
+        )
+        return self._unwrap("SetSkillContractPermissions", proto, "contract")
+
+    # ------------------------------------------------------------------
     # Asset monitoring — server-streaming
     # ------------------------------------------------------------------
 
@@ -410,7 +469,7 @@ class ConnectorClient:
                 code = exc.code()
                 logger.warning("AssetMonitoring gRPC error: %s (%s)", code.name if code else "?", exc.details())
                 if code not in _RETRYABLE_CODES:
-                    await _maybe_call(on_error, exc)
+                    await _maybe_call(on_error, explain(exc))
                     return
             except Exception as exc:  # noqa: BLE001
                 if handle.is_stopped:

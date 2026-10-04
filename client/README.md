@@ -27,7 +27,8 @@ After installation you can verify the version:
 
 ```python
 import client_sdk
-print(client_sdk.__version__)  # "1.0.0"
+
+print(client_sdk.__version__)  # "1.0.1"
 ```
 
 ---
@@ -37,6 +38,7 @@ print(client_sdk.__version__)  # "1.0.0"
 ```python
 import asyncio
 from client_sdk import ZequentClient, TakeoffRequest
+
 
 async def main():
     async with ZequentClient.from_env() as client:
@@ -51,33 +53,39 @@ async def main():
         async for telemetry in client.live_data.stream_telemetry(asset_sn="DOCK-1"):
             print(telemetry)
 
+
 asyncio.run(main())
 ```
 
-`ZequentClient.from_env()` reads connection settings from environment variables.
-Defaults are shown:
+`ZequentClient.from_env()` reads connection settings from environment variables — the same names the
+Java and Go client SDKs read, so one `.env` works for every language. Nothing set is the local
+development stack (`quarkus:dev` or `docker-compose.local.yml`):
 
-| Variable                          | Default     |
-| --------------------------------- | ----------- |
-| `REMOTE_CONTROL_SERVICE_HOST`     | `localhost` |
-| `REMOTE_CONTROL_SERVICE_PORT`     | `8002`      |
-| `MISSION_AUTONOMY_SERVICE_HOST`   | `localhost` |
-| `MISSION_AUTONOMY_SERVICE_PORT`   | `8004`      |
-| `LIVE_DATA_SERVICE_HOST`          | `localhost` |
-| `LIVE_DATA_SERVICE_PORT`          | `8003`      |
+| Variable                                                        | Local default (nothing set)   |
+| --------------------------------------------------------------- | ----------------------------- |
+| `CONNECTOR_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`           | `localhost` / `8010` / `true` |
+| `REMOTE_CONTROL_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`      | `localhost` / `8002` / `true` |
+| `LIVE_DATA_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`           | `localhost` / `8003` / `true` |
+| `MISSION_AUTONOMY_SERVICE_HOST` / `_PORT` / `_USE_PLAINTEXT`    | `localhost` / `8004` / `true` |
+| `ZQNT_CLIENT_TOKEN`                                             | none — issue one in your local console too |
+
+A deployment sets the hosts, `_USE_PLAINTEXT=false` for TLS whenever traffic leaves a private
+network, and `ZQNT_CLIENT_TOKEN` from its secret store — never from a committed file. There is
+deliberately no built-in development credential: the local platform refuses anonymous calls too.
+`from_env(**overrides)` passes `client_token=`, `interceptors=` or a single `*_config=` through.
 
 You can also build a client manually:
 
 ```python
 from client_sdk import ZequentClient
-from client_sdk.config import ZequentClientConfig
+from client_sdk.config import ServiceConfig
 
-config = ZequentClientConfig(
-    remote_control_host="rc.example.com", remote_control_port=8002,
-    mission_autonomy_host="ma.example.com", mission_autonomy_port=8004,
-    live_data_host="ld.example.com", live_data_port=8003,
-)
-async with ZequentClient(config) as client:
+async with ZequentClient(
+    connector_config=ServiceConfig("connector", host="connector.example.com", port=8010),
+    remote_control_config=ServiceConfig("remote-control", host="rc.example.com", port=8002),
+    mission_autonomy_config=ServiceConfig("mission-autonomy", host="ma.example.com", port=8004),
+    live_data_config=ServiceConfig("live-data", host="ld.example.com", port=8003),
+) as client:
     ...
 ```
 
@@ -95,7 +103,7 @@ Flight, manual control, dock and asset operations.
 | Method                         | Purpose                                  |
 | ------------------------------ | ---------------------------------------- |
 | `takeoff(req)`                 | Launch an asset                          |
-| `go_to(req)`                   | Fly-to / waypoint command                |
+| `go_to(req, *, no_fly_zone_override=False)` | Fly-to; the override (org admin / system admin only) flies through a no-fly zone that would refuse it |
 | `return_to_home(req)`          | Trigger RTH                              |
 | `look_at(req)`                 | Point camera at coordinate               |
 | `manual_control(req)`          | Send a single manual-control input       |
@@ -153,6 +161,40 @@ async with client.remote_control.manual_control_session(sn="DOCK-1") as session:
 ```
 
 ---
+
+## Authentication
+
+The platform refuses every call that carries no credential. An organization administrator issues a
+**client credential** in the console under **Deploy → Access & Integrations → Credentials** (kind
+**client**). It is shown once, belongs to that one organization, and reaches only that
+organization's assets, Applications and runs — never users, organizations or other administration.
+
+```bash
+export ZQNT_CLIENT_TOKEN=eyJhbGciOiJFZERTQSIs...   # read by ZequentClient(...) and from_env()
+```
+
+```python
+client = ZequentClient(
+    connector_config=...,
+    remote_control_config=...,
+    mission_autonomy_config=...,
+    live_data_config=...,
+    client_token=token,
+)  # or pass it explicitly
+```
+
+It is sent as `authorization: Bearer <token>` on every call, unary and streaming. A refusal is raised
+as `client_sdk.auth.ZequentAuthError` — a `grpc.aio.AioRpcError` with the same `code()` and a
+`details()` that says what to do: `UNAUTHENTICATED` (no credential, or an expired/revoked one) or
+`PERMISSION_DENIED` (an asset of another organization, or an administrative call). Neither is retried.
+
+### A credential that is not one fixed token
+
+A service that forwards its own caller's token, or rotates a short-lived one, passes its own
+`grpc.aio` interceptors: `ZequentClient(..., interceptors=[...])` or
+`ZequentClient.from_env(interceptors=[...])`. They go on every channel (all four services, unary and
+streaming calls), in the order given, before the SDK's credential interceptor. An `authorization`
+header they set wins, and the fixed client token is then not sent.
 
 ## Error handling
 

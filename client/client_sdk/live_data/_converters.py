@@ -33,8 +33,8 @@ from ..models.live_data import (
     LiveDataStopLiveStreamRequest,
     LiveStreamStartResult,
     NotificationAssetStatus,
+    NotificationCommandExecutionEvent,
     NotificationOperationEvent,
-    NotificationTaskEvent,
     PayloadTelemetry,
     RangeFinderData,
     SensorData,
@@ -203,7 +203,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
     event_type: str | None = None
     asset_status: NotificationAssetStatus | None = None
     operation_event: NotificationOperationEvent | None = None
-    task_event: NotificationTaskEvent | None = None
+    command_execution_event: NotificationCommandExecutionEvent | None = None
     error = None
 
     detail = proto.WhichOneof("detail")
@@ -232,24 +232,25 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
                 status=_enum_name(common_pb2.MissionStatus, mission.status),
                 message=opt_field(mission, "message"),
             )
-        elif which_event == "task":
-            event_type = "NOTIFICATION_EVENT_TASK"
-            from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        elif which_event == "command_execution":
+            event_type = "NOTIFICATION_EVENT_COMMAND_EXECUTION"
+            from zqnt_utils.generated.zqnt import events_pb2  # type: ignore[import]
 
-            task = inner.task
-            task_event = NotificationTaskEvent(
-                task_id=task.task_id,
-                task_type=_enum_name(common_pb2.TaskTypeProto, task.task_type),
-                status=_enum_name(common_pb2.TaskStatus, task.status),
-                progress=opt_field(task, "progress"),
-                message=opt_field(task, "message"),
-                external_task_type=opt_field(task, "external_task_type"),
+            cmd = inner.command_execution
+            command_execution_event = NotificationCommandExecutionEvent(
+                external_execution_id=cmd.external_execution_id,
+                command_id=opt_field(cmd, "command_id"),
+                status=_enum_name(events_pb2.CommandExecutionStatus, cmd.status),
+                progress=opt_field(cmd, "progress"),
+                message=opt_field(cmd, "message"),
+                error=proto_to_error_info(cmd.error) if cmd.HasField("error") else None,
             )
         elif which_event == "error":
             event_type = None
             error = proto_to_error_info(inner.error)
-        # asset_runtime: a newer branch, not yet surfaced as a typed dataclass here -- same
-        # scope boundary as the richer capability-package shape left untouched elsewhere.
+        # asset_runtime / skill_execution: newer branches, not yet surfaced as
+        # typed dataclasses here — same scope boundary as the richer
+        # capability-package shape left untouched in the RemoteControl fix.
 
     return StreamNotificationResponse(
         tid=proto.tid,
@@ -260,7 +261,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
         event_type=event_type,
         asset_status=asset_status,
         operation_event=operation_event,
-        task_event=task_event,
+        command_execution_event=command_execution_event,
         error=error,
     )
 

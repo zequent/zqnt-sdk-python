@@ -1,13 +1,22 @@
-"""Unit tests for ``MissionAutonomyClient`` (Mission / Task / Scheduler), as it exists at the
-1.3.0 wire contract this branch tracks. See this file's own main-branch counterpart for the
-mirror-image cut (Application/SkillExecution real, Mission/Task stubbed)."""
+"""Unit tests for ``MissionAutonomyClient`` (Application / SkillExecution / Scheduler)."""
 
 from __future__ import annotations
 
 from typing import Any
 
 import pytest
-from zqnt_utils.generated.zqnt import base_pb2
+from zqnt_utils.generated.zqnt import (
+    base_pb2,
+)
+from zqnt_utils.generated.zqnt import (
+    capability_execution_contracts_pb2 as exc,
+)
+from zqnt_utils.generated.zqnt import (
+    capability_execution_dto_pb2 as execdto,
+)
+from zqnt_utils.generated.zqnt import (
+    capability_execution_types_pb2 as exts,
+)
 from zqnt_utils.generated.zqnt import (
     mission_autonomy_contracts_pb2 as mac,
 )
@@ -16,8 +25,8 @@ from zqnt_utils.generated.zqnt import (
 )
 
 from client_sdk.config.resilience import ResilienceConfig
+from client_sdk.exceptions import LegacyOperationRemovedError, MissionAutonomyError
 from client_sdk.mission_autonomy.client import MissionAutonomyClient
-from client_sdk.models.enums import MissionStatus, MissionType, TaskStatus, TaskType
 from client_sdk.models.mission_autonomy import MissionDTO, SchedulerDTO, TaskDTO
 
 
@@ -57,179 +66,241 @@ def _error_response(cls, **extra):
 
 
 # ---------------------------------------------------------------------------
-# Mission CRUD
+# Application admin
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_mission_round_trips() -> None:
-    mission = mad.MissionProtoDTO(id="m1", name="Perimeter sweep", status=1, type=0)
-    stub = _FakeStub(mac.MissionResponse(has_errors=False, mission_id="m1", mission=mission))
+async def test_upsert_application_round_trips() -> None:
+    app = execdto.ApplicationProtoDTO(id="app1", version="v1", name="App One")
+    stub = _FakeStub(exc.ApplicationResponse(has_errors=False, application=app))
     c = _client(stub)
 
-    result = await c.create_mission(MissionDTO(name="Perimeter sweep"))
+    result = await c.upsert_application(app, expected_revision="rev-1")
 
-    assert result.success is True
-    assert result.mission is not None
-    assert result.mission.id == "m1"
-    assert result.mission.name == "Perimeter sweep"
-    sent = stub.calls["CreateMission"][0]
-    assert sent.mission.name == "Perimeter sweep"
+    assert result.id == "app1"
+    sent = stub.calls["UpsertApplication"][0]
+    assert sent.application.id == "app1"
+    assert sent.expected_revision == "rev-1"
 
 
 @pytest.mark.asyncio
-async def test_create_mission_raises_on_error() -> None:
-    stub = _FakeStub(_error_response(mac.MissionResponse))
+async def test_upsert_application_raises_on_error() -> None:
+    stub = _FakeStub(_error_response(exc.ApplicationResponse))
     c = _client(stub)
-    result = await c.create_mission(MissionDTO(name="m"))
-    assert result.success is False
-    assert result.error is not None
-    assert result.error.error_message == "boom"
+    with pytest.raises(MissionAutonomyError, match="boom"):
+        await c.upsert_application(execdto.ApplicationProtoDTO(id="app1"))
 
 
 @pytest.mark.asyncio
-async def test_get_mission_validates_id() -> None:
-    c = _client(_FakeStub(mac.MissionResponse(has_errors=False)))
+async def test_get_application_validates_id() -> None:
+    c = _client(_FakeStub(exc.ApplicationResponse(has_errors=False)))
     with pytest.raises(ValueError):
-        await c.get_mission("")
+        await c.get_application("")
 
 
 @pytest.mark.asyncio
-async def test_get_mission_passes_id() -> None:
-    mission = mad.MissionProtoDTO(id="m1", status=2, type=1)
-    stub = _FakeStub(mac.MissionResponse(has_errors=False, mission=mission))
+async def test_get_application_passes_version() -> None:
+    app = execdto.ApplicationProtoDTO(id="app1", version="v2")
+    stub = _FakeStub(exc.ApplicationResponse(has_errors=False, application=app))
     c = _client(stub)
 
-    result = await c.get_mission("m1")
-    assert result.mission is not None
-    assert result.mission.status == MissionStatus.ACTIVE
-    assert result.mission.type == MissionType.REMOTE_OPS
-    assert stub.calls["GetMission"][0].mission_id == "m1"
+    result = await c.get_application("app1", version="v2")
+    assert result.version == "v2"
+    assert stub.calls["GetApplication"][0].version == "v2"
 
 
 @pytest.mark.asyncio
-async def test_update_mission() -> None:
-    mission = mad.MissionProtoDTO(id="m1", name="Renamed")
-    stub = _FakeStub(mac.MissionResponse(has_errors=False, mission=mission))
+async def test_list_applications_returns_page() -> None:
+    apps = [execdto.ApplicationProtoDTO(id="a"), execdto.ApplicationProtoDTO(id="b")]
+    stub = _FakeStub(
+        exc.ApplicationListResponse(
+            has_errors=False,
+            result=exc.ApplicationList(applications=apps, next_page_token="page-2"),
+        )
+    )
     c = _client(stub)
 
-    result = await c.update_mission("m1", MissionDTO(name="Renamed"))
-    assert result.mission.name == "Renamed"
-    sent = stub.calls["UpdateMission"][0]
-    assert sent.mission_id == "m1"
-    assert sent.mission.name == "Renamed"
+    result, next_page_token = await c.list_applications(enabled_only=True, page_size=10)
+
+    assert [a.id for a in result] == ["a", "b"]
+    assert next_page_token == "page-2"
+    assert stub.calls["ListApplications"][0].enabled_only is True
+    assert stub.calls["ListApplications"][0].page_size == 10
 
 
 @pytest.mark.asyncio
-async def test_delete_mission() -> None:
-    stub = _FakeStub(mac.MissionResponse(has_errors=False, mission_id="m1"))
+async def test_delete_application_raises_on_error() -> None:
+    stub = _FakeStub(_error_response(exc.ApplicationResponse))
     c = _client(stub)
-    result = await c.delete_mission("m1")
-    assert result.success is True
-    assert stub.calls["DeleteMission"][0].mission_id == "m1"
+    with pytest.raises(MissionAutonomyError):
+        await c.delete_application("app1")
+
+
+@pytest.mark.asyncio
+async def test_delete_application_succeeds_silently() -> None:
+    stub = _FakeStub(exc.ApplicationResponse(has_errors=False))
+    c = _client(stub)
+    await c.delete_application("app1", version="v1", expected_revision="rev-1")
+    sent = stub.calls["DeleteApplication"][0]
+    assert sent.version == "v1"
+    assert sent.expected_revision == "rev-1"
+
+
+@pytest.mark.asyncio
+async def test_promote_application_version() -> None:
+    pointer = execdto.ApplicationEnvironmentPointerProtoDTO(
+        application_id="app1",
+        environment=exts.ApplicationEnvironmentProto.APPLICATION_ENVIRONMENT_PRODUCTION,
+        version="v1",
+    )
+    stub = _FakeStub(
+        exc.ApplicationEnvironmentsResponse(has_errors=False, result=exc.ApplicationEnvironmentList(pointers=[pointer]))
+    )
+    c = _client(stub)
+
+    pointers = await c.promote_application_version(
+        "app1", "v1", exts.ApplicationEnvironmentProto.APPLICATION_ENVIRONMENT_PRODUCTION
+    )
+    assert len(pointers) == 1
+    assert pointers[0].version == "v1"
 
 
 # ---------------------------------------------------------------------------
-# Task CRUD + lifecycle
+# SkillExecution
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_task_round_trips() -> None:
-    task = mad.TaskProtoDTO(id="t1", name="Waypoint run", status=3, task_type=3, asset_id="a1")
-    stub = _FakeStub(mac.TaskResponse(has_errors=False, task_id="t1", task=task))
+async def test_execute_simple_sends_simple_spec() -> None:
+    execution = execdto.SkillExecutionProtoDTO(id="exec-1", asset_sn="DOCK-1")
+    stub = _FakeStub(exc.SkillExecutionResponse(has_errors=False, execution=execution))
     c = _client(stub)
 
-    result = await c.create_task(TaskDTO(name="Waypoint run", task_type=TaskType.WAYPOINT))
+    result = await c.execute_simple("DOCK-1", "dock.open_cover", {"force": True})
 
-    assert result.success is True
-    assert result.task is not None
-    assert result.task.id == "t1"
-    assert result.task.status == TaskStatus.RUNNING
-    sent = stub.calls["CreateTask"][0]
-    assert sent.task.name == "Waypoint run"
-    assert sent.task.task_type == 3
+    assert result.id == "exec-1"
+    sent = stub.calls["ExecuteSkill"][0]
+    assert sent.base.sn == "DOCK-1"
+    assert sent.spec.simple.command_id == "dock.open_cover"
+    assert sent.spec.simple.parameters.fields["force"].bool_value is True
 
 
 @pytest.mark.asyncio
-async def test_create_task_reports_error() -> None:
-    """Mission/Task/Scheduler responses report failure via ``success``/``error`` on the
-    dataclass, same as this branch's Scheduler methods -- they never raise
-    :class:`MissionAutonomyError` themselves (unlike main's Application/SkillExecution
-    ``_unwrap``, which this branch has none of)."""
-    stub = _FakeStub(_error_response(mac.TaskResponse))
+async def test_execute_application_sends_application_spec() -> None:
+    execution = execdto.SkillExecutionProtoDTO(id="exec-2", asset_sn="DOCK-1")
+    stub = _FakeStub(exc.SkillExecutionResponse(has_errors=False, execution=execution))
     c = _client(stub)
-    result = await c.create_task(TaskDTO())
-    assert result.success is False
-    assert result.error is not None
-    assert result.error.error_message == "boom"
+
+    result = await c.execute_application("DOCK-1", "app1", "skill1", application_version="v3")
+
+    assert result.id == "exec-2"
+    sent = stub.calls["ExecuteSkill"][0]
+    assert sent.spec.application.application_id == "app1"
+    assert sent.spec.application.skill_id == "skill1"
+    assert sent.spec.application.application_version == "v3"
 
 
 @pytest.mark.asyncio
-async def test_get_task_validates_id() -> None:
-    c = _client(_FakeStub(mac.TaskResponse(has_errors=False)))
+async def test_create_simple_execution_validates_sn() -> None:
+    c = _client(_FakeStub(exc.SkillExecutionResponse(has_errors=False)))
     with pytest.raises(ValueError):
-        await c.get_task("")
+        await c.create_simple_execution("", "dock.open_cover")
 
 
 @pytest.mark.asyncio
-async def test_get_task_by_flight_id() -> None:
-    task = mad.TaskProtoDTO(id="t1", status=3)
-    stub = _FakeStub(mac.TaskResponse(has_errors=False, task=task))
+async def test_get_skill_execution_raises_on_error() -> None:
+    stub = _FakeStub(_error_response(exc.SkillExecutionResponse))
+    c = _client(stub)
+    with pytest.raises(MissionAutonomyError, match="boom"):
+        await c.get_skill_execution("exec-1")
+
+
+@pytest.mark.asyncio
+async def test_list_skill_executions_returns_page() -> None:
+    executions = [execdto.SkillExecutionProtoDTO(id="e1"), execdto.SkillExecutionProtoDTO(id="e2")]
+    stub = _FakeStub(
+        exc.SkillExecutionListResponse(
+            has_errors=False,
+            result=exc.SkillExecutionList(executions=executions, next_page_token="tok"),
+        )
+    )
     c = _client(stub)
 
-    result = await c.get_task_by_flight_id("flight-42")
-    assert result.task.id == "t1"
-    assert stub.calls["GetTaskByFlightId"][0].flight_id == "flight-42"
+    result, next_page_token = await c.list_skill_executions(asset_sn="DOCK-1", application_id="app1")
+    assert [e.id for e in result] == ["e1", "e2"]
+    assert next_page_token == "tok"
+    assert stub.calls["ListSkillExecutions"][0].asset_sn == "DOCK-1"
 
 
 @pytest.mark.asyncio
-async def test_update_task() -> None:
-    task = mad.TaskProtoDTO(id="t1", current_progress=50, status=3)
-    stub = _FakeStub(mac.TaskResponse(has_errors=False, task=task))
-    c = _client(stub)
-
-    result = await c.update_task("t1", TaskDTO(current_progress=50))
-    assert result.task.current_progress == 50
-    sent = stub.calls["UpdateTask"][0]
-    assert sent.task_id == "t1"
-
-
-@pytest.mark.asyncio
-async def test_delete_task() -> None:
-    stub = _FakeStub(mac.TaskResponse(has_errors=False, task_id="t1"))
-    c = _client(stub)
-    result = await c.delete_task("t1")
-    assert result.success is True
-    assert stub.calls["DeleteTask"][0].task_id == "t1"
-
-
-@pytest.mark.asyncio
-async def test_task_lifecycle_operations() -> None:
-    task = mad.TaskProtoDTO(id="t1", status=3)
+async def test_lifecycle_operations() -> None:
+    execution = execdto.SkillExecutionProtoDTO(id="exec-1")
     for op, method in [
-        ("StartTask", "start_task"),
-        ("StopTask", "stop_task"),
-        ("PauseTask", "pause_task"),
-        ("ResumeTask", "resume_task"),
+        ("StartSkillExecution", "start_skill_execution"),
+        ("PauseSkillExecution", "pause_skill_execution"),
+        ("ResumeSkillExecution", "resume_skill_execution"),
+        ("CancelSkillExecution", "cancel_skill_execution"),
     ]:
-        stub = _FakeStub(mac.TaskResponse(has_errors=False, task=task))
+        stub = _FakeStub(exc.SkillExecutionResponse(has_errors=False, execution=execution))
         c = _client(stub)
-        result = await getattr(c, method)("t1")
-        assert result.task.id == "t1"
+        result = await getattr(c, method)("exec-1", reason="operator request")
+        assert result.id == "exec-1"
         assert op in stub.calls
-        assert stub.calls[op][0].task_id == "t1"
+        assert stub.calls[op][0].reason == "operator request"
 
 
 @pytest.mark.asyncio
-async def test_task_lifecycle_validates_id() -> None:
-    c = _client(_FakeStub(mac.TaskResponse(has_errors=False)))
-    with pytest.raises(ValueError):
-        await c.start_task("")
+async def test_signal_skill_execution_event_wait() -> None:
+    execution = execdto.SkillExecutionProtoDTO(id="exec-1")
+    stub = _FakeStub(exc.SkillExecutionResponse(has_errors=False, execution=execution))
+    c = _client(stub)
+
+    await c.signal_skill_execution(
+        "exec-1", node_id="node-2", event_type="dock.open_cover.completed", data={"ok": True}
+    )
+
+    sent = stub.calls["SignalSkillExecution"][0]
+    assert sent.node_id == "node-2"
+    assert sent.event_type == "dock.open_cover.completed"
+    assert sent.data.fields["ok"].bool_value is True
+
+
+@pytest.mark.asyncio
+async def test_signal_skill_execution_human_approval() -> None:
+    execution = execdto.SkillExecutionProtoDTO(id="exec-1")
+    stub = _FakeStub(exc.SkillExecutionResponse(has_errors=False, execution=execution))
+    c = _client(stub)
+
+    await c.signal_skill_execution("exec-1", node_id="node-3", approved=True)
+
+    sent = stub.calls["SignalSkillExecution"][0]
+    assert sent.approved is True
+
+
+@pytest.mark.asyncio
+async def test_resolve_execution_config_returns_dict() -> None:
+    from google.protobuf import struct_pb2
+
+    values = struct_pb2.Struct()
+    values.update({"max_altitude": 120})
+    stub = _FakeStub(
+        exc.ResolveExecutionConfigResponse(
+            has_errors=False,
+            config=execdto.ResolvedExecutionConfigProtoDTO(values=values),
+        )
+    )
+    c = _client(stub)
+
+    context = execdto.ExecutionConfigContextProto(asset_sn="DOCK-1")
+    result = await c.resolve_execution_config(context, keys=["max_altitude"])
+
+    assert result == {"max_altitude": 120.0}
+    assert list(stub.calls["ResolveExecutionConfig"][0].keys) == ["max_altitude"]
 
 
 # ---------------------------------------------------------------------------
-# Scheduler CRUD (Mission/Task-based shape at 1.3.0, not the mission-free one main uses)
+# Scheduler CRUD
 # ---------------------------------------------------------------------------
 
 
@@ -242,8 +313,8 @@ def _ok_scheduler_response() -> mac.SchedulerResponse:
             id="s1",
             name="daily",
             cron_expression="0 0 * * *",
-            mission_id="m1",
-            task_id="t1",
+            asset_sn="DOCK-1",
+            command_id="dock.open_cover",
         ),
     )
 
@@ -256,16 +327,16 @@ async def test_create_scheduler() -> None:
         SchedulerDTO(
             name="daily",
             cron_expression="0 0 * * *",
-            mission_id="m1",
-            task_id="t1",
+            asset_sn="DOCK-1",
+            command_id="dock.open_cover",
         )
     )
     assert resp.success is True
     assert resp.scheduler is not None
     assert resp.scheduler.id == "s1"
-    assert resp.scheduler.mission_id == "m1"
+    assert resp.scheduler.asset_sn == "DOCK-1"
     sent = stub.calls["CreateScheduler"][0]
-    assert sent.scheduler.task_id == "t1"
+    assert sent.scheduler.command_id == "dock.open_cover"
 
 
 @pytest.mark.asyncio
@@ -291,15 +362,6 @@ async def test_list_schedulers_returns_all() -> None:
     resp = await c.list_schedulers()
     assert resp.schedulers is not None
     assert [s.id for s in resp.schedulers] == ["s1", "s2"]
-    assert not stub.calls["ListSchedulers"][0].HasField("task_id")
-
-
-@pytest.mark.asyncio
-async def test_list_schedulers_filters_by_task_id() -> None:
-    stub = _FakeStub(mac.SchedulerResponse(has_errors=False, tid="t", scheduler_id=""))
-    c = _client(stub)
-    await c.list_schedulers(task_id="t1")
-    assert stub.calls["ListSchedulers"][0].task_id == "t1"
 
 
 @pytest.mark.asyncio
@@ -325,22 +387,41 @@ async def test_create_scheduler_validates_name() -> None:
 
 
 # ---------------------------------------------------------------------------
-# No Application/SkillExecution surface on this branch (main/2.0.0-only -- capability-execution-
-# *.proto don't exist at 1.3.0).
+# Deprecated Mission/Task operations — removed on the backend
 # ---------------------------------------------------------------------------
 
 
-def test_client_has_no_application_skill_execution_methods() -> None:
-    for name in (
-        "upsert_application",
-        "get_application",
-        "list_applications",
-        "delete_application",
-        "create_skill_execution",
-        "execute_skill",
-        "get_skill_execution",
-        "list_skill_executions",
-        "start_skill_execution",
-        "signal_skill_execution",
-    ):
-        assert not hasattr(MissionAutonomyClient, name)
+@pytest.mark.asyncio
+async def test_legacy_mission_operations_raise() -> None:
+    c = _client(_FakeStub(None))
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.create_mission(MissionDTO(name="m"))
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.get_mission("m1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.update_mission("m1", MissionDTO(name="m"))
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.delete_mission("m1")
+
+
+@pytest.mark.asyncio
+async def test_legacy_task_operations_raise() -> None:
+    c = _client(_FakeStub(None))
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.create_task(TaskDTO())
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.get_task("t1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.get_task_by_flight_id("flight-1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.start_task("t1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.stop_task("t1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.pause_task("t1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.resume_task("t1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.delete_task("t1")
+    with pytest.raises(LegacyOperationRemovedError):
+        await c.update_task("t1", TaskDTO())

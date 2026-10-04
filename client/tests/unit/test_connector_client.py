@@ -178,10 +178,14 @@ async def test_get_organization() -> None:
 
 @pytest.mark.asyncio
 async def test_create_scheduler_via_connector() -> None:
-    scheduler_dto = mad.SchedulerProtoDTO(id="s1", name="daily", cron_expression="* * * * *", task_id="t1")
+    scheduler_dto = mad.SchedulerProtoDTO(
+        id="s1", name="daily", cron_expression="* * * * *", command_id="dock.open_cover"
+    )
     stub = _FakeStub(mac.SchedulerResponse(has_errors=False, tid="t", scheduler_id="s1", scheduler=scheduler_dto))
     c = _client(stub)
-    resp = await c.create_scheduler(SchedulerDTO(name="daily", cron_expression="* * * * *", task_id="t1"))
+    resp = await c.create_scheduler(
+        SchedulerDTO(name="daily", cron_expression="* * * * *", command_id="dock.open_cover")
+    )
     assert resp.success is True
     assert resp.scheduler.id == "s1"
 
@@ -212,19 +216,49 @@ async def test_get_technical_configs() -> None:
 
 
 # ---------------------------------------------------------------------------
-# No Skill Registry on this branch (main/2.0.0-only -- ObserveSkillContract/ListSkillContracts/
-# SetSkillContractStatus/SetSkillContractPermissions don't exist in connector.proto at 1.3.0).
+# Skill Registry
 # ---------------------------------------------------------------------------
 
 
-def test_client_has_no_skill_registry_methods() -> None:
-    for name in (
-        "observe_skill_contract",
-        "list_skill_contracts",
-        "set_skill_contract_status",
-        "set_skill_contract_permissions",
-    ):
-        assert not hasattr(ConnectorClient, name)
+@pytest.mark.asyncio
+async def test_observe_skill_contract() -> None:
+    contract = cp.SkillContractProtoDTO(id="sc1", command_id="dock.open_cover")
+    stub = _FakeStub(cp.SkillContractResponse(has_errors=False, contract=contract))
+    c = _client(stub)
+    result = await c.observe_skill_contract(contract)
+    assert result.id == "sc1"
+
+
+@pytest.mark.asyncio
+async def test_list_skill_contracts_by_command_id() -> None:
+    contract = cp.SkillContractProtoDTO(id="sc1", command_id="dock.open_cover")
+    stub = _FakeStub(cp.SkillContractListResponse(has_errors=False, contracts=[contract]))
+    c = _client(stub)
+    result = await c.list_skill_contracts(command_id="dock.open_cover")
+    assert [x.id for x in result] == ["sc1"]
+    assert stub.calls["ListSkillContracts"][0].command_id == "dock.open_cover"
+
+
+@pytest.mark.asyncio
+async def test_set_skill_contract_status_and_permissions() -> None:
+    contract = cp.SkillContractProtoDTO(id="sc1", status=cp.SkillContractStatus.SKILL_CONTRACT_STATUS_DEPRECATED)
+    stub = _FakeStub(cp.SkillContractResponse(has_errors=False, contract=contract))
+    c = _client(stub)
+    result = await c.set_skill_contract_status("sc1", cp.SkillContractStatus.SKILL_CONTRACT_STATUS_DEPRECATED)
+    assert result.status == cp.SkillContractStatus.SKILL_CONTRACT_STATUS_DEPRECATED
+
+    stub2 = _FakeStub(cp.SkillContractResponse(has_errors=False, contract=contract))
+    c2 = _client(stub2)
+    await c2.set_skill_contract_permissions("sc1", ["mission.launch"])
+    assert list(stub2.calls["SetSkillContractPermissions"][0].required_permissions) == ["mission.launch"]
+
+
+@pytest.mark.asyncio
+async def test_set_skill_contract_status_raises_on_error() -> None:
+    stub = _FakeStub(_error_response(cp.SkillContractResponse))
+    c = _client(stub)
+    with pytest.raises(ConnectorError):
+        await c.set_skill_contract_status("sc1", cp.SkillContractStatus.SKILL_CONTRACT_STATUS_RETIRED)
 
 
 # ---------------------------------------------------------------------------

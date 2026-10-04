@@ -12,10 +12,12 @@ lifecycle below is complete.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Self
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Self
 
 import grpc.aio
 
+from .auth import ENV_VAR, resolve_token
 from .config.resilience import ResilienceConfig
 from .config.service_config import ServiceConfig
 from .grpc_.channel_factory import create_channel
@@ -52,19 +54,45 @@ class ZequentClient:
         mission_autonomy_config: ServiceConfig,
         live_data_config: ServiceConfig,
         resilience: ResilienceConfig | None = None,
+        client_token: str | None = None,
+        interceptors: Sequence[grpc.aio.ClientInterceptor] = (),
     ) -> None:
+        """``client_token``: the client credential issued in the console (Access & Integrations >
+        Credentials, kind "client"). When omitted, ``ZQNT_CLIENT_TOKEN`` is used; with neither, the
+        platform refuses every call.
+
+        ``interceptors``: the host application's own ``grpc.aio`` interceptors, put on every channel
+        (all four services, unary and streaming calls) in the order given, before the SDK's
+        credential interceptor - for a credential that is not one fixed token. An ``authorization``
+        header they set wins; ``client_token`` is then not sent."""
         self._connector_config = connector_config
         self._remote_control_config = remote_control_config
         self._mission_autonomy_config = mission_autonomy_config
         self._live_data_config = live_data_config
+        self._client_token = resolve_token(client_token)
+        self._interceptors = tuple(interceptors)
+        if self._client_token is None and not self._interceptors:
+            logger.warning(
+                "No client credential configured (%s, client_token=... or interceptors=...): "
+                "the platform will refuse every call",
+                ENV_VAR,
+            )
         self._resilience = resilience or ResilienceConfig()
 
         # Channels are created eagerly so that connection problems surface
         # at construction time rather than on the first RPC.
-        self._connector_channel: grpc.aio.Channel = create_channel(connector_config)
-        self._remote_control_channel: grpc.aio.Channel = create_channel(remote_control_config)
-        self._mission_autonomy_channel: grpc.aio.Channel = create_channel(mission_autonomy_config)
-        self._live_data_channel: grpc.aio.Channel = create_channel(live_data_config)
+        self._connector_channel: grpc.aio.Channel = create_channel(
+            connector_config, self._client_token, self._interceptors
+        )
+        self._remote_control_channel: grpc.aio.Channel = create_channel(
+            remote_control_config, self._client_token, self._interceptors
+        )
+        self._mission_autonomy_channel: grpc.aio.Channel = create_channel(
+            mission_autonomy_config, self._client_token, self._interceptors
+        )
+        self._live_data_channel: grpc.aio.Channel = create_channel(
+            live_data_config, self._client_token, self._interceptors
+        )
         self._channels: list[grpc.aio.Channel] = [
             self._connector_channel,
             self._remote_control_channel,
@@ -86,20 +114,27 @@ class ZequentClient:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_env(cls) -> "ZequentClient":
+    def from_env(cls, **overrides: Any) -> "ZequentClient":
         """Build a client from environment variables.
 
-        Honours the same env var names as the Java SDK
-        (``REMOTE_CONTROL_SERVICE_HOST``, ``_PORT``, ``_USE_PLAINTEXT``, ...).
-        See ``core/docs/client-sdk/CONFIGURATION.md`` for the full list.
+        Honours the same variable names as the Java and Go SDKs: ``<SERVICE>_HOST``, ``_PORT`` and
+        ``_USE_PLAINTEXT`` for ``CONNECTOR_SERVICE``, ``REMOTE_CONTROL_SERVICE``,
+        ``LIVE_DATA_SERVICE`` and ``MISSION_AUTONOMY_SERVICE``, and ``ZQNT_CLIENT_TOKEN``. Nothing
+        set is the local development stack on localhost. ``overrides`` are passed to the
+        constructor (``client_token=...``, ``interceptors=[...]``, a single ``*_config``).
         """
         from .config.env_loader import load_from_env
 
-        return load_from_env(cls)
+        return load_from_env(cls, **overrides)
 
     # ------------------------------------------------------------------
     # Configuration / channel access
     # ------------------------------------------------------------------
+
+    @property
+    def has_client_token(self) -> bool:
+        """Whether a client credential is sent (the token itself is never exposed)."""
+        return self._client_token is not None
 
     @property
     def resilience(self) -> ResilienceConfig:
