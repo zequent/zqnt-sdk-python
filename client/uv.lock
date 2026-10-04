@@ -419,14 +419,14 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "python-dotenv", marker = "extra == 'dotenv'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-utils", git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2" },
+    { name = "zqnt-utils", git = "https://github.com/zequent/zqnt-utils-python?tag=v2.0.0" },
 ]
 provides-extras = ["dotenv", "dev"]
 
 [[package]]
 name = "zqnt-utils"
 version = "2.0.0"
-source = { git = "https://github.com/zequent/zqnt-utils-python?branch=refactoring%2Frefactoring-ecosystem-v2#28a8a54d35b6274de168a773d3727ae4027a2e91" }
+source = { git = "https://github.com/zequent/zqnt-utils-python?tag=v2.0.0#c2d5402974fc2552744eae097658367fe4b3af45" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
