@@ -584,6 +584,25 @@ class EdgeAdapter(ABC):
         """Stop / abort the currently running task."""
         return await self._delegate(ctx, "mission.stop", {"taskId": task_id})
 
+    async def cancel_command(self, ctx: RequestContext, command_execution_id: str, reason: str = "") -> CustomCommandResponse:
+        """Cancel a command that is still running (v3 ``CancelCommand``).
+
+        The default stops it the way v2 does, through :meth:`stop_task` with the id the command
+        was accepted under -- which is what an adapter that runs long commands (a waypoint
+        mission) already implements. Override for anything finer.
+        """
+        response = await self.stop_task(ctx, command_execution_id)
+        if response.success:
+            return CustomCommandResponse.ok(ctx.tid, ctx.sn, "mission.stop")
+        if response.error is not None and "not supported" in (response.error.message or ""):
+            return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, "mission.stop")
+        return CustomCommandResponse.fail(
+            ctx.tid,
+            ctx.sn,
+            "mission.stop",
+            response.error or ErrorMessage(message="cancel failed", code=ErrorCode.ASSET_ERROR),
+        )
+
     async def send_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
         """Run the command identified by ``request.command_type``.
 
