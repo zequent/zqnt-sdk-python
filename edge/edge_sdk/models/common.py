@@ -410,6 +410,18 @@ class CapabilitySource(IntEnum):
     AI_GENERATED = 7
 
 
+class CompletionMode(IntEnum):
+    """
+    Whether the reply finishes a command (``ON_REPLY``: a cover, a light) or a later command
+    event does (``ASYNCHRONOUS``: take-off, go-to, return home, a mission). ``UNSPECIFIED`` leaves
+    it to the response: one with an ``external_execution_id`` waits, any other success is done.
+    """
+
+    UNSPECIFIED = 0
+    ON_REPLY = 1
+    ASYNCHRONOUS = 2
+
+
 @dataclass
 class CapabilityTarget:
     """What a command acts on. ``target_ref`` is empty only when the type is ASSET."""
@@ -446,6 +458,11 @@ class Capability:
     skill_id: str | None = None
     source: CapabilitySource = CapabilitySource.EDGE_ADAPTER
     provider: str | None = None
+    #: Whether the reply finishes the command or a later event does. Not the same as the events a
+    #: Skill can react to: DJI reports cover motion as an event, yet the reply is the outcome.
+    completion: CompletionMode = CompletionMode.UNSPECIFIED
+    #: For ASYNCHRONOUS: the event that reports the outcome, e.g. ``flight.takeoff.completed``.
+    completion_event: str | None = None
 
     @property
     def command(self) -> str:

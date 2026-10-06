@@ -14,6 +14,7 @@ still arrives as the adapter's v2 ``CommandExecutionEvent`` until the platform s
 """
 
 import logging
+import time
 from collections.abc import AsyncIterator
 
 import grpc
@@ -26,6 +27,7 @@ from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as e
 from ..adapter.base import EdgeAdapter
 from ..models.common import (
     Capabilities,
+    CompletionMode,
     CustomCommandRequest,
     CustomCommandResponse,
     ErrorCode,
@@ -77,17 +79,26 @@ def _is_not_supported(response: CustomCommandResponse) -> bool:
     )
 
 
-def command_result(command_id: str, command_execution_id: str, response: CustomCommandResponse):
-    """The SDK's command response as a v3 CommandResult."""
+def command_result(
+    command_id: str,
+    command_execution_id: str,
+    response: CustomCommandResponse,
+    completion: CompletionMode = CompletionMode.UNSPECIFIED,
+):
+    """
+    The SDK's command response as a v3 CommandResult.
+
+    A success is ACCEPTED -- the outcome follows as a command event -- when the adapter returned
+    its own ``external_execution_id`` or when the command's capability declares ``ASYNCHRONOUS``;
+    otherwise SUCCEEDED. Without the declaration a take-off that answered a plain success counted as
+    done while the aircraft was still climbing.
+    """
     if response.success:
         result = dict(response.result or {})
         if response.external_execution_id:
             result["external_execution_id"] = response.external_execution_id
-        state = (
-            command_pb2.COMMAND_STATE_ACCEPTED
-            if response.external_execution_id
-            else command_pb2.COMMAND_STATE_SUCCEEDED
-        )
+        waits = bool(response.external_execution_id) or completion is CompletionMode.ASYNCHRONOUS
+        state = command_pb2.COMMAND_STATE_ACCEPTED if waits else command_pb2.COMMAND_STATE_SUCCEEDED
         return command_pb2.CommandResult(
             command_execution_id=command_execution_id,
             command_id=command_id,
@@ -143,6 +154,10 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
                 kwargs[key] = s
         if c.target is not None:
             kwargs["target"] = capability_pb2.Target(type=int(c.target.type), ref=c.target.target_ref or "")
+        if c.completion is not CompletionMode.UNSPECIFIED:
+            kwargs["completion"] = int(c.completion)
+        if c.completion_event:
+            kwargs["completion_event"] = c.completion_event
         proto.append(capability_pb2.Capability(**kwargs))
     snapshot = capability_pb2.CapabilitySet(
         asset_sn=caps.asset_sn,
@@ -160,8 +175,32 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
 class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
     """``zqnt.edge.v3.EdgeAdapterService`` on top of the same EdgeAdapter the v2 servicer uses."""
 
+    #: How long the adapter's capability list is reused to look up a command's completion mode.
+    COMPLETION_CACHE_SECONDS = 30.0
+
     def __init__(self, adapter: EdgeAdapter) -> None:
         self._adapter = adapter
+        self._completion_cache: dict[str, tuple[float, dict[str, CompletionMode]]] = {}
+
+    async def _completion(self, sn: str, command_id: str, response: CustomCommandResponse) -> CompletionMode:
+        """
+        The command's declared completion mode, looked up only when it decides something: a
+        success that did not bring its own execution id. Never fails the command.
+        """
+        if not response.success or response.external_execution_id:
+            return CompletionMode.UNSPECIFIED
+        now = time.monotonic()
+        cached = self._completion_cache.get(sn)
+        if cached is None or cached[0] <= now:
+            try:
+                caps = await self._adapter.get_capabilities(sn=sn, asset_id=None)
+            except Exception:
+                logger.debug("capabilities of %s unreadable; completion left to the response", sn, exc_info=True)
+                return CompletionMode.UNSPECIFIED
+            modes = {c.command_id: c.completion for c in (caps.capabilities if caps else [])}
+            cached = (now + self.COMPLETION_CACHE_SECONDS, modes)
+            self._completion_cache[sn] = cached
+        return cached[1].get(command_id, CompletionMode.UNSPECIFIED)
 
     async def GetCapabilities(self, request, context):
         try:
@@ -182,8 +221,9 @@ class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
         except Exception as exc:
             logger.exception("v3 ExecuteCommand error [sn=%s command=%s]", ctx.sn, command.command_id)
             response = CustomCommandResponse.fail(ctx.tid, ctx.sn, command.command_id, _asset_error(str(exc)))
+        completion = await self._completion(ctx.sn, command.command_id, response)
         return edge_v3.ExecuteCommandResponse(
-            result=command_result(command.command_id, request.command_execution_id, response)
+            result=command_result(command.command_id, request.command_execution_id, response, completion)
         )
 
     async def CancelCommand(self, request, context):

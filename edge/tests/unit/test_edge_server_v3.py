@@ -15,6 +15,7 @@ from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v
 from edge_sdk import AssetType, EdgeAdapter, EdgeResponse
 from edge_sdk.models.common import (
     CapabilityState,
+    CompletionMode,
     Coordinates,
     CustomCommandResponse,
     ErrorCode,
@@ -142,3 +143,57 @@ async def test_capabilities_come_from_the_same_registry_as_v2():
     # Typed take_off is overridden, so the built-in id is advertised as available too.
     assert caps["flight.takeoff"].state == int(CapabilityState.AVAILABLE)
     assert "properties" in caps["flight.takeoff"].input_schema
+
+
+class _DeclaringAdapter(_Adapter):
+    """Declares take-off ASYNCHRONOUS: its typed take_off still answers a plain success."""
+
+    async def get_capabilities(self, sn, asset_id):
+        caps = self._auto_capabilities(sn, AssetType.AIRCRAFT)
+        for capability in caps.capabilities:
+            if capability.command_id == "flight.takeoff":
+                capability.completion = CompletionMode.ASYNCHRONOUS
+                capability.completion_event = "flight.takeoff.completed"
+            if capability.command_id == "vendor.acme.spray":
+                capability.completion = CompletionMode.ON_REPLY
+        return caps
+
+
+async def test_a_declared_asynchronous_command_waits_even_when_its_handler_answered_success():
+    response = await EdgeAdapterV3Servicer(_DeclaringAdapter()).ExecuteCommand(
+        _execute("flight.takeoff", {"latitude": 52.5, "longitude": 13.4, "altitude": 40}), _Context()
+    )
+
+    assert response.result.state == command_pb2.COMMAND_STATE_ACCEPTED
+    assert response.result.command_execution_id == "cx-1"
+
+
+async def test_a_declared_on_reply_command_is_done_on_its_reply():
+    response = await EdgeAdapterV3Servicer(_DeclaringAdapter()).ExecuteCommand(
+        _execute("vendor.acme.spray", {"seconds": 1}), _Context()
+    )
+
+    assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
+
+
+async def test_the_completion_mode_is_published_with_the_capability():
+    response = await EdgeAdapterV3Servicer(_DeclaringAdapter()).GetCapabilities(
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+    )
+    caps = {c.command_id: c for c in response.capabilities.capabilities}
+
+    assert caps["flight.takeoff"].completion == int(CompletionMode.ASYNCHRONOUS)
+    assert caps["flight.takeoff"].completion_event == "flight.takeoff.completed"
+    assert caps["vendor.acme.spray"].completion == int(CompletionMode.ON_REPLY)
+
+
+async def test_unreadable_capabilities_leave_the_command_to_its_response():
+    class _Broken(_Adapter):
+        async def get_capabilities(self, sn, asset_id):
+            raise RuntimeError("registry down")
+
+    response = await EdgeAdapterV3Servicer(_Broken()).ExecuteCommand(
+        _execute("vendor.acme.spray", {"seconds": 1}), _Context()
+    )
+
+    assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
