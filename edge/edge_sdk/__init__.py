@@ -40,8 +40,10 @@ from .adapter.commands import CATALOG as COMMAND_CATALOG
 from .adapter.commands import CommandSpec, RegisteredCommand, schema
 from .auth import EdgeAuthConfig, PlatformTokenVerifier, TokenVerificationError
 from .client.connector_client import ConnectorClient
+from .client.edge_gateway import EdgeGatewayClient
 from .client.live_data_service import LiveDataService
 from .client.mission_autonomy_client import MissionAutonomyClient
+from .client.telemetry_ingest import TelemetryIngestPublisher
 from .client.telemetry_publisher import TelemetryPublisher
 from .config import EdgeAdapterConfig, EdgeAdapterRuntime
 from .models import (
@@ -122,9 +124,20 @@ from .models import (
     Waypoint,
     WaypointTaskConfig,
 )
+from .models.common import CustomCommandResponse, DetectionBatch, TelemetryField, TelemetryValueType
+from .models.live import Alert, AlertSeverity, TelemetrySample
 from .server.edge_server import EdgeServer, RegistrationConfig
 
 __all__ = [
+    "EdgeGatewayClient",
+    "TelemetryIngestPublisher",
+    "TelemetryField",
+    "DetectionBatch",
+    "CustomCommandResponse",
+    "TelemetryValueType",
+    "TelemetrySample",
+    "Alert",
+    "AlertSeverity",
     "__version__",
     # core
     "EdgeAdapter",

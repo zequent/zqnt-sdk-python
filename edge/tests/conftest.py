@@ -16,6 +16,7 @@ import socket
 from contextlib import suppress
 from datetime import datetime, timezone
 
+import pytest
 import pytest_asyncio
 
 from edge_sdk import AssetType, EdgeAdapter, EdgeAuthConfig, EdgeResponse, EdgeServer
@@ -165,3 +166,15 @@ async def registry_server_port(registry_adapter):
 
 def make_ctx(tid: str = "test-tid", sn: str = "TEST-001") -> RequestContext:
     return RequestContext(tid=tid, sn=sn, timestamp=datetime.now(tz=timezone.utc))
+
+
+@pytest.fixture(autouse=True)
+def _fresh_v3_state():
+    """v3 availability and accepted runs are per process; every test starts without either."""
+    from edge_sdk.client.edge_gateway import CommandRuns, V3Fallback
+
+    V3Fallback.reset()
+    CommandRuns.clear()
+    yield
+    V3Fallback.reset()
+    CommandRuns.clear()

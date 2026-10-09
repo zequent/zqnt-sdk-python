@@ -16,6 +16,14 @@ from zqnt_utils.generated.zqnt import common_pb2, edge_pb2_grpc  # type: ignore[
 # ---------------------------------------------------------------------------
 
 
+def _mission():
+    from google.protobuf import struct_pb2
+
+    params = struct_pb2.Struct()
+    params.update({"waypoints": [{"latitude": 47.5, "longitude": 9.7}]})
+    return params
+
+
 def _base(tid: str = "test-tid", sn: str = "TEST-001"):
     from google.protobuf import timestamp_pb2
 
@@ -80,7 +88,7 @@ async def test_send_custom_command_reports_external_execution_id(server_port):
     async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
         resp = await stub.SendCustomCommand(
-            common_pb2.CustomCommandRequest(base=_base(), command_id="mission.waypoint.execute")
+            common_pb2.CustomCommandRequest(base=_base(), command_id="mission.waypoint.execute", params=_mission())
         )
     assert resp.meta.external_id == "vendor-mission.waypoint.execute"
 
@@ -171,7 +179,7 @@ async def test_registered_command_is_dispatched_over_grpc(registry_server_port, 
     async with grpc.aio.insecure_channel(f"localhost:{registry_server_port}") as ch:
         stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
         resp = await stub.SendCustomCommand(
-            common_pb2.CustomCommandRequest(base=_base(), command_id="mission.waypoint.execute")
+            common_pb2.CustomCommandRequest(base=_base(), command_id="mission.waypoint.execute", params=_mission())
         )
     assert resp.has_errors is False
     assert registry_adapter.calls, "handler was never reached"

@@ -23,6 +23,9 @@ Environment variables (all optional, sensible defaults provided):
     TELEMETRY_PORT      LiveDataService port (default: 50052)
     MISSION_AUTONOMY_HOST  MissionAutonomyService host (default: localhost)
     MISSION_AUTONOMY_PORT  MissionAutonomyService port (default: 50054)
+    REMOTE_CONTROL_HOST remote-control host (EdgeGatewayService: capability reports, command
+                        events). Unset: capabilities are not pushed, events go over v2.
+    REMOTE_CONTROL_PORT remote-control port (default: 8002)
     ADAPTER_SN          Adapter identifier used for logging (default: "").
                         Each telemetry frame carries the asset's own SN — this
                         does not need to match an asset SN for multi-asset adapters.
@@ -55,7 +58,9 @@ from .auth import EdgeAuthConfig
 if TYPE_CHECKING:
     from .adapter.base import EdgeAdapter
     from .client.connector_client import ConnectorClient
+    from .client.edge_gateway import EdgeGatewayClient
     from .client.mission_autonomy_client import MissionAutonomyClient
+    from .client.telemetry_ingest import TelemetryIngestPublisher
     from .client.telemetry_publisher import TelemetryPublisher
 
 logger = logging.getLogger(__name__)
@@ -88,8 +93,10 @@ class EdgeAdapterRuntime:
 
     Attributes:
         connector:         Connected :class:`~edge_sdk.ConnectorClient`.
-        telemetry:         Running :class:`~edge_sdk.TelemetryPublisher`.
+        telemetry:         Running :class:`~edge_sdk.TelemetryPublisher` (v2).
+        ingest:            :class:`~edge_sdk.TelemetryIngestPublisher` (v3 samples, detections, alerts).
         mission_autonomy:  Connected :class:`~edge_sdk.MissionAutonomyClient`.
+        gateway:           :class:`~edge_sdk.EdgeGatewayClient` when REMOTE_CONTROL_HOST is set, else None.
     """
 
     def __init__(
@@ -100,10 +107,14 @@ class EdgeAdapterRuntime:
         self.connector: "ConnectorClient" = None  # type: ignore[assignment]
         self.telemetry: "TelemetryPublisher" = None  # type: ignore[assignment]
         self.mission_autonomy: "MissionAutonomyClient" = None  # type: ignore[assignment]
+        self.ingest: "TelemetryIngestPublisher" = None  # type: ignore[assignment]
+        self.gateway: "EdgeGatewayClient | None" = None
 
     async def __aenter__(self) -> "EdgeAdapterRuntime":
         from .client.connector_client import ConnectorClient
+        from .client.edge_gateway import EdgeGatewayClient
         from .client.mission_autonomy_client import MissionAutonomyClient
+        from .client.telemetry_ingest import TelemetryIngestPublisher
         from .client.telemetry_publisher import TelemetryPublisher
 
         _setup_logging(self._config.log_level, self._config.log_format)
@@ -125,6 +136,17 @@ class EdgeAdapterRuntime:
             port=self._config.mission_autonomy_port,
             token=self._config.auth.edge_token,
         )
+        self.ingest = TelemetryIngestPublisher(
+            host=self._config.telemetry_host,
+            port=self._config.telemetry_port,
+            token=self._config.auth.edge_token,
+        )
+        if self._config.remote_control_host:
+            self.gateway = EdgeGatewayClient(
+                host=self._config.remote_control_host,
+                port=self._config.remote_control_port,
+                token=self._config.auth.edge_token,
+            )
 
         await self.connector.connect()
         await self.telemetry.connect()
@@ -146,6 +168,10 @@ class EdgeAdapterRuntime:
     async def __aexit__(self, *_exc) -> None:
         if self.telemetry is not None:
             await self.telemetry.close()
+        if self.ingest is not None:
+            await self.ingest.close()
+        if self.gateway is not None:
+            await self.gateway.close()
         if self.connector is not None:
             await self.connector.close()
         if self.mission_autonomy is not None:
@@ -179,6 +205,7 @@ class EdgeAdapterRuntime:
             host=cfg.grpc_host,
             registration=registration,
             auth=cfg.auth,
+            gateway=self.gateway,
         )
         await server.serve()
 
@@ -200,6 +227,8 @@ class EdgeAdapterConfig:
     telemetry_port: int = 50052
     mission_autonomy_host: str = "localhost"
     mission_autonomy_port: int = 50054
+    remote_control_host: str | None = None
+    remote_control_port: int = 8002
     adapter_sn: str = ""
     log_level: str = "INFO"
     log_format: str = "json"
@@ -229,6 +258,8 @@ class EdgeAdapterConfig:
             telemetry_port=int(os.getenv("TELEMETRY_PORT", "50052")),
             mission_autonomy_host=os.getenv("MISSION_AUTONOMY_HOST", "localhost"),
             mission_autonomy_port=int(os.getenv("MISSION_AUTONOMY_PORT", "50054")),
+            remote_control_host=os.getenv("REMOTE_CONTROL_HOST") or None,
+            remote_control_port=int(os.getenv("REMOTE_CONTROL_PORT", "8002")),
             adapter_sn=os.getenv("ADAPTER_SN", ""),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             log_format=os.getenv("LOG_FORMAT", "json"),

@@ -51,3 +51,6 @@ class CommandExecutionEvent:
     # refuses an event without it ("requires external_execution_id, asset_sn and occurred_at") and
     # the refusal is invisible here — the publish still succeeds, the event is simply dropped.
     occurred_at: datetime | None = None
+    # The platform's id of the run (RequestContext.command_execution_id). Unset: the SDK looks it
+    # up from the external_execution_id the command was accepted under.
+    command_execution_id: str | None = None

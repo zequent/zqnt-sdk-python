@@ -38,6 +38,7 @@ ignore = ["E501"]  # line-too-long (handled by formatter)
 [tool.ruff.lint.per-file-ignores]
 "edge_sdk/server/edge_server.py" = ["N802"]  # gRPC servicer methods must match PascalCase proto names
 "edge_sdk/server/edge_server_v3.py" = ["N802"]
+"tests/integration/test_v3_platform_calls.py" = ["N802"]  # fake platform servicers
 
 [build-system]
 requires = ["hatchling"]

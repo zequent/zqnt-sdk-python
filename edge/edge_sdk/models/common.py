@@ -219,6 +219,9 @@ class CommandExecutionStatus(IntEnum):
     CANCELLED = 5
 
 
+INVALID_PARAMS_CODE = "command.invalid_params"
+
+
 class ErrorCode(IntEnum):
     SYSTEM_ERROR = 0
     CLIENT_ERROR = 1
@@ -275,11 +278,14 @@ class RequestContext:
         tid:       Transaction ID (unique per request).
         sn:        Asset serial number the command is addressed to.
         timestamp: Time the request was created on the sender side.
+        command_execution_id: The platform's id of this command run (v3 ``ExecuteCommand``). An
+            adapter that answers ACCEPTED reports progress and completion under it.
     """
 
     tid: str
     sn: str
     timestamp: datetime
+    command_execution_id: str | None = None
 
 
 @dataclass
@@ -287,6 +293,8 @@ class ErrorMessage:
     message: str
     code: ErrorCode
     timestamp: datetime | None = None
+    #: Stable, machine-readable code such as ``command.invalid_params``.
+    reason: str | None = None
 
 
 @dataclass
@@ -481,6 +489,26 @@ class Capabilities:
     asset_type: AssetType
     capabilities: list[Capability] = field(default_factory=list)
     timestamp: datetime | None = None
+    #: The device-specific keys this asset sends in ``TelemetrySample.details``.
+    telemetry_fields: list["TelemetryField"] = field(default_factory=list)
+
+
+class TelemetryValueType(IntEnum):
+    UNSPECIFIED = 0
+    NUMBER = 1
+    STRING = 2
+    BOOLEAN = 3
+
+
+@dataclass
+class TelemetryField:
+    """One device-specific value in ``TelemetrySample.details``, e.g. ``dock.cover_state``."""
+
+    key: str
+    type: TelemetryValueType
+    unit: str = ""
+    description: str = ""
+    allowed_values: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -597,6 +625,8 @@ class DetectionBatch:
     sn: str = ""  # asset serial number – required for multi-asset adapters
     detections: list[DetectionResult] = field(default_factory=list)
     stream_url: str | None = None
+    #: When the frame was analysed; v3 publishing uses now() when unset.
+    observed_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -661,6 +691,16 @@ class CustomCommandResponse:
         error: ErrorMessage,
     ) -> "CustomCommandResponse":
         return cls(tid=tid, sn=sn, success=False, command_type=command_type, error=error)
+
+    @classmethod
+    def invalid_params(cls, tid: str, sn: str, command_type: str, message: str) -> "CustomCommandResponse":
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=False,
+            command_type=command_type,
+            error=ErrorMessage(message=message, code=ErrorCode.CLIENT_ERROR, reason=INVALID_PARAMS_CODE),
+        )
 
     @classmethod
     def not_supported(cls, tid: str = "", sn: str = "", command_type: str = "") -> "CustomCommandResponse":

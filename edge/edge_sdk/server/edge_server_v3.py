@@ -7,25 +7,31 @@ registered with :meth:`EdgeAdapter.register_command` first, then built-in ids ro
 methods an older adapter overrides. An adapter therefore serves v2 and v3 from one set of
 declarations and needs no change to answer v3 calls.
 
+Params are checked against the command's input schema before the handler runs (invalid:
+``REJECTED`` with ``command.invalid_params``). The handler sees the platform's id of the run as
+``ctx.command_execution_id``.
+
 Long-running commands: when the adapter returns an ``external_execution_id`` the command is
-reported ``ACCEPTED`` and that id is handed back in ``result.external_execution_id``; completion
-still arrives as the adapter's v2 ``CommandExecutionEvent`` until the platform serves
-``zqnt.edge.v3.EdgeGatewayService`` (zqnt-core#147).
+reported ``ACCEPTED`` and that id is handed back in ``result.external_execution_id``. Events the
+adapter then publishes under that id go to ``EdgeGatewayService.PublishCommandEvent`` with the
+platform's id (see :mod:`edge_sdk.client.edge_gateway`).
 """
 
 import logging
-import time
 from collections.abc import AsyncIterator
 
 import grpc
-from google.protobuf import json_format, struct_pb2, timestamp_pb2
+from google.protobuf import struct_pb2, timestamp_pb2
 from zqnt_utils.generated.zqnt.capability.v3 import capability_pb2, command_pb2
 from zqnt_utils.generated.zqnt.common.v3 import common_pb2
 from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
 from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
 
 from ..adapter.base import EdgeAdapter
+from ..client.edge_gateway import CommandRuns
+from ..client.telemetry_ingest import detection_to_v3
 from ..models.common import (
+    INVALID_PARAMS_CODE,
     Capabilities,
     CompletionMode,
     CustomCommandRequest,
@@ -63,10 +69,24 @@ def _struct(value: dict | None) -> struct_pb2.Struct | None:
     return s
 
 
-def _context(request_context, asset) -> RequestContext:
+def _context(request_context, asset, command_execution_id: str | None = None) -> RequestContext:
     from datetime import datetime, timezone
 
-    return RequestContext(tid=request_context.request_id, sn=asset.sn, timestamp=datetime.now(tz=timezone.utc))
+    return RequestContext(
+        tid=request_context.request_id,
+        sn=asset.sn,
+        timestamp=datetime.now(tz=timezone.utc),
+        command_execution_id=command_execution_id or None,
+    )
+
+
+def _python(value):
+    """A Struct value as plain Python, keeping NaN a float (json_format would turn it into "NaN")."""
+    if isinstance(value, struct_pb2.Struct):
+        return {k: _python(v) for k, v in value.items()}
+    if isinstance(value, struct_pb2.ListValue):
+        return [_python(v) for v in value]
+    return value
 
 
 def _is_not_supported(response: CustomCommandResponse) -> bool:
@@ -105,6 +125,18 @@ def command_result(
             state=state,
             result=_struct(result),
         )
+    if response.error is not None and response.error.reason == INVALID_PARAMS_CODE:
+        return command_pb2.CommandResult(
+            command_execution_id=command_execution_id,
+            command_id=command_id,
+            state=command_pb2.COMMAND_STATE_REJECTED,
+            error=common_pb2.Error(
+                category=common_pb2.ERROR_CATEGORY_INVALID_ARGUMENT,
+                code=INVALID_PARAMS_CODE,
+                message=response.error.message,
+                occurred_at=_now(),
+            ),
+        )
     if _is_not_supported(response):
         return command_pb2.CommandResult(
             command_execution_id=command_execution_id,
@@ -126,6 +158,7 @@ def command_result(
             category=_CATEGORY.get(error.code, common_pb2.ERROR_CATEGORY_ASSET)
             if error
             else common_pb2.ERROR_CATEGORY_ASSET,
+            code=(error.reason if error else None) or "",
             message=(error.message if error else None) or response.message or f"{command_id} failed",
             occurred_at=_now(),
         ),
@@ -164,6 +197,16 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
         asset_type=getattr(caps.asset_type, "name", str(caps.asset_type)),
         capabilities=proto,
         snapshot_state=capability_pb2.SNAPSHOT_STATE_CURRENT,
+        telemetry_fields=[
+            capability_pb2.TelemetryField(
+                key=f.key,
+                type=int(f.type),
+                unit=f.unit,
+                description=f.description,
+                allowed_values=list(f.allowed_values),
+            )
+            for f in caps.telemetry_fields
+        ],
     )
     if caps.timestamp is not None:
         snapshot.observed_at.FromDatetime(caps.timestamp)
@@ -175,12 +218,8 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
 class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
     """``zqnt.edge.v3.EdgeAdapterService`` on top of the same EdgeAdapter the v2 servicer uses."""
 
-    #: How long the adapter's capability list is reused to look up a command's completion mode.
-    COMPLETION_CACHE_SECONDS = 30.0
-
     def __init__(self, adapter: EdgeAdapter) -> None:
         self._adapter = adapter
-        self._completion_cache: dict[str, tuple[float, dict[str, CompletionMode]]] = {}
 
     async def _completion(self, sn: str, command_id: str, response: CustomCommandResponse) -> CompletionMode:
         """
@@ -189,18 +228,12 @@ class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
         """
         if not response.success or response.external_execution_id:
             return CompletionMode.UNSPECIFIED
-        now = time.monotonic()
-        cached = self._completion_cache.get(sn)
-        if cached is None or cached[0] <= now:
-            try:
-                caps = await self._adapter.get_capabilities(sn=sn, asset_id=None)
-            except Exception:
-                logger.debug("capabilities of %s unreadable; completion left to the response", sn, exc_info=True)
-                return CompletionMode.UNSPECIFIED
-            modes = {c.command_id: c.completion for c in (caps.capabilities if caps else [])}
-            cached = (now + self.COMPLETION_CACHE_SECONDS, modes)
-            self._completion_cache[sn] = cached
-        return cached[1].get(command_id, CompletionMode.UNSPECIFIED)
+        try:
+            capability = (await self._adapter.advertised_capabilities(sn)).get(command_id)
+        except Exception:
+            logger.debug("capabilities of %s unreadable; completion left to the response", sn, exc_info=True)
+            return CompletionMode.UNSPECIFIED
+        return capability.completion if capability is not None else CompletionMode.UNSPECIFIED
 
     async def GetCapabilities(self, request, context):
         try:
@@ -212,15 +245,19 @@ class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
 
     async def ExecuteCommand(self, request, context):
         command = request.command
-        ctx = _context(request.context, command.asset)
-        params = json_format.MessageToDict(command.params) if command.HasField("params") else {}
+        ctx = _context(request.context, command.asset, request.command_execution_id)
+        params = _python(command.params) if command.HasField("params") else {}
         try:
-            response = await self._adapter.send_custom_command(
+            response = await self._adapter.execute_command(
                 ctx, CustomCommandRequest(command_type=command.command_id, params=params)
             )
         except Exception as exc:
             logger.exception("v3 ExecuteCommand error [sn=%s command=%s]", ctx.sn, command.command_id)
             response = CustomCommandResponse.fail(ctx.tid, ctx.sn, command.command_id, _asset_error(str(exc)))
+        if response.success and response.external_execution_id:
+            CommandRuns.remember(
+                response.external_execution_id, request.command_execution_id, command.command_id, ctx.sn
+            )
         completion = await self._completion(ctx.sn, command.command_id, response)
         return edge_v3.ExecuteCommandResponse(
             result=command_result(command.command_id, request.command_execution_id, response, completion)
@@ -268,26 +305,7 @@ class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
         ctx = _context(common_pb2.RequestContext(), request.asset)
         try:
             async for batch in self._adapter.get_detections(ctx, request.stream_url or None):
-                detections = []
-                for d in batch.detections:
-                    detection = edge_v3.Detection(
-                        object_id=d.object_id or "", object_type=d.object_type or "", confidence=d.confidence or 0.0
-                    )
-                    if d.bounding_box is not None:
-                        detection.bounding_box.CopyFrom(
-                            edge_v3.BoundingBox(
-                                x=d.bounding_box.x,
-                                y=d.bounding_box.y,
-                                width=d.bounding_box.width,
-                                height=d.bounding_box.height,
-                            )
-                        )
-                    if d.position is not None:
-                        point = common_pb2.GeoPoint(latitude=d.position.latitude, longitude=d.position.longitude)
-                        if d.position.altitude is not None:
-                            point.altitude = d.position.altitude
-                        detection.position.CopyFrom(point)
-                    detections.append(detection)
+                detections = [detection_to_v3(d) for d in batch.detections]
                 yield edge_v3.StreamDetectionsResponse(
                     asset=request.asset, detections=detections, stream_url=request.stream_url, observed_at=_now()
                 )

@@ -108,7 +108,10 @@ async def test_an_unknown_id_is_rejected_not_aborted():
 
 
 async def test_a_long_command_is_accepted_under_the_id_it_runs_as():
-    response = await EdgeAdapterV3Servicer(_Adapter()).ExecuteCommand(_execute("mission.waypoint.execute"), _Context())
+    mission = {"waypoints": [{"latitude": 47.5, "longitude": 9.7}]}
+    response = await EdgeAdapterV3Servicer(_Adapter()).ExecuteCommand(
+        _execute("mission.waypoint.execute", mission), _Context()
+    )
 
     assert response.result.state == command_pb2.COMMAND_STATE_ACCEPTED
     assert response.result.result["external_execution_id"] == "dji-77"

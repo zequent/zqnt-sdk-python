@@ -35,6 +35,9 @@ Minimal example (drone-only adapter, no dock operations)::
     asyncio.run(server.serve())
 """
 
+import logging
+import time
+import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import AsyncIterator, Awaitable, Callable
@@ -63,8 +66,16 @@ from ..models.common import (
     ManualControlRequest,
     RequestContext,
     ReturnToHomeRequest,
+    TelemetryField,
+    TelemetryValueType,
 )
 from .commands import CATALOG, CommandHandler, RegisteredCommand, spec_for
+from .validation import validate_params
+
+logger = logging.getLogger(__name__)
+
+#: Called with the asset serial whose capabilities changed, or None for every asset.
+CapabilityListener = Callable[[str | None], None]
 
 # Maps Python method name → the dotted command id that method implements.
 #
@@ -112,6 +123,7 @@ _METHOD_COMMANDS: dict[str, str] = {
 # send_custom_command -- collapsing them into the command envelope would cost a round trip per
 # frame, which is why the 2.0 plan deliberately leaves ManualControlInput/GetDetections typed.
 _STREAMING_COMMANDS = frozenset({"flight.manual.input", "detections.stream"})
+_STREAMING_METHODS = frozenset({"manual_control_input", "get_detections"})
 
 
 def _coordinate_params(coordinates: Coordinates) -> dict:
@@ -137,7 +149,25 @@ class EdgeAdapter(ABC):
 
         async def get_capabilities(self, sn, asset_id):
             return self._auto_capabilities(sn, AssetType.DOCK)
+
+    Declare each command once with :meth:`register_command`. The typed methods (``take_off``,
+    ``open_cover``, ...) are the v2 compatibility layer and deprecated: overriding one still works
+    and is served under its dotted id, but warns.
     """
+
+    #: How long the advertised capabilities are reused for schema and completion lookups.
+    CAPABILITY_CACHE_SECONDS = 30.0
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        typed = sorted(name for name in _METHOD_COMMANDS if name in cls.__dict__ and name not in _STREAMING_METHODS)
+        if typed:
+            warnings.warn(
+                f"{cls.__name__} overrides typed command methods ({', '.join(typed)}); they are the v2 "
+                "compatibility layer -- declare the commands with register_command instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     # ------------------------------------------------------------------
     # Capability management  (required)
@@ -219,6 +249,124 @@ class EdgeAdapter(ABC):
             unavailable_reason=unavailable_reason,
             metadata=dict(metadata or {}),
         )
+        self.notify_capabilities_changed()
+
+    def unregister_command(self, command_id: str) -> None:
+        """Withdraw a command; it is reported UNSUPPORTED (catalog ids) or not at all from now on."""
+        if self._commands.pop(command_id, None) is not None:
+            self.notify_capabilities_changed()
+
+    def declare_telemetry_field(
+        self,
+        key: str,
+        value_type: TelemetryValueType,
+        *,
+        unit: str = "",
+        description: str = "",
+        allowed_values: list[str] | None = None,
+    ) -> None:
+        """
+        Declare a device-specific value this adapter sends in ``TelemetrySample.details``.
+
+        The declaration travels with the capabilities (``CapabilitySet.telemetry_fields``), so the
+        platform knows the key, its type and unit without a contract change::
+
+            self.declare_telemetry_field("dock.cover_state", TelemetryValueType.STRING,
+                                         allowed_values=["OPEN", "CLOSED", "OPENING", "CLOSING"])
+        """
+        self._telemetry_fields[key] = TelemetryField(
+            key=key,
+            type=value_type,
+            unit=unit,
+            description=description,
+            allowed_values=list(allowed_values or []),
+        )
+        self.notify_capabilities_changed()
+
+    @property
+    def _telemetry_fields(self) -> dict[str, TelemetryField]:
+        return self.__dict__.setdefault("_declared_telemetry_fields", {})
+
+    def reported_asset_sns(self) -> list[str]:
+        """
+        Serials whose capabilities the SDK reports to the platform on start and on every change.
+
+        Override in an adapter that knows its assets up front; one that learns them later calls
+        :meth:`notify_capabilities_changed` with the serial once it does.
+        """
+        return []
+
+    def add_capability_listener(self, listener: CapabilityListener) -> None:
+        self.__dict__.setdefault("_capability_listeners", []).append(listener)
+
+    def notify_capabilities_changed(self, sn: str | None = None) -> None:
+        """Tell the SDK that what *sn* (None: every asset) can do changed, so it is reported again."""
+        self.__dict__["_capability_cache"] = {}
+        for listener in list(self.__dict__.get("_capability_listeners", [])):
+            try:
+                listener(sn)
+            except Exception:
+                logger.exception("capability listener failed")
+
+    async def advertised_capabilities(self, sn: str) -> dict[str, Capability]:
+        """The capabilities :meth:`get_capabilities` reports for *sn*, by id, briefly cached."""
+        cache: dict = self.__dict__.setdefault("_capability_cache", {})
+        now = time.monotonic()
+        cached = cache.get(sn)
+        if cached is not None and cached[0] > now:
+            return cached[1]
+        caps = await self.get_capabilities(sn=sn, asset_id=None)
+        by_id = {c.command_id: c for c in (caps.capabilities if caps else [])}
+        cache[sn] = (now + self.CAPABILITY_CACHE_SECONDS, by_id)
+        return by_id
+
+    async def input_schema(self, sn: str, command_id: str) -> dict | None:
+        """The input schema of *command_id*: its registration, else what the asset advertises."""
+        registered = self._commands.get(command_id)
+        if registered is not None and registered.input_schema is not None:
+            return registered.input_schema
+        try:
+            capability = (await self.advertised_capabilities(sn)).get(command_id)
+        except Exception:
+            logger.debug("capabilities of %s unreadable; %s runs unchecked", sn, command_id, exc_info=True)
+            return None
+        return capability.input_schema if capability is not None else None
+
+    async def execute_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
+        """
+        Validate the params against the command's input schema, then run it.
+
+        Numbers are coerced here once (an integral double where the schema says integer becomes an
+        int); invalid params never reach the handler and come back as ``command.invalid_params``.
+        """
+        schema = await self.input_schema(ctx.sn, request.command_type)
+        checked = validate_params(schema, request.params)
+        if not checked.valid:
+            return CustomCommandResponse.invalid_params(
+                ctx.tid, ctx.sn, request.command_type, f"{request.command_type}: {checked.message}"
+            )
+        return await self.send_custom_command(
+            ctx, CustomCommandRequest(command_type=request.command_type, params=checked.params)
+        )
+
+    def can_execute(self, command_id: str) -> bool:
+        """
+        Whether this adapter runs *command_id* through ``ExecuteCommand``/``send_custom_command``:
+        a registered handler, or a built-in id whose typed method is implemented. An adapter that
+        overrides ``send_custom_command`` itself may run more; the SDK cannot see that.
+        """
+        registered = self._commands.get(command_id)
+        if registered is not None and registered.dispatchable:
+            return True
+        return command_id in _TYPED_DISPATCH and any(
+            self._is_overridden(method) for method, mapped in _METHOD_COMMANDS.items() if mapped == command_id
+        )
+
+    def executable_command_ids(self) -> set[str]:
+        """Every id :meth:`can_execute` accepts."""
+        ids = {command_id for command_id, registered in self._commands.items() if registered.dispatchable}
+        ids.update(command_id for command_id in _TYPED_DISPATCH if self.can_execute(command_id))
+        return ids
 
     @property
     def _commands(self) -> dict[str, RegisteredCommand]:
@@ -292,6 +440,7 @@ class EdgeAdapter(ABC):
             asset_type=asset_type,
             capabilities=list(derived.values()),
             timestamp=datetime.now(tz=timezone.utc),
+            telemetry_fields=list(self._telemetry_fields.values()),
         )
 
     async def _dispatch_registered(

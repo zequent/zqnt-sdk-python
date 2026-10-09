@@ -18,14 +18,21 @@ hiccup doesn't interrupt telemetry) — this only unifies lifecycle and gives PO
     await live_data.produce_notification(AssetStatusEvent(sn="DOCK001", online=True))
 
     await live_data.close()
+
+v3 live data (a sample with declared ``details``, alerts) goes through :attr:`ingest`
+(:class:`~edge_sdk.client.telemetry_ingest.TelemetryIngestPublisher`), whose streams open on first
+use: ``await live_data.produce_sample(TelemetrySample(...))``.
 """
 
 import logging
 
+from ..models.live import Alert, TelemetrySample
 from ..models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
 from ..models.telemetry import AssetTelemetry, SubAssetTelemetry
 from .detection_publisher import DetectionPublisher
+from .edge_gateway import EdgeGatewayClient
 from .notification_publisher import NotificationPublisher
+from .telemetry_ingest import TelemetryIngestPublisher
 from .telemetry_publisher import TelemetryPublisher
 
 logger = logging.getLogger(__name__)
@@ -50,13 +57,15 @@ class LiveDataService:
         sn: str = "",
         queue_max_size: int = 1000,
         token: str | None = None,
+        gateway: EdgeGatewayClient | None = None,
     ) -> None:
         self._sn = sn
         self.telemetry = TelemetryPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token)
         self.detection = DetectionPublisher(host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token)
         self.notification = NotificationPublisher(
-            host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token
+            host=host, port=port, sn=sn, queue_max_size=queue_max_size, token=token, gateway=gateway
         )
+        self.ingest = TelemetryIngestPublisher(host=host, port=port, token=token, queue_max_size=queue_max_size)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -74,6 +83,7 @@ class LiveDataService:
         await self.telemetry.close()
         await self.detection.close()
         await self.notification.close()
+        await self.ingest.close()
         logger.info("LiveDataService closed (sn=%s)", self._sn)
 
     async def __aenter__(self) -> "LiveDataService":
@@ -92,6 +102,12 @@ class LiveDataService:
             await self.telemetry.publish_subasset_telemetry(telemetry)
         else:
             await self.telemetry.publish_asset_telemetry(telemetry)
+
+    async def produce_sample(self, sample: TelemetrySample) -> None:
+        await self.ingest.publish_sample(sample)
+
+    async def produce_alert(self, alert: Alert) -> None:
+        await self.ingest.publish_alert(alert)
 
     # ------------------------------------------------------------------
     # Detection

@@ -200,32 +200,90 @@ await publisher.publish_sub_asset_telemetry(
 
 ## Capabilities & Commands
 
-The SDK automatically detects which commands your adapter supports by checking which methods you override.
+Declare each command once; the registration is both what the platform discovers and what runs:
 
-Supported commands include:
+```python
+from edge_sdk import EdgeAdapter, AssetType, CustomCommandResponse, TelemetryValueType, schema
 
-**Flight Control:**
-- TakeOff, GoTo, ReturnToHome
 
-**Manual Control:**
-- EnterManualControl, ExitManualControl, ManualControlInput
+class MyDockAdapter(EdgeAdapter):
+    def __init__(self):
+        self.register_command("dock.open_cover", self._open_cover)
+        self.register_command(
+            "vendor.acme.spray",
+            self._spray,
+            input_schema=schema({"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]),
+        )
+        self.declare_telemetry_field(
+            "dock.cover_state", TelemetryValueType.STRING, allowed_values=["OPEN", "CLOSED", "OPENING", "CLOSING"]
+        )
 
-**Gimbal & Camera:**
-- LookAt, TakePhoto, EnableGimbalTracking, ChangeLens, ChangeZoom, CapturePhoto, StartRecording, StopRecording
+    async def get_capabilities(self, sn, asset_id):
+        return self._auto_capabilities(sn, AssetType.DOCK)
 
-**Dock Operations:**
-- OpenCover, CloseCover, StartCharging, StopCharging
+    def reported_asset_sns(self):
+        return ["DOCK-1"]
 
-**Asset Management:**
-- RebootAsset, BootUpSubAsset, BootDownSubAsset, RegisterAsset, DeRegisterAsset
+    async def _open_cover(self, ctx, params):
+        await hardware.open_cover()
+        return CustomCommandResponse.ok(ctx.tid, ctx.sn, "dock.open_cover")
 
-**Task Execution:**
-- PrepareTask, StartTask, StopTask
+    async def _spray(self, ctx, params):
+        await hardware.spray(params["seconds"])
+        return CustomCommandResponse.ok(ctx.tid, ctx.sn, "vendor.acme.spray")
+```
 
-**Video Streaming:**
-- StartLiveStream, StopLiveStream
+- `EdgeServer` serves `zqnt.edge.v3.EdgeAdapterService` (`ExecuteCommand`) and v2 side by side
+  from the same registrations. The typed methods (`take_off`, `open_cover`, ...) are the v2
+  compatibility layer: overriding one still works but is deprecated.
+- Params are validated against the command's input schema before the handler runs. Integral
+  doubles become `int` where the schema says `integer`; invalid params come back as `REJECTED`
+  with `command.invalid_params`. Omitted coordinates arrive as NaN: NaN is a number, but never
+  satisfies `required`.
+- A handler sees the platform's run id as `ctx.command_execution_id`.
+- With `REMOTE_CONTROL_HOST` set, capabilities (with `telemetry_fields`) are reported via
+  `EdgeGatewayService.ReportCapabilities` on start and whenever the registry changes
+  (`notify_capabilities_changed(sn)` for anything else). An older core gets v2 `ReportAssetRuntime`.
 
-**And more...** ## Advanced Usage
+### Command events
+
+A command that keeps running returns an `external_execution_id` (v3: `ACCEPTED`) and reports its
+outcome later, as before:
+
+```python
+await notifier.publish_command_execution_event(
+    CommandExecutionEvent(
+        external_execution_id="vendor-42", status=CommandExecutionStatus.SUCCEEDED, sn="DOCK-1", output={"photos": 12}
+    )
+)
+```
+
+With a gateway (`REMOTE_CONTROL_HOST`, or `NotificationPublisher(..., gateway=EdgeGatewayClient(...))`)
+this goes to `EdgeGatewayService.PublishCommandEvent` under the platform's `command_execution_id`
+(looked up from the external id, or set `command_execution_id` yourself). `occurred_at` is always
+set (now() if omitted). A core without v3 answers UNIMPLEMENTED: the event goes over v2 and v3 is
+not tried again for 10 minutes.
+
+### v3 live data
+
+```python
+from edge_sdk import Alert, AlertSeverity, DetectionBatch, TelemetryIngestPublisher, TelemetrySample
+
+ingest = TelemetryIngestPublisher(host="live-data", port=8003)
+await ingest.publish_sample(
+    TelemetrySample(sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"})
+)
+await ingest.publish_detections(DetectionBatch(sn="RADAR-1", detections=[...]))
+await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING))
+```
+
+Long-lived streams to `TelemetryIngestService`, opened on first use and reconnected with backoff.
+`None`/NaN values are not sent. Against a core without v3 samples and detections go over v2
+`ProduceTelemetry`/`ProduceDetection` with the shared fields only: **`details` is dropped**, a
+sample with a speed or battery value becomes sub-asset (aircraft) telemetry, any other asset
+telemetry. Alerts have no v2 counterpart and are dropped. The v2 `TelemetryPublisher` is unchanged.
+
+## Advanced Usage
 
 ### Custom Task Handling
 
@@ -271,33 +329,23 @@ server = EdgeServer(adapter=adapter, port=50051, registration_config=config)
 
 ## Testing
 
-The SDK includes test utilities for writing integration tests:
+Run the conformance kit in your adapter's tests -- every advertised id is executable, every
+executable id is advertised, schemas parse, completion events carry `occurred_at`:
 
 ```python
-import pytest
-from edge_sdk import EdgeAdapter, EdgeResponse, AssetType
-from tests.conftest import test_adapter, server_port
+from edge_sdk.testing import RecordingGateway, assert_conformant
 
 
-class MyTestAdapter(EdgeAdapter):
-    async def get_capabilities(self, sn, asset_id):
-        return self._auto_capabilities(sn, AssetType.AIRCRAFT)
-
-    async def take_off(self, ctx, coordinates):
-        return EdgeResponse.ok(ctx.tid, ctx.sn)
+async def test_adapter_is_conformant():
+    await assert_conformant(MyDockAdapter(), sn="SIM-1")
+    # also runs every advertised command with minimal params -- fake/simulated devices only
+    await assert_conformant(MyDockAdapter(), sn="SIM-1", execute=True)
 
 
-@pytest.mark.asyncio
-async def test_take_off(server_port):
-    """Test take-off via gRPC."""
-    import grpc
-    from edge_sdk.generated import edge_pb2, edge_pb2_grpc
-
-    async with grpc.aio.insecure_channel(f"localhost:{server_port}") as ch:
-        stub = edge_pb2_grpc.EdgeAdapterServiceStub(ch)
-        resp = await stub.TakeOff(edge_pb2.EdgeTakeOffRequest(...))
-
-    assert resp.hasErrors is False
+async def test_completion_events():
+    gateway = RecordingGateway()
+    ...  # NotificationPublisher(..., gateway=gateway), run a command
+    gateway.assert_events_complete()
 ```
 
 ## Logging
@@ -350,6 +398,8 @@ The SDK respects the following environment variables:
 - `EDGE_SERVER_PORT` - Port for the gRPC server (default: 50051)
 - `EDGE_TELEMETRY_HOST` - Host for telemetry (default: localhost)
 - `EDGE_TELEMETRY_PORT` - Port for telemetry (default: 50052)
+- `REMOTE_CONTROL_HOST` / `REMOTE_CONTROL_PORT` - remote-control (`EdgeGatewayService`: capability
+  reports, v3 command events; port default 8002). Unset: no capability push, events over v2.
 
 ### Authentication
 
