@@ -584,7 +584,9 @@ class EdgeAdapter(ABC):
         """Stop / abort the currently running task."""
         return await self._delegate(ctx, "mission.stop", {"taskId": task_id})
 
-    async def cancel_command(self, ctx: RequestContext, command_execution_id: str, reason: str = "") -> CustomCommandResponse:
+    async def cancel_command(
+        self, ctx: RequestContext, command_execution_id: str, reason: str = ""
+    ) -> CustomCommandResponse:
         """Cancel a command that is still running (v3 ``CancelCommand``).
 
         The default stops it the way v2 does, through :meth:`stop_task` with the id the command

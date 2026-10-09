@@ -410,7 +410,7 @@ wheels = [
 [[package]]
 name = "zqnt-utils"
 version = "2.0.0"
-source = { git = "https://github.com/zequent/zqnt-utils-python?branch=feature%2Fv3-agentic#ddec490a88b01c554a5ec829fa55e34d72480b59" }
+source = { git = "https://github.com/zequent/zqnt-utils-python?branch=feature%2Fv3-agentic#222bf5326cd5e9a411e85ea9d98b2378788add0a" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
