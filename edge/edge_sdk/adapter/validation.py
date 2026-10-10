@@ -6,7 +6,8 @@ Struct carries every number as a double, so ``3`` arrives as ``3.0``; where the 
 the platform sends it for an omitted coordinate. A required property that is NaN counts as missing.
 
 The subset covered is what command schemas use: type, properties, required, additionalProperties,
-items, enum, const, minimum/maximum (and exclusive), minLength/maxLength, minItems/maxItems.
+items, enum, const, minimum/maximum (and exclusive), minLength/maxLength, minItems/maxItems,
+uniqueItems.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ _SUPPORTED_KEYWORDS = frozenset(
         "maxLength",
         "minItems",
         "maxItems",
+        "uniqueItems",
         "description",
         "title",
         "default",
@@ -106,6 +108,8 @@ def check_schema(schema: Any, path: str = "schema") -> list[str]:
         problems.extend(check_schema(schema["items"], f"{path}.items"))
     if "enum" in schema and not isinstance(schema["enum"], list):
         problems.append(f"{path}.enum must be a list")
+    if "uniqueItems" in schema and not isinstance(schema["uniqueItems"], bool):
+        problems.append(f"{path}.uniqueItems must be a boolean")
     unknown = sorted(set(schema) - _SUPPORTED_KEYWORDS)
     if unknown:
         problems.append(f"{path}: keywords not checked by the SDK: {', '.join(unknown)}")
@@ -173,6 +177,8 @@ def _validate(schema: dict, value: Any, path: str, errors: list[str]) -> Any:
         items = schema.get("items")
         if isinstance(items, dict):
             value = [_validate(items, item, f"{path}[{i}]", errors) for i, item in enumerate(value)]
+        if schema.get("uniqueItems") and any(item in value[:i] for i, item in enumerate(value)):
+            errors.append(f"{path} must not repeat an item")
     if isinstance(value, dict):
         value = _validate_object(schema, value, path, errors)
     return value
@@ -240,7 +246,11 @@ def _example(schema: dict) -> Any:
         properties = schema.get("properties", {})
         return {name: _example(properties.get(name, {})) for name in schema.get("required", [])}
     if t == "array":
-        return [_example(schema.get("items", {})) for _ in range(schema.get("minItems", 0))]
+        items = schema.get("items", {})
+        count = schema.get("minItems", 0)
+        if schema.get("uniqueItems") and items.get("enum"):
+            return list(items["enum"][:count])
+        return [_example(items) for _ in range(count)]
     if t == "string":
         return "x" * max(1, schema.get("minLength", 1))
     if t == "integer":

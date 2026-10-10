@@ -129,6 +129,25 @@ def test_the_minimal_example_satisfies_its_schema():
     assert validate_params(SPRAY, example_params(SPRAY)).valid
 
 
+def test_unique_items_refuses_a_repeated_item():
+    bands = schema(
+        {
+            "bands": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["GNSS", "ISM_2400", "ISM_5800"]},
+                "minItems": 2,
+                "uniqueItems": True,
+            }
+        },
+        ["bands"],
+    )
+
+    assert check_schema(bands) == []
+    assert validate_params(bands, {"bands": ["GNSS", "ISM_2400"]}).valid
+    assert validate_params(bands, {"bands": ["GNSS", "GNSS"]}).errors == ["params.bands must not repeat an item"]
+    assert validate_params(bands, example_params(bands)).valid
+
+
 async def test_invalid_params_never_reach_the_handler_and_are_rejected():
     adapter = _Adapter()
 
