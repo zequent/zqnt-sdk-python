@@ -1,7 +1,8 @@
 # zqnt-client-sdk (Python)
 
 Python client SDK for the Zequent Framework. Provides an async interface over gRPC
-to the Remote Control, Mission Autonomy and Live Data services.
+to the Remote Control, Mission Autonomy and Live Data services. On Zequent 3.0 every asset is
+commanded by id through `client.commands` (see [Commands](#commands-zequent-30)).
 
 - Python 3.12+
 - Async-first (`asyncio` / `grpc.aio`)
@@ -37,13 +38,13 @@ print(client_sdk.__version__)  # "1.0.1"
 
 ```python
 import asyncio
-from client_sdk import ZequentClient, TakeoffRequest
+from client_sdk import ZequentClient
 
 
 async def main():
     async with ZequentClient.from_env() as client:
-        # Remote Control
-        await client.remote_control.takeoff(TakeoffRequest(sn="DOCK-1"))
+        # Commands (Zequent 3.0)
+        await client.commands.execute_command("DOCK-1", "flight.takeoff", {"altitude": 40})
 
         # Mission Autonomy
         task = await client.mission_autonomy.get_task("task-uuid")
@@ -91,14 +92,65 @@ async with ZequentClient(
 
 ---
 
+## Commands (Zequent 3.0)
+
+On a 3.0 platform every asset is commanded the same way: list what it can do, then run a command by
+its dotted id with a dict of params. There are no typed methods per command.
+
+```python
+from client_sdk import CommandError
+from client_sdk.commands import to_dict
+
+async with ZequentClient.from_env() as client:
+    capabilities = await client.commands.list_capabilities("DOCK-1")
+    for capability in capabilities.capabilities:
+        print(capability.command_id, capability.safety.risk, capability.input_schema)
+
+    try:
+        result = await client.commands.execute_command(
+            "DOCK-1", "navigation.go_to", {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60}
+        )
+    except CommandError as error:
+        print(error.category_name, error.code, error)  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
+    else:
+        async for event in client.commands.watch_command(result.command_execution_id):
+            print(event.state, event.progress, to_dict(event.result))
+```
+
+| Method | Purpose |
+| --- | --- |
+| `list_capabilities(asset_sn)` | The asset's `CapabilitySet`: command ids, input/output JSON schemas, risk, declared errors and events |
+| `execute_command(asset_sn, command_id, params=None, *, asset_id, target, timeout, reason, no_fly_zone_override, idempotency_key)` | Run a command; returns the `CommandResult` (`ACCEPTED`/`RUNNING` with a `command_execution_id` while underway, or the final state) |
+| `watch_command(command_execution_id)` | Async iterator of that run's events from now on, ending after its terminal event |
+| `watch_asset(asset_sn)` | Async iterator of every command event on the asset until you leave the loop |
+| `cancel_command(command_execution_id, reason=None)` | Cancel a run |
+
+- A refused call, or a command rejected before it started, raises `CommandError` (`category`,
+  `category_name`, `code` such as `command.invalid_params`, `status`, `result`). A command that
+  started and failed is returned with state `COMMAND_STATE_FAILED` and its `error`.
+- Start watching before a run can finish, or read the final state from `execute_command`.
+- `navigation.go_to` altitude is metres above the **takeoff point**. Leave a param out when you
+  have no value; never send `0` for "not given". `None` values are left out.
+- Results and events are the generated `zqnt.capability.v3` messages; `to_dict(...)` turns a result
+  payload into a plain dict.
+- `client.commands` uses the remote-control connection, credential and interceptors the client
+  already has; nothing else to set up. [`main.py`](main.py) is a runnable example.
+
+**Upgrading from 2.x:** the typed methods on `client.remote_control` are deprecated (they emit a
+`DeprecationWarning` naming the command id) and keep working against 2.x platforms.
+[MIGRATION.md](MIGRATION.md) maps every typed call to its command id and params.
+
+---
+
 ## Sub-clients
 
-The top-level `ZequentClient` exposes three sub-clients matching the underlying gRPC
+The top-level `ZequentClient` exposes sub-clients matching the underlying gRPC
 services. Each method maps 1:1 to the Java client SDK.
 
-### `client.remote_control`
+### `client.remote_control` (2.x, deprecated on 3.0)
 
-Flight, manual control, dock and asset operations.
+Flight, manual control, dock and asset operations for 2.x platforms. On 3.0 use `client.commands`;
+`start_manual_control_input` stays the way to fly by hand.
 
 | Method                         | Purpose                                  |
 | ------------------------------ | ---------------------------------------- |
@@ -201,16 +253,20 @@ header they set wins, and the fixed client token is then not sent.
 All client errors derive from `ZequentClientError`:
 
 ```python
-from client_sdk import ZequentClientError, ZequentRetryExhaustedError
+from client_sdk import CommandError, ZequentClientError
 
 try:
-    await client.remote_control.takeoff(TakeoffRequest(sn="DOCK-1"))
-except ZequentRetryExhaustedError as e:
-    # Retries exhausted across the configured policy
-    print("retries gave up:", e)
+    await client.commands.execute_command("DOCK-1", "flight.takeoff", {"altitude": 40})
+except CommandError as e:
+    # Refused or rejected: e.category_name, e.code, e.status, e.retryable
+    print("command error:", e.code, e)
 except ZequentClientError as e:
     print("client error:", e)
 ```
+
+`client.commands` raises `CommandError` for every refusal, including exhausted retries
+(`retryable=True`) and authentication (`ERROR_CATEGORY_PERMISSION_DENIED`). The 2.x sub-clients
+raise `ZequentRetryExhaustedError` when retries give up.
 
 The SDK also exposes `CircuitBreakerOpen` (in `client_sdk.grpc_.resilience`)
 raised when the per-method breaker is open.
@@ -245,6 +301,7 @@ level when needed.
 
 ```
 ZequentClient
+ |- CommandsClient        -> zqnt.control.v3 RemoteControlServiceStub (remote-control channel)
  |- RemoteControlClient   -> remote_control_pb2_grpc.RemoteControlServiceStub
  |- MissionAutonomyClient -> mission_autonomy_pb2_grpc.MissionAutonomyServiceStub
  |- LiveDataClient        -> live_data_pb2_grpc.LiveDataServiceStub
