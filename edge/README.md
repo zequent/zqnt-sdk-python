@@ -214,9 +214,8 @@ class MyDockAdapter(EdgeAdapter):
             self._spray,
             input_schema=schema({"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]),
         )
-        self.declare_telemetry_field(
-            "dock.cover_state", TelemetryValueType.STRING, allowed_values=["OPEN", "CLOSED", "OPENING", "CLOSING"]
-        )
+        self.declare_standard_telemetry_field("dock.cover_state")
+        self.declare_telemetry_field("vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%")
 
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.DOCK)
@@ -279,9 +278,11 @@ await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain", severity=AlertSe
 
 Long-lived streams to `TelemetryIngestService`, opened on first use and reconnected with backoff.
 `None`/NaN values are not sent. Against a core without v3 samples and detections go over v2
-`ProduceTelemetry`/`ProduceDetection` with the shared fields only: **`details` is dropped**, a
-sample with a speed or battery value becomes sub-asset (aircraft) telemetry, any other asset
-telemetry. Alerts have no v2 counterpart and are dropped. The v2 `TelemetryPublisher` is unchanged.
+`ProduceTelemetry`/`ProduceDetection`, mapped by `zqnt_utils.telemetry`: keys of the platform's
+catalog (`dock.mode`, `wind.speed`, `drone.gear`, …; declare them with
+`declare_standard_telemetry_field`) land in their v2 fields, **other `details` keys are dropped**. A
+sample with a speed or an aircraft key becomes sub-asset (aircraft) telemetry, one with dock keys or
+only a battery asset telemetry. Alerts have no v2 counterpart and are dropped. The v2 `TelemetryPublisher` is unchanged.
 
 ## Advanced Usage
 

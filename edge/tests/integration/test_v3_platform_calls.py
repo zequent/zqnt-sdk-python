@@ -11,6 +11,7 @@ import grpc
 import grpc.aio
 import pytest_asyncio
 from zqnt_utils.generated.zqnt import (
+    asset_pb2,
     device_control_contracts_pb2,
     live_data_pb2_grpc,
     live_data_types_pb2,
@@ -353,9 +354,20 @@ async def test_an_older_core_gets_samples_and_detections_over_v2(older_core):
     ingest = TelemetryIngestPublisher("localhost", port, token="t")
     try:
         await ingest.publish_sample(
-            TelemetrySample(sn="DRONE-1", latitude=47.5, longitude=9.7, battery_percent=81.0, details={"x": 1})
+            TelemetrySample(
+                sn="DRONE-1",
+                latitude=47.5,
+                longitude=9.7,
+                horizontal_speed=4.0,
+                battery_percent=81.0,
+                details={"drone.gear": 1, "x": 1},
+            )
         )
-        await ingest.publish_sample(TelemetrySample(sn="DOCK-1", latitude=1.0, longitude=2.0))
+        await ingest.publish_sample(
+            TelemetrySample(
+                sn="DOCK-1", latitude=1.0, longitude=2.0, battery_percent=64.0, details={"dock.mode": "IDLE"}
+            )
+        )
         await ingest.publish_detections(DetectionBatch(sn="RADAR-1", detections=[DetectionResult("t", "drone", 0.5)]))
         await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain"))
         await _until(lambda: len(platform.v2_telemetry) == 2 and len(platform.v2_detections) == 1)
@@ -364,9 +376,12 @@ async def test_an_older_core_gets_samples_and_detections_over_v2(older_core):
 
     aircraft, dock = platform.v2_telemetry
     assert aircraft.data.HasField("sub_asset")
-    assert aircraft.data.sub_asset.battery_information.percentage == "81.0"
+    assert aircraft.data.sub_asset.battery_information.percentage == "81"
+    assert aircraft.data.sub_asset.gear == 1
     assert aircraft.data.latitude == 47.5
     assert dock.data.HasField("asset")
+    assert dock.data.asset.sub_asset_percentage == 64
+    assert dock.data.asset.mode == asset_pb2.ASSET_MODE_IDLE
     assert platform.v2_detections[0].base.sn == "RADAR-1"
     assert platform.alerts == []
 

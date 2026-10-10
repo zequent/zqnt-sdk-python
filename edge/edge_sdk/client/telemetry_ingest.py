@@ -11,10 +11,11 @@ buffered while down and reconnected with backoff (1 s doubling to 60 s)::
     await ingest.close()
 
 An older core answers UNIMPLEMENTED; the stream then uses v2 ``ProduceTelemetry``/
-``ProduceDetection`` for :attr:`V3Fallback.WINDOW_SECONDS` before trying v3 again. In v2 a sample
-keeps only its shared fields (``details`` is dropped): with a speed or battery value it goes out as
-sub-asset (aircraft) telemetry, otherwise as asset telemetry. Alerts have no v2 counterpart and are
-dropped while v2 is in use.
+``ProduceDetection`` for :attr:`V3Fallback.WINDOW_SECONDS` before trying v3 again. In v2 a sample is
+mapped by ``zqnt_utils.telemetry``: keys of the platform's catalog in ``details`` land in their v2
+fields, other keys are dropped; a moving sample or one with aircraft keys is sub-asset (aircraft)
+telemetry, otherwise asset telemetry. Alerts have no v2 counterpart and are dropped while v2 is in
+use.
 """
 
 from __future__ import annotations
@@ -31,7 +32,6 @@ from google.protobuf import struct_pb2, timestamp_pb2
 from ..auth import default_edge_token, platform_channel
 from ..models.common import DetectionBatch
 from ..models.live import Alert, TelemetrySample
-from ..models.telemetry import AssetTelemetry, SubAssetBatteryInfo, SubAssetTelemetry
 from .edge_gateway import V3Fallback, is_unimplemented
 
 logger = logging.getLogger(__name__)
@@ -86,33 +86,9 @@ def sample_to_v3(sample: TelemetrySample):
 
 
 def sample_to_v2(sample: TelemetrySample):
-    from .telemetry_publisher import TelemetryPublisher
+    from zqnt_utils.telemetry import to_request
 
-    def opt(value):
-        return value if _given(value) else None
-
-    builder = TelemetryPublisher(host="", sn=sample.sn, token="")
-    shared = {
-        "id": sample.sn,
-        "timestamp": sample.observed_at,
-        "latitude": opt(sample.latitude) if _given(sample.longitude) else None,
-        "longitude": opt(sample.longitude) if _given(sample.latitude) else None,
-        "absolute_altitude": opt(sample.altitude),
-        "relative_altitude": opt(sample.relative_altitude),
-        "heading": opt(sample.heading_degrees),
-    }
-    aircraft = any(_given(v) for v in (sample.horizontal_speed, sample.vertical_speed, sample.battery_percent))
-    if aircraft:
-        battery = SubAssetBatteryInfo(percentage=sample.battery_percent) if _given(sample.battery_percent) else None
-        return builder._build_subasset_request(
-            SubAssetTelemetry(
-                **shared,
-                horizontal_speed=opt(sample.horizontal_speed),
-                vertical_speed=opt(sample.vertical_speed),
-                battery=battery,
-            )
-        )
-    return builder._build_asset_request(AssetTelemetry(**shared))
+    return to_request(sample_to_v3(sample).sample)
 
 
 def detection_to_v3(d):
