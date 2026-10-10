@@ -62,8 +62,8 @@ class RemoteControlClient:
     """Async client for the 2.x ``RemoteControlService`` gRPC API, kept for 2.x platforms.
 
     Every typed command is deprecated: on a 3.0 platform use ``client.commands.execute_command``
-    with the command id and params (see MIGRATION.md). :meth:`start_manual_control_input` is not
-    deprecated; it stays the way to fly by hand.
+    with the command id and params (see MIGRATION.md), and ``client.commands.stream_manual_control``
+    for stick input.
     """
 
     def __init__(
@@ -223,6 +223,12 @@ class RemoteControlClient:
                 response = await session.complete()
         """
         validate_sn(sn)
+        warnings.warn(
+            "RemoteControlClient.start_manual_control_input is the 2.x stick input; on Zequent 3.0 use "
+            "client.commands.stream_manual_control(asset_sn)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from .manual_control_session import ManualControlInputSession
 
         return ManualControlInputSession(sn=sn, stub=self._stub, timeout=self._timeout)

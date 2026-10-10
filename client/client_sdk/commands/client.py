@@ -26,6 +26,7 @@ from zqnt_utils.generated.zqnt.control.v3 import remote_control_service_pb2_grpc
 from ..config.resilience import ResilienceConfig
 from ..grpc_.resilience import GrpcResilience
 from .errors import CommandError
+from .manual_control import ManualControlStream
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +182,17 @@ class CommandsClient:
         """Events of every command on the asset from now on, until the loop is left."""
         _require("asset_sn", asset_sn)
         return self._watch(control_pb2.WatchCommandEventsRequest(asset=common_pb2.AssetRef(sn=asset_sn)))
+
+    def stream_manual_control(self, asset_sn: str) -> ManualControlStream:
+        """Opens a stick-input session on the asset. One session controls one asset; inputs go out
+        in the order they are sent, without a deadline, until the session is closed::
+
+            async with client.commands.stream_manual_control("DRONE-1") as stick:
+                await stick.send(pitch=0.2, throttle=0.5)
+        """
+        _require("asset_sn", asset_sn)
+        logger.info("StreamManualControl: asset=%s", asset_sn)
+        return ManualControlStream(asset_sn, self._stub.StreamManualControl())
 
     async def _watch(self, request: control_pb2.WatchCommandEventsRequest) -> AsyncIterator[command_pb2.CommandEvent]:
         call = self._stub.WatchCommandEvents(request)

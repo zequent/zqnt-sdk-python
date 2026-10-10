@@ -44,6 +44,8 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
         self.asset_watches: list[asyncio.Queue] = []
         self.events_on_execute: list[command_pb2.CommandEvent] = []
         self.received: list[str] = []
+        self.manual_inputs: list[control_pb2.StreamManualControlRequest] = []
+        self.manual_answer_error: common_pb2.Error | None = None
 
     async def _refused(self, context) -> bool:
         self.metadata = dict(context.invocation_metadata())
@@ -108,6 +110,20 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
         yield control_pb2.WatchCommandEventsResponse(event=_event("exec-2", command_pb2.COMMAND_STATE_RUNNING))
         while True:
             yield control_pb2.WatchCommandEventsResponse(event=await events.get())
+
+    async def StreamManualControl(self, request_iterator, context):  # noqa: N802
+        sn = None
+        async for request in request_iterator:
+            if sn is None:
+                sn = request.asset.sn
+                if not sn:
+                    await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "asset.sn is required")
+                await self._refused(context)
+            self.manual_inputs.append(request)
+        response = control_pb2.StreamManualControlResponse(accepted_inputs=len(self.manual_inputs))
+        if self.manual_answer_error is not None:
+            response.error.CopyFrom(self.manual_answer_error)
+        return response
 
 
 @pytest.fixture
@@ -380,3 +396,70 @@ def test_params_round_trip_through_a_struct():
     params = {"waypoints": [{"latitude": 1.5}], "enabled": True, "mode": "cool", "unset": None}
 
     assert to_dict(to_struct(params)) == {"waypoints": [{"latitude": 1.5}], "enabled": True, "mode": "cool"}
+
+
+async def test_streams_stick_input_naming_the_asset_once(client: CommandsClient, fake: FakeRemoteControlV3):
+    async with client.stream_manual_control("DRONE-1") as stick:
+        await stick.send(roll=0.1, pitch=-0.2, yaw=0.3, throttle=0.5)
+        await stick.send(throttle=0.4, gimbal_pitch=-30)
+
+    assert stick.accepted_inputs == 2
+    first, second = fake.manual_inputs
+    assert first.asset.sn == "DRONE-1"
+    assert first.input.roll == pytest.approx(0.1)
+    assert first.input.throttle == pytest.approx(0.5)
+    assert not first.input.HasField("gimbal_pitch")
+    assert not second.HasField("asset")
+    assert second.input.gimbal_pitch == pytest.approx(-30)
+
+
+async def test_a_refused_manual_control_session_raises_its_category(client: CommandsClient, fake: FakeRemoteControlV3):
+    fake.refuse_with = (grpc.StatusCode.UNAVAILABLE, "no adapter for DRONE-1")
+    stick = client.stream_manual_control("DRONE-1")
+    await stick.send(throttle=0.5)
+
+    with pytest.raises(CommandError) as raised:
+        await stick.close()
+
+    assert raised.value.status == grpc.StatusCode.UNAVAILABLE
+    assert raised.value.category == common_pb2.ERROR_CATEGORY_SERVICE
+    with pytest.raises(RuntimeError):
+        await stick.send(throttle=0.5)
+
+
+async def test_an_error_in_the_manual_control_answer_raises(client: CommandsClient, fake: FakeRemoteControlV3):
+    fake.manual_answer_error = common_pb2.Error(
+        category=common_pb2.ERROR_CATEGORY_PRECONDITION_FAILED,
+        code="flight.manual.not_entered",
+        message="enter manual control first",
+    )
+
+    with pytest.raises(CommandError) as raised:
+        async with client.stream_manual_control("DRONE-1") as stick:
+            await stick.send(throttle=0.5)
+
+    assert raised.value.category == common_pb2.ERROR_CATEGORY_PRECONDITION_FAILED
+    assert raised.value.code == "flight.manual.not_entered"
+    assert str(raised.value) == "enter manual control first"
+
+
+async def test_manual_control_needs_an_asset_and_closes_once(client: CommandsClient):
+    with pytest.raises(ValueError):
+        client.stream_manual_control(" ")
+
+    stick = client.stream_manual_control("DRONE-1")
+    assert await stick.close() == 0
+    assert await stick.close() == 0
+    with pytest.raises(RuntimeError):
+        await stick.send(throttle=0.5)
+
+
+async def test_leaving_the_block_with_an_exception_aborts_the_stream(client: CommandsClient, fake: FakeRemoteControlV3):
+    with pytest.raises(KeyError):
+        async with client.stream_manual_control("DRONE-1") as stick:
+            await stick.send(throttle=0.5)
+            raise KeyError("operator let go")
+
+    assert stick.accepted_inputs is None
+    with pytest.raises(RuntimeError):
+        await stick.send(throttle=0.5)

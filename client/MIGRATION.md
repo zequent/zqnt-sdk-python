@@ -12,7 +12,8 @@ result = await client.commands.execute_command(
 
 The 2.x typed methods on `client.remote_control` still work against 2.x platforms; they are
 deprecated and emit a `DeprecationWarning` naming the command id to use instead.
-`remote_control.start_manual_control_input(...)` (stick input) is not deprecated.
+`remote_control.start_manual_control_input(...)` stays for stick input on 2.x platforms; on 3.0 use
+`commands.stream_manual_control(...)`.
 
 ## Typed call → command id + params
 
@@ -73,3 +74,22 @@ await client.commands.execute_command(
 `reason` is required for commands whose capability is `COMMAND_RISK_CRITICAL`. The same
 `idempotency_key` sent twice runs the command once. `asset_id=` names the asset by its platform id
 instead of its serial number, `target=` a payload or sub-asset (`capability_pb2.Target`).
+
+## Manual control
+
+| 2.x | 3.0 |
+|---|---|
+| `remote_control.start_manual_control_input(sn)` | `commands.stream_manual_control(asset_sn)` |
+| `session.send_input(ManualControlInput(...))` | `await stick.send(roll, pitch, yaw, throttle, gimbal_pitch=...)` |
+| `session.complete()` (a response) | leave the `async with` block or `await stick.close()`: the number of inputs passed on to the asset |
+| a broken stream | `CommandError` from `send` / `close` |
+
+Enter and leave manual control with the commands `flight.manual.enter` and `flight.manual.exit`.
+
+## Telemetry
+
+| 2.x | 3.0 |
+|---|---|
+| `live_data.stream_telemetry(...)` | `async for item in telemetry.watch_telemetry(asset_sns, min_interval=...)` |
+| per-vendor telemetry types | `TelemetrySample`: position, relative altitude, heading, speeds, battery; the rest in `details` under the capabilities' `telemetry_fields` |
+| reconnects on its own | raises `CommandError` on a refusal, a dropped stream or missing heartbeats; watch again |

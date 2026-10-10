@@ -129,6 +129,7 @@ async with ZequentClient.from_env() as client:
 | `watch_command(command_execution_id)` | Async iterator of that run's events from now on, ending after its terminal event |
 | `watch_asset(asset_sn)` | Async iterator of every command event on the asset until you leave the loop |
 | `cancel_command(command_execution_id, reason=None)` | Cancel a run |
+| `stream_manual_control(asset_sn)` | A `ManualControlStream` for stick input on the asset (see below) |
 
 - A refused call, or a command rejected before it started, raises `CommandError` (`category`,
   `category_name`, `code` such as `command.invalid_params`, `status`, `result`). From
@@ -146,6 +147,48 @@ async with ZequentClient.from_env() as client:
 - `client.commands` uses the remote-control connection, credential and interceptors the client
   already has; nothing else to set up. [`main.py`](main.py) is a runnable example.
 
+### Manual control (Zequent 3.0)
+
+Stick input goes over one stream per asset. Put the asset in manual control first, then send
+inputs (roll, pitch, yaw, throttle from -1 to 1) at your control rate:
+
+```python
+await client.commands.execute_and_wait("DRONE-1", "flight.manual.enter")
+async with client.commands.stream_manual_control("DRONE-1") as stick:
+    await stick.send(pitch=0.2, throttle=0.5)
+    await stick.send(throttle=0.5, gimbal_pitch=-30)
+print(stick.accepted_inputs)
+await client.commands.execute_and_wait("DRONE-1", "flight.manual.exit")
+```
+
+The first input names the asset; one stream controls one asset. Leaving the block normally ends
+the session and waits for the platform's answer: `accepted_inputs` is the number of inputs passed
+on to the asset (`await stick.close()` returns it too). Leaving it with an exception aborts the
+stream. `send` and `close` raise `CommandError` when the platform refused the session (no adapter
+reachable, an asset of another organization) or the adapter dropped it.
+
+### Telemetry (Zequent 3.0)
+
+```python
+from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2
+
+async for item in client.telemetry.watch_telemetry(["DOCK-1"], min_interval=1.0):
+    if isinstance(item, telemetry_pb2.TelemetrySample):
+        print(item.asset.sn, item.position, item.battery_percent, to_dict(item.details))
+    else:
+        print(item.asset.sn, telemetry_pb2.SourceState.Name(item.state))
+```
+
+`watch_telemetry(asset_sns=None, *, min_interval=None, heartbeat_timeout=35s)` streams
+`TelemetrySample`s from the live-data service: the shared fields (position, relative altitude,
+heading, speeds, battery) and the device-specific `details` under the keys of the capabilities'
+`telemetry_fields`. No asset watches every asset of the caller's organization; a dock's serial
+includes its drone. `min_interval` keeps at most one sample per asset per interval. A
+`SourceStatus` comes first for every watched asset, then on each change to online, stale or no
+data. The platform sends heartbeats on a quiet stream; when neither a sample nor a heartbeat
+arrives within `heartbeat_timeout`, the loop raises a retryable `CommandError` (`SERVICE`). A
+watch does not reconnect: watch again. `client.live_data` stays the 2.x stream.
+
 **Upgrading from 2.x:** the typed methods on `client.remote_control` are deprecated (they emit a
 `DeprecationWarning` naming the command id) and keep working against 2.x platforms.
 [MIGRATION.md](MIGRATION.md) maps every typed call to its command id and params.
@@ -159,8 +202,8 @@ services. Each method maps 1:1 to the Java client SDK.
 
 ### `client.remote_control` (2.x, deprecated on 3.0)
 
-Flight, manual control, dock and asset operations for 2.x platforms. On 3.0 use `client.commands`;
-`start_manual_control_input` stays the way to fly by hand.
+Flight, manual control, dock and asset operations for 2.x platforms. On 3.0 use `client.commands`,
+and `client.commands.stream_manual_control` for stick input.
 
 | Method                         | Purpose                                  |
 | ------------------------------ | ---------------------------------------- |

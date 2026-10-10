@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from .live_data.client import LiveDataClient
     from .mission_autonomy.client import MissionAutonomyClient
     from .remote_control.client import RemoteControlClient
+    from .telemetry.client import TelemetryClient
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class ZequentClient:
     exposes typed sub-clients:
 
         client.commands
+        client.telemetry
         client.connector
         client.remote_control
         client.mission_autonomy
@@ -109,6 +111,7 @@ class ZequentClient:
         self._remote_control: "RemoteControlClient | None" = None
         self._mission_autonomy: "MissionAutonomyClient | None" = None
         self._live_data: "LiveDataClient | None" = None
+        self._telemetry: "TelemetryClient | None" = None
 
         logger.info("ZequentClient initialized with %d channels", len(self._channels))
 
@@ -173,6 +176,16 @@ class ZequentClient:
 
             self._commands = CommandsClient(self._remote_control_channel, self._resilience)
         return self._commands
+
+    @property
+    def telemetry(self) -> "TelemetryClient":
+        """Live telemetry of Zequent 3.0: samples and source status of assets, as one stream
+        (``watch_telemetry``). Needs a 3.0 platform; :attr:`live_data` streams 2.x telemetry."""
+        if self._telemetry is None:
+            from .telemetry.client import TelemetryClient
+
+            self._telemetry = TelemetryClient(self._live_data_channel)
+        return self._telemetry
 
     @property
     def connector(self) -> "ConnectorClient":

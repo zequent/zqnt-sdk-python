@@ -4,7 +4,9 @@ ZQNT Python Client SDK
 
 Python client for the Zequent Framework. Connects to:
 
-  * zqnt.control.v3.RemoteControlService (any command by id: list_capabilities, execute_command)
+  * zqnt.control.v3.RemoteControlService (any command by id: list_capabilities, execute_command,
+    stream_manual_control)
+  * zqnt.telemetry.v3.TelemetryService (watch_telemetry)
   * RemoteControlService     (2.x typed flight, dock & asset ops; deprecated on 3.0)
   * MissionAutonomyService   (mission / task / scheduler CRUD + start/stop)
   * LiveDataService          (telemetry streaming, live stream, camera control)
@@ -28,9 +30,10 @@ Quick-start
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
-from .commands import CommandError, CommandsClient
+from .commands import CommandError, CommandsClient, ManualControlStream
 from .exceptions import ZequentClientError, ZequentRetryExhaustedError
 from .live_data.stream_handle import StreamHandle
+from .telemetry import TelemetryClient
 
 try:
     __version__ = _pkg_version("zqnt-client-sdk")
@@ -81,6 +84,8 @@ __all__ = [
     "ZequentClient",
     "CommandsClient",
     "CommandError",
+    "ManualControlStream",
+    "TelemetryClient",
     "StreamHandle",
     "ManualControlInputSession",
     # core responses

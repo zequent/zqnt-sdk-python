@@ -94,10 +94,10 @@ async def test_a_typed_call_points_at_its_command_id(client_with_fake_stub) -> N
 
 
 @pytest.mark.asyncio
-async def test_the_manual_input_session_is_not_deprecated(client_with_fake_stub, recwarn) -> None:
+async def test_the_manual_input_session_points_at_the_v3_stream(client_with_fake_stub) -> None:
     rc, _ = client_with_fake_stub()
-    rc.start_manual_control_input("DOCK-001")
-    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+    with pytest.warns(DeprecationWarning, match="stream_manual_control"):
+        rc.start_manual_control_input("DOCK-001")
 
 
 # ---------------------------------------------------------------------------
