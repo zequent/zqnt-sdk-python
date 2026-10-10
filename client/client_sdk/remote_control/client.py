@@ -6,7 +6,9 @@ Manual-control client-streaming session is added in a later phase.
 
 from __future__ import annotations
 
+import functools
 import logging
+import warnings
 from typing import TYPE_CHECKING
 
 import grpc.aio
@@ -39,8 +41,30 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _deprecated(command_id: str):
+    def decorate(method):
+        @functools.wraps(method)
+        async def call(self, *args, **kwargs):
+            warnings.warn(
+                f"RemoteControlClient.{method.__name__} is the 2.x typed call; on Zequent 3.0 use "
+                f'client.commands.execute_command(asset_sn, "{command_id}", params)',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return await method(self, *args, **kwargs)
+
+        return call
+
+    return decorate
+
+
 class RemoteControlClient:
-    """Async client for the ``RemoteControlService`` gRPC API."""
+    """Async client for the 2.x ``RemoteControlService`` gRPC API, kept for 2.x platforms.
+
+    Every typed command is deprecated: on a 3.0 platform use ``client.commands.execute_command``
+    with the command id and params (see MIGRATION.md). :meth:`start_manual_control_input` is not
+    deprecated; it stays the way to fly by hand.
+    """
 
     def __init__(
         self,
@@ -70,6 +94,7 @@ class RemoteControlClient:
     # Flight ops
     # ------------------------------------------------------------------
 
+    @_deprecated("flight.takeoff")
     async def takeoff(self, request: TakeoffRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         validate_coordinates(request.latitude, request.longitude, request.altitude)
@@ -84,6 +109,7 @@ class RemoteControlClient:
         proto = await self._resilience_helper.execute(lambda: self._stub.TakeOff(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("navigation.go_to")
     async def go_to(self, request: GoToRequest, *, no_fly_zone_override: bool = False) -> RemoteControlResponse:
         """Fly to a coordinate.
 
@@ -107,6 +133,7 @@ class RemoteControlClient:
         proto = await self._resilience_helper.execute(lambda: self._stub.GoTo(proto_request, timeout=self._timeout))
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("flight.return_to_home")
     async def return_to_home(self, request: ReturnToHomeRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("ReturnToHome: sn=%s", request.sn)
@@ -126,6 +153,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("gimbal.look_at")
     async def look_at(self, request: LookAtRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         validate_coordinates(request.latitude, request.longitude, request.altitude)
@@ -144,9 +172,11 @@ class RemoteControlClient:
     # Manual control (unary)
     # ------------------------------------------------------------------
 
+    @_deprecated("flight.manual.enter")
     async def enter_manual_control(self, request: ManualControlRequest) -> RemoteControlResponse:
         return await self._manual_control_call(request, enter=True)
 
+    @_deprecated("flight.manual.exit")
     async def exit_manual_control(self, request: ManualControlRequest) -> RemoteControlResponse:
         return await self._manual_control_call(request, enter=False)
 
@@ -201,6 +231,7 @@ class RemoteControlClient:
     # Dock operations
     # ------------------------------------------------------------------
 
+    @_deprecated("dock.open_cover")
     async def open_cover(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("OpenCover: sn=%s", request.sn)
@@ -215,6 +246,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("dock.close_cover")
     async def close_cover(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("CloseCover: sn=%s, force=%s", request.sn, request.value)
@@ -231,6 +263,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("dock.start_charging")
     async def start_charging(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("StartCharging: sn=%s", request.sn)
@@ -245,6 +278,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("dock.stop_charging")
     async def stop_charging(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("StopCharging: sn=%s", request.sn)
@@ -263,6 +297,7 @@ class RemoteControlClient:
     # Asset operations
     # ------------------------------------------------------------------
 
+    @_deprecated("asset.reboot")
     async def reboot_asset(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("RebootAsset: sn=%s", request.sn)
@@ -277,6 +312,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("asset.boot_sub_asset")
     async def boot_sub_asset(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("BootSubAsset: sn=%s, boot=%s", request.sn, request.value)
@@ -295,6 +331,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("asset.remote_debug")
     async def debug_mode(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("DebugMode: sn=%s, enabled=%s", request.sn, request.value)
@@ -311,6 +348,7 @@ class RemoteControlClient:
         )
         return proto_to_response(proto, request.sn)
 
+    @_deprecated("asset.change_ac_mode")
     async def change_ac_mode(self, request: DockOperationRequest) -> RemoteControlResponse:
         validate_sn(request.sn)
         logger.info("ChangeAcMode: sn=%s", request.sn)

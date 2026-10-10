@@ -82,6 +82,25 @@ def client_with_fake_stub():
 
 
 # ---------------------------------------------------------------------------
+# Deprecation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_typed_call_points_at_its_command_id(client_with_fake_stub) -> None:
+    rc, _ = client_with_fake_stub()
+    with pytest.warns(DeprecationWarning, match='"dock.open_cover"'):
+        await rc.open_cover(DockOperationRequest(sn="DOCK-001"))
+
+
+@pytest.mark.asyncio
+async def test_the_manual_input_session_is_not_deprecated(client_with_fake_stub, recwarn) -> None:
+    rc, _ = client_with_fake_stub()
+    rc.start_manual_control_input("DOCK-001")
+    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 
