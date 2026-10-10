@@ -107,28 +107,38 @@ async with ZequentClient.from_env() as client:
         print(capability.command_id, capability.safety.risk, capability.input_schema)
 
     try:
-        result = await client.commands.execute_command(
-            "DOCK-1", "navigation.go_to", {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60}
-        )
+        async with asyncio.timeout(300):
+            result = await client.commands.execute_and_wait(
+                "DOCK-1", "navigation.go_to", {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60}
+            )
     except CommandError as error:
         print(error.category_name, error.code, error)  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
     else:
-        async for event in client.commands.watch_command(result.command_execution_id):
-            print(event.state, event.progress, to_dict(event.result))
+        print(to_dict(result.result))
+
+    started = await client.commands.execute_command("DOCK-1", "dock.open_cover")
+    async for event in client.commands.watch_command(started.command_execution_id):
+        print(event.state, event.progress, event.message)
 ```
 
 | Method | Purpose |
 | --- | --- |
 | `list_capabilities(asset_sn)` | The asset's `CapabilitySet`: command ids, input/output JSON schemas, risk, declared errors and events |
 | `execute_command(asset_sn, command_id, params=None, *, asset_id, target, timeout, reason, no_fly_zone_override, idempotency_key)` | Run a command; returns the `CommandResult` (`ACCEPTED`/`RUNNING` with a `command_execution_id` while underway, or the final state) |
+| `execute_and_wait(asset_sn, command_id, params=None, *, target, timeout, reason, no_fly_zone_override, idempotency_key)` | Run a command and wait for its outcome; returns the `SUCCEEDED` result. Bound the wait with `asyncio.timeout` |
 | `watch_command(command_execution_id)` | Async iterator of that run's events from now on, ending after its terminal event |
 | `watch_asset(asset_sn)` | Async iterator of every command event on the asset until you leave the loop |
 | `cancel_command(command_execution_id, reason=None)` | Cancel a run |
 
 - A refused call, or a command rejected before it started, raises `CommandError` (`category`,
-  `category_name`, `code` such as `command.invalid_params`, `status`, `result`). A command that
-  started and failed is returned with state `COMMAND_STATE_FAILED` and its `error`.
-- Start watching before a run can finish, or read the final state from `execute_command`.
+  `category_name`, `code` such as `command.invalid_params`, `status`, `result`). From
+  `execute_command`, a command that started and failed is returned with state
+  `COMMAND_STATE_FAILED` and its `error`; `execute_and_wait` raises `CommandError` for a run that
+  ends `FAILED`, `CANCELLED` or `TIMED_OUT`, with that final `result`.
+- `execute_and_wait` watches the asset before it sends the command, so a run that finishes right
+  away is not missed, and ignores the events of other runs. A watch opened after
+  `execute_command` returns can miss the end of a fast run. Leaving the wait early (timeout,
+  cancellation) closes the watch and leaves the command running; `cancel_command` stops it.
 - `navigation.go_to` altitude is metres above the **takeoff point**. Leave a param out when you
   have no value; never send `0` for "not given". `None` values are left out.
 - Results and events are the generated `zqnt.capability.v3` messages; `to_dict(...)` turns a result

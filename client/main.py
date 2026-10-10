@@ -7,19 +7,10 @@ import asyncio
 import logging
 import os
 
-from zqnt_utils.generated.zqnt.capability.v3 import command_pb2
-
 from client_sdk import CommandError, ZequentClient
 from client_sdk.commands import to_dict
 
 logging.basicConfig(level=logging.INFO)
-
-TERMINAL = {
-    command_pb2.COMMAND_STATE_SUCCEEDED,
-    command_pb2.COMMAND_STATE_FAILED,
-    command_pb2.COMMAND_STATE_CANCELLED,
-    command_pb2.COMMAND_STATE_TIMED_OUT,
-}
 
 
 async def main() -> None:
@@ -30,18 +21,12 @@ async def main() -> None:
             print(capability.command_id, capability.display_name)
 
         try:
-            result = await client.commands.execute_command(asset_sn, "dock.open_cover")
+            async with asyncio.timeout(300):
+                result = await client.commands.execute_and_wait(asset_sn, "dock.open_cover")
         except CommandError as error:
-            print("refused:", error.category_name, error.code, error)
+            print("not carried out:", error.category_name, error.code, error)
             return
-
-        if result.state not in TERMINAL:
-            async for event in client.commands.watch_command(result.command_execution_id):
-                print(command_pb2.CommandState.Name(event.state), event.message)
-                if event.state in TERMINAL:
-                    print("result:", to_dict(event.result))
-        else:
-            print(command_pb2.CommandState.Name(result.state), to_dict(result.result))
+        print("succeeded:", to_dict(result.result))
 
 
 if __name__ == "__main__":

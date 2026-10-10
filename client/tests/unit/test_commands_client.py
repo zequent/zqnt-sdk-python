@@ -41,6 +41,9 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
         self.answer_with: command_pb2.CommandResult | None = None
         self.asset_watch_cancelled = asyncio.Event()
         self.asset_watch_open = asyncio.Event()
+        self.asset_watches: list[asyncio.Queue] = []
+        self.events_on_execute: list[command_pb2.CommandEvent] = []
+        self.received: list[str] = []
 
     async def _refused(self, context) -> bool:
         self.metadata = dict(context.invocation_metadata())
@@ -64,7 +67,11 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
 
     async def ExecuteCommand(self, request, context):  # noqa: N802
         self.requests["ExecuteCommand"] = request
+        self.received.append("ExecuteCommand")
         await self._refused(context)
+        for event in self.events_on_execute:
+            for watch in self.asset_watches:
+                watch.put_nowait(event)
         result = self.answer_with or command_pb2.CommandResult(
             command_execution_id="exec-1",
             command_id=request.command.command_id,
@@ -84,6 +91,7 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
 
     async def WatchCommandEvents(self, request, context):  # noqa: N802
         self.requests["WatchCommandEvents"] = request
+        self.received.append("WatchCommandEvents")
         await self._refused(context)
         if request.command_execution_id:
             yield control_pb2.WatchCommandEventsResponse(
@@ -93,10 +101,13 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
                 event=_event(request.command_execution_id, command_pb2.COMMAND_STATE_SUCCEEDED, arrived=True)
             )
             return
+        events: asyncio.Queue = asyncio.Queue()
+        self.asset_watches.append(events)
         context.add_done_callback(lambda _ctx: self.asset_watch_cancelled.set())
         self.asset_watch_open.set()
         yield control_pb2.WatchCommandEventsResponse(event=_event("exec-2", command_pb2.COMMAND_STATE_RUNNING))
-        await asyncio.Event().wait()
+        while True:
+            yield control_pb2.WatchCommandEventsResponse(event=await events.get())
 
 
 @pytest.fixture
@@ -276,6 +287,93 @@ async def test_an_asset_and_a_command_id_are_required(client: CommandsClient):
         await client.execute_command("DRONE-1", "")
     with pytest.raises(ValueError):
         await client.list_capabilities("")
+
+
+async def test_execute_and_wait_returns_the_succeeded_result(client: CommandsClient, fake: FakeRemoteControlV3):
+    fake.events_on_execute = [
+        _event("exec-1", command_pb2.COMMAND_STATE_RUNNING),
+        _event("exec-1", command_pb2.COMMAND_STATE_SUCCEEDED, arrived=True),
+    ]
+
+    async with asyncio.timeout(5):
+        result = await client.execute_and_wait("DRONE-1", "navigation.go_to", {"latitude": 52.52})
+
+    assert result.state == command_pb2.COMMAND_STATE_SUCCEEDED
+    assert result.command_execution_id == "exec-1"
+    assert to_dict(result.result) == {"arrived": True}
+    assert fake.requests["WatchCommandEvents"].asset.sn == "DRONE-1"
+    await asyncio.wait_for(fake.asset_watch_cancelled.wait(), timeout=5)
+
+
+async def test_execute_and_wait_raises_the_final_result_of_a_failed_run(
+    client: CommandsClient, fake: FakeRemoteControlV3
+):
+    failed = _event("exec-1", command_pb2.COMMAND_STATE_FAILED)
+    failed.error.CopyFrom(common_pb2.Error(code="flight.not_airborne", message="not airborne"))
+    fake.events_on_execute = [failed]
+
+    with pytest.raises(CommandError) as raised:
+        async with asyncio.timeout(5):
+            await client.execute_and_wait("DRONE-1", "navigation.go_to")
+
+    assert raised.value.result.state == command_pb2.COMMAND_STATE_FAILED
+    assert raised.value.result.command_execution_id == "exec-1"
+    assert raised.value.category == common_pb2.ERROR_CATEGORY_ASSET
+    assert raised.value.code == "flight.not_airborne"
+    assert str(raised.value) == "not airborne"
+    await asyncio.wait_for(fake.asset_watch_cancelled.wait(), timeout=5)
+
+
+async def test_execute_and_wait_raises_a_rejection_without_waiting(client: CommandsClient, fake: FakeRemoteControlV3):
+    fake.answer_with = command_pb2.CommandResult(
+        command_id="flight.takeoff",
+        state=command_pb2.COMMAND_STATE_REJECTED,
+        error=common_pb2.Error(code="command.invalid_params"),
+    )
+
+    with pytest.raises(CommandError) as raised:
+        async with asyncio.timeout(5):
+            await client.execute_and_wait("DRONE-1", "flight.takeoff")
+
+    assert raised.value.category == common_pb2.ERROR_CATEGORY_INVALID_ARGUMENT
+    assert raised.value.result.state == command_pb2.COMMAND_STATE_REJECTED
+
+
+async def test_execute_and_wait_ignores_events_of_other_runs(client: CommandsClient, fake: FakeRemoteControlV3):
+    fake.events_on_execute = [
+        _event("exec-7", command_pb2.COMMAND_STATE_FAILED),
+        _event("exec-1", command_pb2.COMMAND_STATE_SUCCEEDED),
+    ]
+
+    async with asyncio.timeout(5):
+        result = await client.execute_and_wait("DRONE-1", "navigation.go_to")
+
+    assert result.command_execution_id == "exec-1"
+    assert result.state == command_pb2.COMMAND_STATE_SUCCEEDED
+
+
+async def test_execute_and_wait_sees_an_outcome_that_arrives_before_the_reply(
+    client: CommandsClient, fake: FakeRemoteControlV3
+):
+    fake.events_on_execute = [_event("exec-1", command_pb2.COMMAND_STATE_SUCCEEDED)]
+
+    async with asyncio.timeout(5):
+        result = await client.execute_and_wait("DRONE-1", "navigation.go_to")
+
+    assert fake.received == ["WatchCommandEvents", "ExecuteCommand"]
+    assert result.state == command_pb2.COMMAND_STATE_SUCCEEDED
+
+
+async def test_execute_and_wait_closes_the_watch_on_the_callers_timeout(
+    client: CommandsClient, fake: FakeRemoteControlV3
+):
+    fake.events_on_execute = [_event("exec-1", command_pb2.COMMAND_STATE_RUNNING)]
+
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(0.5):
+            await client.execute_and_wait("DRONE-1", "navigation.go_to")
+
+    await asyncio.wait_for(fake.asset_watch_cancelled.wait(), timeout=5)
 
 
 def test_params_round_trip_through_a_struct():

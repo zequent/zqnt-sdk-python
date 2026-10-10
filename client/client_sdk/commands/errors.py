@@ -27,13 +27,24 @@ _RETRYABLE_STATUSES = frozenset(
 )
 
 
+_REJECTED = ("was rejected", common_pb2.ERROR_CATEGORY_INVALID_ARGUMENT)
+
+_OUTCOME_BY_STATE: dict[int, tuple[str, int]] = {
+    command_pb2.COMMAND_STATE_FAILED: ("failed", common_pb2.ERROR_CATEGORY_ASSET),
+    command_pb2.COMMAND_STATE_CANCELLED: ("was cancelled", common_pb2.ERROR_CATEGORY_UNSPECIFIED),
+    command_pb2.COMMAND_STATE_TIMED_OUT: ("timed out", common_pb2.ERROR_CATEGORY_TIMEOUT),
+}
+
+
 class CommandError(ZequentClientError):
-    """A command call the platform refused, or a command it ``REJECTED`` before it started.
+    """A command call the platform refused, a command it ``REJECTED`` before it started, or (from
+    ``execute_and_wait``) a run that ended ``FAILED``, ``CANCELLED`` or ``TIMED_OUT``.
 
     ``category`` is a ``zqnt.common.v3.ErrorCategory`` value (compare with
     ``common_pb2.ERROR_CATEGORY_INVALID_ARGUMENT`` etc., or read ``category_name``), ``code`` the
     stable machine-readable code (e.g. ``command.invalid_params``), ``status`` the gRPC status the
-    platform answered with (``None`` for a rejected command), ``result`` the rejected result.
+    platform answered with (``None`` for a rejected command), ``result`` the command's final result
+    (``None`` when the call itself was refused or the watch ended without one).
     """
 
     def __init__(
@@ -59,11 +70,18 @@ class CommandError(ZequentClientError):
 
     @classmethod
     def rejected(cls, result: command_pb2.CommandResult) -> CommandError:
+        return cls.of(result)
+
+    @classmethod
+    def of(cls, result: command_pb2.CommandResult) -> CommandError:
+        """A command that did not succeed, from its final result: ``REJECTED``, ``FAILED``,
+        ``CANCELLED`` or ``TIMED_OUT``. Without a category on the error, a rejection counts as
+        ``INVALID_ARGUMENT``, a failure as ``ASSET``, a timeout as ``TIMEOUT``."""
         error = result.error
-        category = error.category or common_pb2.ERROR_CATEGORY_INVALID_ARGUMENT
+        outcome, category = _OUTCOME_BY_STATE.get(result.state, _REJECTED)
         return cls(
-            error.message or f"{result.command_id} was rejected",
-            category=category,
+            error.message or f"{result.command_id} {outcome}",
+            category=error.category or category,
             code=error.code,
             retryable=error.retryable,
             result=result,

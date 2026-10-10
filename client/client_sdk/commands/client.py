@@ -45,8 +45,9 @@ def to_dict(struct: struct_pb2.Struct) -> dict[str, Any]:
 
 class CommandsClient:
     """Async client for the v3 command API. Every call raises :class:`CommandError` when the
-    platform refuses it or the command is ``REJECTED``; a command that started and then failed is
-    returned with state ``COMMAND_STATE_FAILED`` and its error on the result."""
+    platform refuses it or the command is ``REJECTED``. :meth:`execute_command` returns the reply as
+    it is, so a command that started and then failed is returned with state ``COMMAND_STATE_FAILED``
+    and its error on the result; :meth:`execute_and_wait` returns only a ``SUCCEEDED`` result."""
 
     def __init__(self, channel: grpc.aio.Channel, resilience: ResilienceConfig) -> None:
         self._stub = control_pb2_grpc.RemoteControlServiceStub(channel)
@@ -109,6 +110,56 @@ class CommandsClient:
         response = await self._unary(lambda: self._stub.ExecuteCommand(request, timeout=self._timeout))
         return _accepted(response.result)
 
+    async def execute_and_wait(
+        self,
+        asset_sn: str,
+        command_id: str,
+        params: Mapping[str, Any] | None = None,
+        *,
+        target: capability_pb2.Target | None = None,
+        timeout: timedelta | float | None = None,
+        reason: str | None = None,
+        no_fly_zone_override: bool = False,
+        idempotency_key: str | None = None,
+    ) -> command_pb2.CommandResult:
+        """Run ``command_id`` on the asset and wait for its outcome.
+
+        The asset's command events are watched before the command is sent, so a run that finishes
+        right away is not missed; events of other runs are ignored. Returns the ``SUCCEEDED`` result
+        and raises :class:`CommandError` carrying the final result when the run is ``REJECTED``,
+        ``FAILED``, ``CANCELLED`` or ``TIMED_OUT``. ``timeout`` is the command's own timeout, as in
+        :meth:`execute_command`; bound the wait with ``asyncio.timeout``. Leaving the call early
+        (timeout, cancellation) closes the watch and leaves the command running on the platform
+        (:meth:`cancel_command` stops it).
+        """
+        _require("asset_sn", asset_sn)
+        _require("command_id", command_id)
+        call = self._stub.WatchCommandEvents(
+            control_pb2.WatchCommandEventsRequest(asset=common_pb2.AssetRef(sn=asset_sn))
+        )
+        try:
+            try:
+                await call.wait_for_connection()
+            except grpc.aio.AioRpcError as exc:
+                raise CommandError.from_exception(exc) from exc
+            result = await self.execute_command(
+                asset_sn,
+                command_id,
+                params,
+                target=target,
+                timeout=timeout,
+                reason=reason,
+                no_fly_zone_override=no_fly_zone_override,
+                idempotency_key=idempotency_key,
+            )
+            if result.state not in _FINAL_STATES:
+                result = await _final_result(call, result.command_execution_id, command_id)
+            if result.state != command_pb2.COMMAND_STATE_SUCCEEDED:
+                raise CommandError.of(result)
+            return result
+        finally:
+            call.cancel()
+
     async def cancel_command(self, command_execution_id: str, reason: str | None = None) -> command_pb2.CommandResult:
         _require("command_execution_id", command_execution_id)
         request = control_pb2.CancelCommandRequest(
@@ -120,8 +171,9 @@ class CommandsClient:
         return _accepted(response.result)
 
     def watch_command(self, command_execution_id: str) -> AsyncIterator[command_pb2.CommandEvent]:
-        """Events of one command run from now on, ending after its terminal event. Start watching
-        before the run can finish, or read the terminal state from :meth:`execute_command`."""
+        """Events of one command run from now on, ending after its terminal event. A run that
+        finishes before the watch starts is missed; :meth:`execute_and_wait` waits for a run's
+        outcome."""
         _require("command_execution_id", command_execution_id)
         return self._watch(control_pb2.WatchCommandEventsRequest(command_execution_id=command_execution_id))
 
@@ -147,6 +199,38 @@ class CommandsClient:
             raise
         except Exception as exc:
             raise CommandError.from_exception(exc) from exc
+
+
+_FINAL_STATES = frozenset(
+    {
+        command_pb2.COMMAND_STATE_SUCCEEDED,
+        command_pb2.COMMAND_STATE_FAILED,
+        command_pb2.COMMAND_STATE_REJECTED,
+        command_pb2.COMMAND_STATE_CANCELLED,
+        command_pb2.COMMAND_STATE_TIMED_OUT,
+    }
+)
+
+
+async def _final_result(call, command_execution_id: str, command_id: str) -> command_pb2.CommandResult:
+    try:
+        async for response in call:
+            event = response.event
+            if event.command_execution_id == command_execution_id and event.state in _FINAL_STATES:
+                return command_pb2.CommandResult(
+                    command_execution_id=event.command_execution_id,
+                    command_id=event.command_id or command_id,
+                    state=event.state,
+                    result=event.result,
+                    error=event.error,
+                )
+    except grpc.aio.AioRpcError as exc:
+        raise CommandError.from_exception(exc) from exc
+    raise CommandError(
+        f"the event watch ended before {command_id} ({command_execution_id}) finished",
+        category=common_pb2.ERROR_CATEGORY_SERVICE,
+        retryable=True,
+    )
 
 
 def _accepted(result: command_pb2.CommandResult) -> command_pb2.CommandResult:

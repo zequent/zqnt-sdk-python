@@ -52,6 +52,7 @@ given"; sending `0` means latitude 0 / longitude 0 / ground level. A `None` valu
 | `error.error_code` / `error_message` | `result.error`: `category`, stable `code` (e.g. `flight.not_airborne`), `message`, `retryable` |
 | a refused call (`grpc.aio.AioRpcError`, `ZequentAuthError`) | `CommandError` with `category`, `code`, `status` |
 | a command refused before it started | `CommandError` with the rejected `result` (e.g. `ERROR_CATEGORY_INVALID_ARGUMENT` / `command.invalid_params`) |
+| waiting for the outcome | `await client.commands.execute_and_wait(...)`: the `SUCCEEDED` result, or `CommandError` with the final `result` |
 | `progress` | `async for event in client.commands.watch_command(result.command_execution_id)`: `progress`, `remaining`, `message`, the final `result` |
 | `tid` | `result.command_execution_id`: watch it, cancel it with `cancel_command(id, reason)` |
 | a result payload | `to_dict(result.result)` (`from client_sdk.commands import to_dict`) |
