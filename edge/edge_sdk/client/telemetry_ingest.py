@@ -91,6 +91,15 @@ def sample_to_v2(sample: TelemetrySample):
     return to_request(sample_to_v3(sample).sample)
 
 
+_DETECTION_GEOMETRY = (
+    ("range_m", "range_meters"),
+    ("bearing_deg", "bearing_degrees"),
+    ("elevation_deg", "elevation_degrees"),
+    ("speed_mps", "speed"),
+    ("heading_deg", "heading_degrees"),
+)
+
+
 def detection_to_v3(d):
     from zqnt_api.generated.zqnt.common.v3 import common_pb2
     from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
@@ -109,6 +118,11 @@ def detection_to_v3(d):
         if _given(d.position.altitude):
             point.altitude = d.position.altitude
         detection.position.CopyFrom(point)
+    if d.position is not None:
+        for v2_name, v3_name in _DETECTION_GEOMETRY:
+            value = getattr(d.position, v2_name)
+            if _given(value):
+                setattr(detection, v3_name, value)
     return detection
 
 
