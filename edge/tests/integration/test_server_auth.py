@@ -8,7 +8,7 @@ import grpc
 import grpc.aio
 import pytest
 import pytest_asyncio
-from zqnt_utils.generated.zqnt import (  # type: ignore[import]
+from zqnt_api.generated.zqnt import (  # type: ignore[import]
     common_pb2,
     device_control_contracts_pb2,
     edge_pb2_grpc,

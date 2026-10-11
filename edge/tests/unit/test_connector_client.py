@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from zqnt_utils.generated.zqnt import common_pb2, connector_pb2
+from zqnt_api.generated.zqnt import common_pb2, connector_pb2
 
 from edge_sdk.client.connector_client import ConnectorClient
 from edge_sdk.models.asset import Asset, SubAsset

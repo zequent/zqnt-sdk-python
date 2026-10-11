@@ -22,10 +22,10 @@ from collections.abc import AsyncIterator
 
 import grpc
 from google.protobuf import struct_pb2, timestamp_pb2
-from zqnt_utils.generated.zqnt.capability.v3 import capability_pb2, command_pb2
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
-from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
+from zqnt_api.generated.zqnt.capability.v3 import capability_pb2, command_pb2
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
+from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
 
 from ..adapter.base import EdgeAdapter
 from ..client.edge_gateway import CommandRuns

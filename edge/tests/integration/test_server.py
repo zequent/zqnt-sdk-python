@@ -9,7 +9,7 @@ servicer routing, status codes, and exception handling.
 import grpc
 import grpc.aio
 import pytest
-from zqnt_utils.generated.zqnt import common_pb2, edge_pb2_grpc  # type: ignore[import]
+from zqnt_api.generated.zqnt import common_pb2, edge_pb2_grpc  # type: ignore[import]
 
 # ---------------------------------------------------------------------------
 # Helpers

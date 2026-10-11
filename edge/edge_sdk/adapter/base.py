@@ -285,11 +285,11 @@ class EdgeAdapter(ABC):
 
     def declare_standard_telemetry_field(self, key: str) -> None:
         """
-        Declare a key of the platform's telemetry catalog (``zqnt_utils.telemetry``, e.g.
+        Declare a key of the platform's telemetry catalog (``zqnt_api.telemetry``, e.g.
         ``dock.mode`` or ``wind.speed``) with the platform's type, unit and allowed values. Catalog
         keys also reach a 2.x platform, mapped onto their v2 telemetry fields.
         """
-        from zqnt_utils.telemetry import telemetry_field
+        from zqnt_api.telemetry import telemetry_field
 
         described = telemetry_field(key)
         if described is None:

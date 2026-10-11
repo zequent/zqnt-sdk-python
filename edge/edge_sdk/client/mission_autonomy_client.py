@@ -65,7 +65,7 @@ class MissionAutonomyClient:
 
     async def connect(self) -> None:
         """Create the gRPC channel and initialise the stub."""
-        from zqnt_utils.generated.zqnt import mission_autonomy_pb2_grpc
+        from zqnt_api.generated.zqnt import mission_autonomy_pb2_grpc
 
         self._channel = platform_channel(self._host, self._port, self._token)
         self._stub = mission_autonomy_pb2_grpc.MissionAutonomyServiceStub(self._channel)
@@ -85,7 +85,7 @@ class MissionAutonomyClient:
 
     async def get_scheduler(self, scheduler_id: str, sn: str = "") -> SchedulerDTO | None:
         """Fetch a scheduler by ID."""
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2
 
         tid = str(uuid.uuid4())
         resp = await self._call(
@@ -142,7 +142,7 @@ class MissionAutonomyClient:
 
     def _base(self, tid: str | None = None, sn: str = ""):
         from google.protobuf import timestamp_pb2
-        from zqnt_utils.generated.zqnt import common_pb2
+        from zqnt_api.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()

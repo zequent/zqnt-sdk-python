@@ -98,7 +98,7 @@ def test_custom_command_response_ok_sets_external_execution_id():
 
 
 # ---------------------------------------------------------------------------
-# AssetType / AssetVendor parity with the real proto enums (zqnt-utils)
+# AssetType / AssetVendor parity with the real proto enums (zqnt-api)
 #
 # This SDK carries its own plain-Python IntEnum mirrors of asset.proto's AssetTypeEnum/
 # AssetVendor rather than depending on the generated protobuf classes directly (see this module's
@@ -116,7 +116,7 @@ def test_custom_command_response_ok_sets_external_execution_id():
 
 
 def test_asset_type_has_every_proto_value():
-    from zqnt_utils.generated.zqnt.common_pb2 import AssetTypeEnum
+    from zqnt_api.generated.zqnt.common_pb2 import AssetTypeEnum
 
     proto_names = {name.removeprefix("ASSET_TYPE_") for name in AssetTypeEnum.keys()}
     sdk_names = {member.name for member in AssetType}
@@ -124,7 +124,7 @@ def test_asset_type_has_every_proto_value():
 
 
 def test_asset_vendor_has_every_proto_value():
-    from zqnt_utils.generated.zqnt.common_pb2 import AssetVendor as ProtoAssetVendor
+    from zqnt_api.generated.zqnt.common_pb2 import AssetVendor as ProtoAssetVendor
 
     proto_names = {name.removeprefix("ASSET_VENDOR_") for name in ProtoAssetVendor.keys()}
     sdk_names = {member.name for member in AssetVendor}
@@ -132,14 +132,14 @@ def test_asset_vendor_has_every_proto_value():
 
 
 def test_proto_enum_lookup_resolves_every_asset_type():
-    from zqnt_utils.generated.zqnt.common_pb2 import AssetTypeEnum
+    from zqnt_api.generated.zqnt.common_pb2 import AssetTypeEnum
 
     for proto_name in AssetTypeEnum.keys():
         proto_enum_lookup(AssetType, proto_name)  # must not raise
 
 
 def test_proto_enum_lookup_resolves_every_asset_vendor():
-    from zqnt_utils.generated.zqnt.common_pb2 import AssetVendor as ProtoAssetVendor
+    from zqnt_api.generated.zqnt.common_pb2 import AssetVendor as ProtoAssetVendor
 
     for proto_name in ProtoAssetVendor.keys():
         proto_enum_lookup(AssetVendor, proto_name)  # must not raise

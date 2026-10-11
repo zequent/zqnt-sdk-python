@@ -8,7 +8,7 @@ dependencies = [
     "protobuf>=4.25.0",
     "grpcio-health-checking>=1.60.0",
     "cryptography>=42.0.0",
-    "zqnt-utils>=2.0.0",
+    "zqnt-api",
 ]
 
 [project.optional-dependencies]
@@ -20,7 +20,7 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "fakeredis[aioredis]>=2.26.0",
     "ruff>=0.15.12",
-    "zqnt-utils",
+    "redis[asyncio]>=8.0.0",
 ]
 
 [tool.pytest.ini_options]
@@ -50,10 +50,9 @@ packages = ["edge_sdk"]
 [tool.uv.sources]
 # A git source, not a local path: CI and Docker builds check out only this repository.
 # uv allows one URL per package across a graph, so every consumer pins the same ref.
-# 3.0.0 preview: the v3 contracts (zequent/zqnt-utils-python#41) -- back to the release tag
-# (v3.0.0) after the release.
-zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "feature/v3-agentic" }
+# Preview of the public API (zequent/zqnt-api-python#1) -- a release tag once it is merged and tagged.
+zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", branch = "feature/public-api-split" }
 # Swap to this for day-to-day monorepo development (offline-friendly, picks up sibling edits
 # immediately, no push-then-pull round trip) -- but keep it local-only; don't commit it back to
 # main, or every downstream adapter's CI breaks again the same way this fix closes.
-#zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
+#zqnt-api = { path = "../../../utils/zqnt-api-python", editable = true }

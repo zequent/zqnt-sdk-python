@@ -78,7 +78,7 @@ class ConnectorClient:
 
     async def connect(self) -> None:
         """Create the gRPC channel and initialise the stub."""
-        from zqnt_utils.generated.zqnt import connector_pb2_grpc
+        from zqnt_api.generated.zqnt import connector_pb2_grpc
 
         self._channel = platform_channel(self._host, self._port, self._token)
         self._stub = connector_pb2_grpc.ConnectorServiceStub(self._channel)
@@ -152,7 +152,7 @@ class ConnectorClient:
         so that a caller cannot use it to discover which codes exist. Nothing here can tell you
         which of those it was, and it must not guess.
         """
-        from zqnt_utils.generated.zqnt import common_pb2, connector_pb2
+        from zqnt_api.generated.zqnt import common_pb2, connector_pb2
 
         from ..server._converters import asset_to_proto, proto_to_asset
 
@@ -222,7 +222,7 @@ class ConnectorClient:
     async def observe_skill_contract(self, contract):
         """Upsert ``contract`` — new for a never-seen (command_id, schema_version) pair, or
         refreshed content/last-seen for one already known."""
-        from zqnt_utils.generated.zqnt import connector_pb2
+        from zqnt_api.generated.zqnt import connector_pb2
 
         tid = str(uuid.uuid4())
         resp = await self._call(
@@ -243,7 +243,7 @@ class ConnectorClient:
         """List the whole registry, optionally filtered by ``status`` (a ``SkillContractStatus``
         enum value). When ``command_id`` is set, returns that one command's full version history
         instead (``status`` is then ignored, matching the RPC's own semantics)."""
-        from zqnt_utils.generated.zqnt import connector_pb2
+        from zqnt_api.generated.zqnt import connector_pb2
 
         kwargs: dict = {"base": self._base()}
         if status is not None:
@@ -268,7 +268,7 @@ class ConnectorClient:
 
     async def set_skill_contract_status(self, contract_id: str, status):
         """Set a skill contract's lifecycle status (a ``SkillContractStatus`` enum value)."""
-        from zqnt_utils.generated.zqnt import connector_pb2
+        from zqnt_api.generated.zqnt import connector_pb2
 
         tid = str(uuid.uuid4())
         resp = await self._call(
@@ -287,7 +287,7 @@ class ConnectorClient:
 
     async def set_skill_contract_permissions(self, contract_id: str, required_permissions: list[str]):
         """Full replacement, not a merge. Declarative only — nothing currently enforces this."""
-        from zqnt_utils.generated.zqnt import connector_pb2
+        from zqnt_api.generated.zqnt import connector_pb2
 
         tid = str(uuid.uuid4())
         resp = await self._call(
@@ -363,7 +363,7 @@ class ConnectorClient:
 
     def _base(self, tid: str | None = None, sn: str = ""):
         from google.protobuf import timestamp_pb2
-        from zqnt_utils.generated.zqnt import common_pb2
+        from zqnt_api.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()

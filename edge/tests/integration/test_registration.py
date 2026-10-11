@@ -12,47 +12,8 @@ import fakeredis.aioredis as fakeredis
 import pytest
 
 from edge_sdk import AssetType, AssetVendor
-from edge_sdk.server.edge_server import RegistrationConfig
-
-# ---------------------------------------------------------------------------
-# Fixture: CachingService with injected fakeredis
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-async def fake_cache():
-    """CachingService backed by fakeredis – no real Redis needed."""
-    from zqnt_utils.caching import CachingService
-
-    svc = CachingService("redis://localhost")
-    svc._client = fakeredis.FakeRedis(decode_responses=True)
-    yield svc
-    await svc.close()
-
-
-# ---------------------------------------------------------------------------
-# CacheKeys
-# ---------------------------------------------------------------------------
-
-
-def test_edge_endpoints_key_format():
-    from zqnt_utils.caching import CacheKeys
-
-    assert CacheKeys.EDGE_ENDPOINTS.build(vendor="DJI") == "zqnt:edge-endpoints:DJI"
-    assert CacheKeys.EDGE_ENDPOINTS.build(vendor="ROS") == "zqnt:edge-endpoints:ROS"
-
-
-def test_edge_vendor_key_format():
-    from zqnt_utils.caching import CacheKeys
-
-    assert CacheKeys.EDGE_VENDOR.build(sn="SENSOR-001") == "zqnt:edge-vendor:SENSOR-001"
-
-
-def test_asset_dto_key_format():
-    from zqnt_utils.caching import CacheKeys
-
-    assert CacheKeys.ASSET_DTO.build(sn="DOCK-007") == "zqnt:asset-dto:DOCK-007"
-
+from edge_sdk.auth import EdgeAuthConfig
+from edge_sdk.server.edge_server import EdgeServer, RegistrationConfig
 
 # ---------------------------------------------------------------------------
 # EdgeEndpointDTO JSON format
@@ -60,7 +21,7 @@ def test_asset_dto_key_format():
 
 
 def test_dto_serialises_to_java_compatible_json():
-    from zqnt_utils.core import EdgeEndpointDTO
+    from zqnt_api.core import EdgeEndpointDTO
 
     dto = EdgeEndpointDTO(
         endpoint="grpc://adapter:50051",
@@ -77,7 +38,7 @@ def test_dto_serialises_to_java_compatible_json():
 
 
 def test_dto_roundtrip():
-    from zqnt_utils.core import EdgeEndpointDTO
+    from zqnt_api.core import EdgeEndpointDTO
 
     original = EdgeEndpointDTO("grpc://x:1", True, "DOCK", "DJI")
     restored = EdgeEndpointDTO.from_json(original.to_json())
@@ -85,63 +46,54 @@ def test_dto_roundtrip():
 
 
 # ---------------------------------------------------------------------------
-# CachingService – register / get / deregister
+# EdgeServer registration
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_register_endpoint_writes_correct_key(fake_cache):
-    from zqnt_utils.core import EdgeEndpointDTO
+@pytest.fixture
+def fake_redis(monkeypatch):
+    import redis.asyncio as aioredis
 
-    dto = EdgeEndpointDTO("grpc://sensor:50051", True, "SENSOR", "ROS")
-    await fake_cache.register_edge_endpoint("ROS", dto)
-
-    raw = await fake_cache._client.get("zqnt:edge-endpoints:ROS")
-    assert raw is not None
-    parsed = json.loads(raw)
-    assert parsed["online"] is True
-    assert parsed["assetVendor"] == "ROS"
+    server = fakeredis.FakeServer()
+    monkeypatch.setattr(
+        aioredis, "from_url", lambda url, **kw: fakeredis.FakeRedis(server=server, decode_responses=True)
+    )
+    return fakeredis.FakeRedis(server=server, decode_responses=True)
 
 
-@pytest.mark.asyncio
-async def test_get_endpoint_returns_dto(fake_cache):
-    from zqnt_utils.core import EdgeEndpointDTO
-
-    dto = EdgeEndpointDTO("grpc://sensor:50051", True, "SENSOR", "ROS")
-    await fake_cache.register_edge_endpoint("ROS", dto)
-
-    result = await fake_cache.get_edge_endpoint("ROS")
-    assert result is not None
-    assert result.endpoint == "grpc://sensor:50051"
-    assert result.online is True
-
-
-@pytest.mark.asyncio
-async def test_deregister_sets_online_false(fake_cache):
-    from zqnt_utils.core import EdgeEndpointDTO
-
-    dto = EdgeEndpointDTO("grpc://sensor:50051", True, "SENSOR", "ROS")
-    await fake_cache.register_edge_endpoint("ROS", dto)
-
-    await fake_cache.deregister_edge_endpoint("ROS")
-
-    result = await fake_cache.get_edge_endpoint("ROS")
-    assert result is not None
-    assert result.online is False  # soft delete – key still exists
-    assert result.endpoint == "grpc://sensor:50051"  # data preserved
+def _server() -> EdgeServer:
+    return EdgeServer(
+        adapter=None,  # type: ignore[arg-type]
+        registration=RegistrationConfig(
+            endpoint="grpc://sensor:50051",
+            asset_type=AssetType.SENSOR,
+            asset_vendor=AssetVendor.ROS,
+            redis_url="redis://localhost",
+        ),
+        auth=EdgeAuthConfig(),
+    )
 
 
-@pytest.mark.asyncio
-async def test_deregister_nonexistent_does_not_raise(fake_cache):
-    # Must not crash – mirrors Java's null-check before deregister
-    await fake_cache.deregister_edge_endpoint("UNKNOWN_VENDOR")
+async def test_register_writes_the_endpoint_under_the_platform_key(fake_redis):
+    await _server()._register(online=True)
+
+    parsed = json.loads(await fake_redis.get("zqnt:edge-endpoints:ASSET_VENDOR_ROS"))
+    assert parsed == {
+        "endpoint": "grpc://sensor:50051",
+        "online": True,
+        "assetType": "ASSET_TYPE_SENSOR",
+        "assetVendor": "ASSET_VENDOR_ROS",
+    }
 
 
-@pytest.mark.asyncio
-async def test_register_asset_vendor(fake_cache):
-    await fake_cache.register_asset_vendor("SENSOR-001", "ROS")
-    vendor = await fake_cache.get_asset_vendor("SENSOR-001")
-    assert vendor == "ROS"
+async def test_deregister_keeps_the_endpoint_and_marks_it_offline(fake_redis):
+    server = _server()
+    await server._register(online=True)
+    await server._register(online=False)
+
+    parsed = json.loads(await fake_redis.get("zqnt:edge-endpoints:ASSET_VENDOR_ROS"))
+    assert parsed["online"] is False
+    assert parsed["endpoint"] == "grpc://sensor:50051"
 
 
 # ---------------------------------------------------------------------------

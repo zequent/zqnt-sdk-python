@@ -7,7 +7,7 @@ a parameter form and what mission-autonomy needs to detect contract drift.
 """
 
 from google.protobuf import timestamp_pb2
-from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
 from edge_sdk.models.common import (
     AssetType,

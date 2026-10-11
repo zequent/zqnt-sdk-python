@@ -12,7 +12,7 @@ buffered while down and reconnected with backoff (1 s doubling to 60 s)::
 
 An older core answers UNIMPLEMENTED; the stream then uses v2 ``ProduceTelemetry``/
 ``ProduceDetection`` for :attr:`V3Fallback.WINDOW_SECONDS` before trying v3 again. In v2 a sample is
-mapped by ``zqnt_utils.telemetry``: keys of the platform's catalog in ``details`` land in their v2
+mapped by ``zqnt_api.telemetry``: keys of the platform's catalog in ``details`` land in their v2
 fields, other keys are dropped; a moving sample or one with aircraft keys is sub-asset (aircraft)
 telemetry, otherwise asset telemetry. Alerts have no v2 counterpart and are dropped while v2 is in
 use.
@@ -53,7 +53,7 @@ def _given(value: float | None) -> bool:
 
 
 def _asset_ref(sn: str, asset_id: str | None):
-    from zqnt_utils.generated.zqnt.common.v3 import common_pb2
+    from zqnt_api.generated.zqnt.common.v3 import common_pb2
 
     return common_pb2.AssetRef(sn=sn, id=asset_id or "")
 
@@ -65,8 +65,8 @@ def _struct(values: dict) -> struct_pb2.Struct:
 
 
 def sample_to_v3(sample: TelemetrySample):
-    from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-    from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2
+    from zqnt_api.generated.zqnt.common.v3 import common_pb2
+    from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2
 
     proto = telemetry_pb2.TelemetrySample(
         asset=_asset_ref(sample.sn, sample.asset_id), observed_at=_timestamp(sample.observed_at)
@@ -86,14 +86,14 @@ def sample_to_v3(sample: TelemetrySample):
 
 
 def sample_to_v2(sample: TelemetrySample):
-    from zqnt_utils.telemetry import to_request
+    from zqnt_api.telemetry import to_request
 
     return to_request(sample_to_v3(sample).sample)
 
 
 def detection_to_v3(d):
-    from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-    from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
+    from zqnt_api.generated.zqnt.common.v3 import common_pb2
+    from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
 
     detection = edge_v3.Detection(
         object_id=d.object_id or "", object_type=d.object_type or "", confidence=d.confidence or 0.0
@@ -113,7 +113,7 @@ def detection_to_v3(d):
 
 
 def detections_to_v3(batch: DetectionBatch):
-    from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2
+    from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2
 
     return telemetry_pb2.PublishDetectionsRequest(
         batch=telemetry_pb2.DetectionBatch(
@@ -132,7 +132,7 @@ def detections_to_v2(batch: DetectionBatch):
 
 
 def alert_to_v3(alert: Alert):
-    from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2
+    from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2
 
     proto = telemetry_pb2.Alert(
         asset=_asset_ref(alert.sn, alert.asset_id),
@@ -304,7 +304,7 @@ class TelemetryIngestPublisher:
 
         def ingest(method: str):
             def call(channel):
-                from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2_grpc
+                from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2_grpc
 
                 return getattr(telemetry_pb2_grpc.TelemetryIngestServiceStub(channel), method)
 
@@ -312,7 +312,7 @@ class TelemetryIngestPublisher:
 
         def live_data(method: str):
             def call(channel):
-                from zqnt_utils.generated.zqnt import live_data_pb2_grpc
+                from zqnt_api.generated.zqnt import live_data_pb2_grpc
 
                 return getattr(live_data_pb2_grpc.LiveDataServiceStub(channel), method)
 

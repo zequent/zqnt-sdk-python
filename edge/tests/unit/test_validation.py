@@ -5,10 +5,10 @@ Params are checked against the command's input schema once, in the SDK, before a
 import math
 
 from google.protobuf import struct_pb2
-from zqnt_utils.generated.zqnt import common_pb2 as common_v2
-from zqnt_utils.generated.zqnt.capability.v3 import command_pb2
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
+from zqnt_api.generated.zqnt import common_pb2 as common_v2
+from zqnt_api.generated.zqnt.capability.v3 import command_pb2
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
 
 from edge_sdk import AssetType, EdgeAdapter, schema
 from edge_sdk.adapter.validation import check_schema, example_params, validate_params
