@@ -66,7 +66,7 @@ def _enum_name(enum_module, enum_value, default: str | None = None) -> str | Non
 
 
 def stream_telemetry_request_to_proto(req: StreamTelemetryRequest):
-    from zqnt_utils.generated.zqnt import common_pb2, live_data_types_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2, live_data_types_pb2  # type: ignore[import]
 
     from ..models._converters import build_request_base
 
@@ -82,7 +82,7 @@ def stream_telemetry_request_to_proto(req: StreamTelemetryRequest):
 
 
 def stream_notifications_request_to_proto(req: StreamNotificationRequest):
-    from zqnt_utils.generated.zqnt import events_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import events_pb2  # type: ignore[import]
 
     from ..models._converters import build_request_base
 
@@ -93,7 +93,7 @@ def stream_notifications_request_to_proto(req: StreamNotificationRequest):
 
 
 def start_live_stream_to_proto(req: LiveDataStartLiveStreamRequest):
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     from ..models._converters import build_request_base
 
@@ -110,7 +110,7 @@ def start_live_stream_to_proto(req: LiveDataStartLiveStreamRequest):
 
 
 def stop_live_stream_to_proto(req: LiveDataStopLiveStreamRequest):
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     from ..models._converters import build_request_base
 
@@ -122,7 +122,7 @@ def stop_live_stream_to_proto(req: LiveDataStopLiveStreamRequest):
 
 
 def change_lens_to_proto(req: ChangeLensRequest):
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     from ..models._converters import build_request_base
 
@@ -134,7 +134,7 @@ def change_lens_to_proto(req: ChangeLensRequest):
 
 
 def change_zoom_to_proto(req: ChangeZoomRequest):
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     from ..models._converters import build_request_base
 
@@ -223,7 +223,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
             )
         elif which_event == "mission":
             event_type = "NOTIFICATION_EVENT_MISSION"
-            from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+            from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
             mission = inner.mission
             operation_event = NotificationOperationEvent(
@@ -234,7 +234,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
             )
         elif which_event == "command_execution":
             event_type = "NOTIFICATION_EVENT_COMMAND_EXECUTION"
-            from zqnt_utils.generated.zqnt import events_pb2  # type: ignore[import]
+            from zqnt_api.generated.zqnt import events_pb2  # type: ignore[import]
 
             cmd = inner.command_execution
             command_execution_event = NotificationCommandExecutionEvent(
@@ -272,7 +272,7 @@ def proto_to_stream_notification_response(proto) -> StreamNotificationResponse:
 
 
 def _decode_asset_telemetry_details(sn: str | None, base_id: str, timestamp, t) -> AssetTelemetry:
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     net = None
     if has_field(t, "network_information"):
@@ -403,7 +403,7 @@ def _decode_payload(p) -> PayloadTelemetry:
 def _decode_sub_asset_telemetry_details(
     sn: str | None, base_id: str, timestamp, wind_speed, heading, t
 ) -> SubAssetTelemetry:
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     payload = _decode_payload(t.payload_telemetry) if has_field(t, "payload_telemetry") else None
     batt = None

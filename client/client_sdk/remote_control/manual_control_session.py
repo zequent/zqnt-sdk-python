@@ -70,7 +70,7 @@ class ManualControlInputSession:
         self._call = self._stub.ManualControlInput(self._request_iterator(), timeout=self._timeout)
 
     async def _request_iterator(self):
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         while True:
             item = await self._queue.get()

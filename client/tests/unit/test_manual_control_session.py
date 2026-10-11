@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from google.protobuf import empty_pb2
-from zqnt_utils.generated.zqnt import common_pb2
+from zqnt_api.generated.zqnt import common_pb2
 
 from client_sdk.models.remote_control_input import ManualControlInput
 from client_sdk.remote_control.manual_control_session import (

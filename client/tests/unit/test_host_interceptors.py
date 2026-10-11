@@ -12,7 +12,7 @@ import asyncio
 import grpc
 import grpc.aio
 import pytest
-from zqnt_utils.generated.zqnt import (  # type: ignore[import]
+from zqnt_api.generated.zqnt import (  # type: ignore[import]
     connector_pb2,
     connector_pb2_grpc,
     live_data_pb2_grpc,

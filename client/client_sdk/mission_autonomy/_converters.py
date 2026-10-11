@@ -40,7 +40,7 @@ def _set_opt(kwargs: dict[str, Any], proto_field: str, value: Any) -> None:
 
 
 def scheduler_to_proto(s: SchedulerDTO):
-    from zqnt_utils.generated.zqnt import mission_autonomy_dto_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import mission_autonomy_dto_pb2  # type: ignore[import]
 
     kwargs: dict[str, Any] = {
         "name": s.name,
@@ -107,7 +107,7 @@ def proto_to_scheduler_response(proto) -> SchedulerResponse:
 
 
 def simple_spec(command_id: str, parameters: dict | None):
-    from zqnt_utils.generated.zqnt import capability_execution_dto_pb2 as execdto  # type: ignore[import]
+    from zqnt_api.generated.zqnt import capability_execution_dto_pb2 as execdto  # type: ignore[import]
 
     return execdto.SkillExecutionSpecProto(
         simple=execdto.SimpleExecutionSpecProto(command_id=command_id, parameters=dict_to_struct(parameters)),
@@ -115,7 +115,7 @@ def simple_spec(command_id: str, parameters: dict | None):
 
 
 def application_spec(application_id: str, skill_id: str, application_version: str | None, parameters: dict | None):
-    from zqnt_utils.generated.zqnt import capability_execution_dto_pb2 as execdto  # type: ignore[import]
+    from zqnt_api.generated.zqnt import capability_execution_dto_pb2 as execdto  # type: ignore[import]
 
     kwargs: dict[str, Any] = {
         "application_id": application_id,

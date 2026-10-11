@@ -9,10 +9,10 @@ import grpc
 import grpc.aio
 import pytest
 from google.protobuf import timestamp_pb2
-from zqnt_utils.generated.zqnt.capability.v3 import capability_pb2, command_pb2
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-from zqnt_utils.generated.zqnt.control.v3 import remote_control_service_pb2 as control_pb2
-from zqnt_utils.generated.zqnt.control.v3 import remote_control_service_pb2_grpc as control_pb2_grpc
+from zqnt_api.generated.zqnt.capability.v3 import capability_pb2, command_pb2
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.control.v3 import remote_control_service_pb2 as control_pb2
+from zqnt_api.generated.zqnt.control.v3 import remote_control_service_pb2_grpc as control_pb2_grpc
 
 from client_sdk import CommandError, ZequentClient
 from client_sdk.commands import CommandsClient, to_dict, to_struct

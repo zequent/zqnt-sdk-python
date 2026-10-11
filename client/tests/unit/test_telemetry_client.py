@@ -9,8 +9,8 @@ import grpc
 import grpc.aio
 import pytest
 from google.protobuf import timestamp_pb2
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2, telemetry_pb2_grpc
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2, telemetry_pb2_grpc
 
 from client_sdk import CommandError, TelemetryClient, ZequentClient
 from client_sdk.config.resilience import ResilienceConfig

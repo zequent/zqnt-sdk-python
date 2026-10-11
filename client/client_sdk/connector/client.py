@@ -65,7 +65,7 @@ class ConnectorClient:
 
     def __init__(self, channel: grpc.aio.Channel, resilience: ResilienceConfig) -> None:
         try:
-            from zqnt_utils.generated.zqnt import connector_pb2_grpc  # type: ignore[import]
+            from zqnt_api.generated.zqnt import connector_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
             raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
@@ -96,7 +96,7 @@ class ConnectorClient:
 
     async def register_asset(self, asset):
         """``asset`` is an ``AssetProtoDTO``. Returns the registered ``AssetProtoDTO``."""
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("RegisterAsset")
         proto = await self._call(
@@ -115,7 +115,7 @@ class ConnectorClient:
         """``asset`` is an ``AssetProtoDTO``. Empty ``update_mask`` replaces every mutable field."""
         validate_non_blank("assetId", asset_id)
         from google.protobuf import field_mask_pb2
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN), "asset": asset, "asset_id": asset_id}
         if update_mask:
@@ -128,7 +128,7 @@ class ConnectorClient:
         """``sub_asset`` is a ``SubAssetProtoDTO``."""
         validate_non_blank("subAssetId", sub_asset_id)
         from google.protobuf import field_mask_pb2
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         kwargs: dict[str, Any] = {
             "base": build_request_base(_DEFAULT_SN),
@@ -149,7 +149,7 @@ class ConnectorClient:
 
     async def get_asset_by_id(self, asset_id: str):
         validate_non_blank("assetId", asset_id)
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("GetAssetById: id=%s", asset_id)
         proto = await self._call(
@@ -170,7 +170,7 @@ class ConnectorClient:
 
     @staticmethod
     def _payload_owner(asset_id: str | None, sub_asset_id: str | None):
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         if asset_id:
             return connector_pb2.AssetPayloadOwner(asset_id=asset_id)
@@ -188,7 +188,7 @@ class ConnectorClient:
     ):
         """``payload`` is an ``AssetPayloadProtoDTO``. Empty ``update_mask`` means a full upsert."""
         from google.protobuf import field_mask_pb2
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         kwargs: dict[str, Any] = {
             "base": build_request_base(_DEFAULT_SN),
@@ -204,7 +204,7 @@ class ConnectorClient:
         return self._unwrap("UpsertAssetPayload", proto, "payload")
 
     async def list_asset_payloads(self, asset_id: str | None = None, sub_asset_id: str | None = None) -> list:
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("ListAssetPayloads")
         proto = await self._call(
@@ -217,7 +217,7 @@ class ConnectorClient:
 
     async def delete_asset_payload(self, payload_id: str, asset_id: str | None = None, sub_asset_id: str | None = None):
         validate_non_blank("payloadId", payload_id)
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("DeleteAssetPayload: id=%s", payload_id)
         proto = await self._call(
@@ -235,7 +235,7 @@ class ConnectorClient:
     # ------------------------------------------------------------------
 
     async def get_organization(self, bind_code: str | None = None):
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN)}
         if bind_code:
@@ -250,7 +250,7 @@ class ConnectorClient:
 
     async def get_scheduler(self, scheduler_id: str) -> SchedulerResponse:
         validate_non_blank("schedulerId", scheduler_id)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("GetScheduler: id=%s", scheduler_id)
         proto = await self._call(
@@ -264,7 +264,7 @@ class ConnectorClient:
     async def create_scheduler(self, scheduler: SchedulerDTO) -> SchedulerResponse:
         validate_non_blank("scheduler.name", scheduler.name)
         validate_non_blank("scheduler.cronExpression", scheduler.cron_expression)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("CreateScheduler: name=%s", scheduler.name)
         proto = await self._call(
@@ -276,7 +276,7 @@ class ConnectorClient:
         return proto_to_scheduler_response(proto)
 
     async def create_schedulers(self, schedulers: list[SchedulerDTO]) -> SchedulerResponse:
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("CreateSchedulers: count=%d", len(schedulers))
         proto = await self._call(
@@ -289,7 +289,7 @@ class ConnectorClient:
 
     async def update_scheduler(self, scheduler_id: str, scheduler: SchedulerDTO) -> SchedulerResponse:
         validate_non_blank("schedulerId", scheduler_id)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("UpdateScheduler: id=%s", scheduler_id)
         proto = await self._call(
@@ -302,7 +302,7 @@ class ConnectorClient:
 
     async def delete_scheduler(self, scheduler_id: str) -> SchedulerResponse:
         validate_non_blank("schedulerId", scheduler_id)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("DeleteScheduler: id=%s", scheduler_id)
         proto = await self._call(
@@ -314,7 +314,7 @@ class ConnectorClient:
         return proto_to_scheduler_response(proto)
 
     async def delete_schedulers(self, scheduler_ids: list[str]) -> SchedulerResponse:
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("DeleteSchedulers: count=%d", len(scheduler_ids))
         proto = await self._call(
@@ -331,7 +331,7 @@ class ConnectorClient:
 
     async def get_active_policies_by_type(self, policy_type: str) -> list:
         validate_non_blank("policyType", policy_type)
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("GetActivePoliciesByType: type=%s", policy_type)
         proto = await self._call(
@@ -342,7 +342,7 @@ class ConnectorClient:
         return list(result.policies)
 
     async def get_all_active_policies(self) -> list:
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("GetAllActivePolicies")
         proto = await self._call(
@@ -352,7 +352,7 @@ class ConnectorClient:
         return list(result.policies)
 
     async def get_technical_configs(self, scope: str | None = None, scope_target: str | None = None) -> list:
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN)}
         if scope:
@@ -371,7 +371,7 @@ class ConnectorClient:
     async def observe_skill_contract(self, contract):
         """Upsert ``contract`` (a ``SkillContractProtoDTO``) — new for a never-seen
         (command_id, schema_version) pair, or refreshed content/last-seen for one already known."""
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("ObserveSkillContract: command_id=%s", getattr(contract, "command_id", None))
         proto = await self._call(
@@ -383,7 +383,7 @@ class ConnectorClient:
     async def list_skill_contracts(self, status=None, command_id: str | None = None) -> list:
         """``status`` is a ``SkillContractStatus`` enum value (int). ``command_id``, when set,
         returns that command's full version history instead of the whole registry."""
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN)}
         if status is not None:
@@ -397,7 +397,7 @@ class ConnectorClient:
     async def set_skill_contract_status(self, contract_id: str, status):
         """``status`` is a ``SkillContractStatus`` enum value (int)."""
         validate_non_blank("id", contract_id)
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("SetSkillContractStatus: id=%s", contract_id)
         proto = await self._call(
@@ -411,7 +411,7 @@ class ConnectorClient:
     async def set_skill_contract_permissions(self, contract_id: str, required_permissions: list[str]):
         """Full replacement, not a merge. Declarative only — nothing currently enforces this."""
         validate_non_blank("id", contract_id)
-        from zqnt_utils.generated.zqnt import connector_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import connector_pb2  # type: ignore[import]
 
         logger.info("SetSkillContractPermissions: id=%s", contract_id)
         proto = await self._call(

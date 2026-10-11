@@ -1,6 +1,6 @@
 [project]
 name = "zqnt-client-sdk"
-version = "2.0.0"
+version = "3.0.0"
 description = "Python Client SDK for the Zequent Framework"
 requires-python = ">=3.12"
 license = "Apache-2.0"
@@ -8,7 +8,7 @@ license-files = ["LICENSE", "NOTICE"]
 dependencies = [
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
-    "zqnt-utils>=2.0.0",
+    "zqnt-api",
 ]
 
 [project.optional-dependencies]
@@ -52,9 +52,9 @@ packages = ["client_sdk"]
 [tool.uv.sources]
 # A git source, not a local path: CI and Docker builds check out only this repository.
 # uv allows one URL per package across a graph, so every 2.0 consumer pins this same tag.
-zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "feature/v3-agentic" }
+zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", tag = "pr-3-0afa431" }  # zqnt-api 3.0.0 preview; the release tag once it is cut
 # Swap to this for day-to-day monorepo development (offline-friendly, picks up sibling edits
 # immediately, no push-then-pull round trip) -- but keep it local-only; don't commit it back,
 # or this repo's CI breaks again the same way this fix closes.
-#zqnt-utils = { path = "../../../utils/zqnt-utils-python", editable = true }
+#zqnt-api = { path = "../../../utils/zqnt-api-python", editable = true }
 

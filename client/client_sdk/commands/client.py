@@ -18,10 +18,10 @@ import grpc
 import grpc.aio
 from google.protobuf import duration_pb2, struct_pb2
 from google.protobuf.json_format import MessageToDict
-from zqnt_utils.generated.zqnt.capability.v3 import capability_pb2, command_pb2
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-from zqnt_utils.generated.zqnt.control.v3 import remote_control_service_pb2 as control_pb2
-from zqnt_utils.generated.zqnt.control.v3 import remote_control_service_pb2_grpc as control_pb2_grpc
+from zqnt_api.generated.zqnt.capability.v3 import capability_pb2, command_pb2
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.control.v3 import remote_control_service_pb2 as control_pb2
+from zqnt_api.generated.zqnt.control.v3 import remote_control_service_pb2_grpc as control_pb2_grpc
 
 from ..config.resilience import ResilienceConfig
 from ..grpc_.resilience import GrpcResilience
