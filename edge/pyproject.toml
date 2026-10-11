@@ -3,6 +3,8 @@ name = "edge-python-sdk"
 version = "2.0.0"
 description = "Python SDK for implementing ZQNT Edge Adapters"
 requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = [
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
@@ -41,7 +43,7 @@ ignore = ["E501"]  # line-too-long (handled by formatter)
 "tests/integration/test_v3_platform_calls.py" = ["N802"]  # fake platform servicers
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
