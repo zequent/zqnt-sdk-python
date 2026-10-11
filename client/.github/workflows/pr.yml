@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - feature/v3-agentic
 
 permissions:
   contents: read
