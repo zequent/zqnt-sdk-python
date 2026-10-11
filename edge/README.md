@@ -411,7 +411,7 @@ pytest tests/ --cov=edge_sdk --cov-report=html
 
 ## License
 
-Proprietary - ZQNT Organization
+Licensed under the [Apache License, Version 2.0](LICENSE); see [NOTICE](NOTICE).
 
 ## Support
 
