@@ -50,7 +50,7 @@ packages = ["client_sdk"]
 [tool.uv.sources]
 # A git source, not a local path: CI and Docker builds check out only this repository.
 # uv allows one URL per package across a graph, so every 2.0 consumer pins this same tag.
-zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", branch = "main" }  # zqnt-api 3.0.0 line (zequent/zqnt-api-python main); the release tag once it is cut
+zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", tag = "pr-3-0afa431" }  # zqnt-api 3.0.0 preview; the release tag once it is cut
 # Swap to this for day-to-day monorepo development (offline-friendly, picks up sibling edits
 # immediately, no push-then-pull round trip) -- but keep it local-only; don't commit it back,
 # or this repo's CI breaks again the same way this fix closes.

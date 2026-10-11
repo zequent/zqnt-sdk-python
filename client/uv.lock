@@ -377,7 +377,7 @@ wheels = [
 [[package]]
 name = "zqnt-api"
 version = "3.0.0"
-source = { git = "https://github.com/zequent/zqnt-api-python?branch=main#0e72bbc376fc942cdf91e7da000a7e8962e5601c" }
+source = { git = "https://github.com/zequent/zqnt-api-python?tag=pr-3-0afa431#0afa4317262ba969f38dec8a71576aad4accc132" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
@@ -419,6 +419,6 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "python-dotenv", marker = "extra == 'dotenv'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api-python?branch=main" },
+    { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api-python?tag=pr-3-0afa431" },
 ]
 provides-extras = ["dotenv", "dev"]
