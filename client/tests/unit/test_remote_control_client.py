@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from zqnt_utils.generated.zqnt import common_pb2
+from zqnt_api.generated.zqnt import common_pb2
 
 from client_sdk.config.resilience import ResilienceConfig
 from client_sdk.models import (

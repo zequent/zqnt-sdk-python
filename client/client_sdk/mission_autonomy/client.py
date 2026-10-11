@@ -50,7 +50,7 @@ class MissionAutonomyClient:
         resilience: ResilienceConfig,
     ) -> None:
         try:
-            from zqnt_utils.generated.zqnt import mission_autonomy_pb2_grpc  # type: ignore[import]
+            from zqnt_api.generated.zqnt import mission_autonomy_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
             raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
@@ -81,7 +81,7 @@ class MissionAutonomyClient:
 
     async def upsert_application(self, application, expected_revision: str | None = None):
         """Create or update a capability package. ``application`` is an ``ApplicationProtoDTO``."""
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN), "application": application}
         if expected_revision:
@@ -92,7 +92,7 @@ class MissionAutonomyClient:
 
     async def get_application(self, application_id: str, version: str | None = None):
         validate_non_blank("applicationId", application_id)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN), "application_id": application_id}
         if version:
@@ -109,7 +109,7 @@ class MissionAutonomyClient:
         page_token: str | None = None,
     ) -> tuple[list, str]:
         """``scope`` is an ``ApplicationScopeProtoDTO`` (``None`` = every scope)."""
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN)}
         if scope is not None:
@@ -132,7 +132,7 @@ class MissionAutonomyClient:
         expected_revision: str | None = None,
     ) -> None:
         validate_non_blank("applicationId", application_id)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN), "application_id": application_id}
         if version:
@@ -147,7 +147,7 @@ class MissionAutonomyClient:
 
     async def get_application_environments(self, application_id: str) -> list:
         validate_non_blank("applicationId", application_id)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         logger.info("GetApplicationEnvironments: id=%s", application_id)
         proto = await self._call(
@@ -161,7 +161,7 @@ class MissionAutonomyClient:
         """``environment`` is an ``ApplicationEnvironmentProto`` enum value (int)."""
         validate_non_blank("applicationId", application_id)
         validate_non_blank("version", version)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         logger.info("PromoteApplicationVersion: id=%s, version=%s", application_id, version)
         proto = await self._call(
@@ -212,8 +212,8 @@ class MissionAutonomyClient:
         self, rpc_name, asset_sn, spec, options, idempotency_key, organization_id, location_id, theatre_id
     ):
         validate_non_blank("sn", asset_sn)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
-        from zqnt_utils.generated.zqnt import capability_execution_dto_pb2 as execdto  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_dto_pb2 as execdto  # type: ignore[import]
 
         kwargs: dict[str, Any] = {
             "base": build_request_base(asset_sn),
@@ -289,7 +289,7 @@ class MissionAutonomyClient:
 
     async def get_skill_execution(self, execution_id: str):
         validate_non_blank("executionId", execution_id)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         logger.info("GetSkillExecution: id=%s", execution_id)
         proto = await self._call(
@@ -310,7 +310,7 @@ class MissionAutonomyClient:
         page_token: str | None = None,
     ) -> tuple[list, str]:
         """``status`` is a ``SkillExecutionStatusProto`` enum value (int), if filtering by status."""
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN)}
         if asset_sn:
@@ -336,7 +336,7 @@ class MissionAutonomyClient:
 
     async def _lifecycle(self, rpc_name: str, execution_id: str, reason: str | None, idempotency_key: str | None):
         validate_non_blank("executionId", execution_id)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         kwargs: dict[str, Any] = {"base": build_request_base(_DEFAULT_SN), "execution_id": execution_id}
         if reason:
@@ -381,7 +381,7 @@ class MissionAutonomyClient:
         ``event_type`` is required for event waits; ``approved`` is required for human approvals.
         """
         validate_non_blank("executionId", execution_id)
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         kwargs: dict[str, Any] = {
             "base": build_request_base(_DEFAULT_SN),
@@ -402,7 +402,7 @@ class MissionAutonomyClient:
 
     async def resolve_execution_config(self, context, keys: list[str] | None = None) -> dict:
         """``context`` is an ``ExecutionConfigContextProto``. Returns the resolved config as a dict."""
-        from zqnt_utils.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
+        from zqnt_api.generated.zqnt import capability_execution_contracts_pb2 as exc  # type: ignore[import]
 
         logger.info("ResolveExecutionConfig")
         proto = await self._call(
@@ -421,7 +421,7 @@ class MissionAutonomyClient:
     async def create_scheduler(self, scheduler: SchedulerDTO) -> SchedulerResponse:
         validate_non_blank("scheduler.name", scheduler.name)
         validate_non_blank("scheduler.cronExpression", scheduler.cron_expression)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("CreateScheduler: name=%s", scheduler.name)
         req = mission_autonomy_contracts_pb2.CreateSchedulerRequest(
@@ -433,7 +433,7 @@ class MissionAutonomyClient:
 
     async def update_scheduler(self, scheduler_id: str, scheduler: SchedulerDTO) -> SchedulerResponse:
         validate_non_blank("schedulerId", scheduler_id)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("UpdateScheduler: id=%s", scheduler_id)
         req = mission_autonomy_contracts_pb2.UpdateSchedulerRequest(
@@ -446,7 +446,7 @@ class MissionAutonomyClient:
 
     async def get_scheduler(self, scheduler_id: str) -> SchedulerResponse:
         validate_non_blank("schedulerId", scheduler_id)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("GetScheduler: id=%s", scheduler_id)
         req = mission_autonomy_contracts_pb2.GetSchedulerRequest(
@@ -457,7 +457,7 @@ class MissionAutonomyClient:
 
     async def delete_scheduler(self, scheduler_id: str) -> SchedulerResponse:
         validate_non_blank("schedulerId", scheduler_id)
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("DeleteScheduler: id=%s", scheduler_id)
         req = mission_autonomy_contracts_pb2.DeleteSchedulerRequest(
@@ -468,7 +468,7 @@ class MissionAutonomyClient:
 
     async def list_schedulers(self) -> SchedulerResponse:
         """Fetch all schedulers. Result is in :attr:`SchedulerResponse.schedulers`."""
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("ListSchedulers")
         req = mission_autonomy_contracts_pb2.ListSchedulersRequest(base=build_request_base(_DEFAULT_SN))
@@ -476,7 +476,7 @@ class MissionAutonomyClient:
         return proto_to_scheduler_response(proto)
 
     async def create_schedulers(self, schedulers: list[SchedulerDTO]) -> SchedulerResponse:
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("CreateSchedulers: count=%d", len(schedulers))
         req = mission_autonomy_contracts_pb2.CreateSchedulersRequest(
@@ -487,7 +487,7 @@ class MissionAutonomyClient:
         return proto_to_scheduler_response(proto)
 
     async def delete_schedulers(self, scheduler_ids: list[str]) -> SchedulerResponse:
-        from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2  # type: ignore[import]
 
         logger.info("DeleteSchedulers: count=%d", len(scheduler_ids))
         req = mission_autonomy_contracts_pb2.DeleteSchedulersRequest(

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import grpc
 import grpc.aio
-from zqnt_utils.generated.zqnt.capability.v3 import command_pb2
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.capability.v3 import command_pb2
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
 
 from ..exceptions import ZequentClientError, ZequentRetryExhaustedError
 

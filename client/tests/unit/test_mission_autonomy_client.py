@@ -5,22 +5,22 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     base_pb2,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     capability_execution_contracts_pb2 as exc,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     capability_execution_dto_pb2 as execdto,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     capability_execution_types_pb2 as exts,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     mission_autonomy_contracts_pb2 as mac,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     mission_autonomy_dto_pb2 as mad,
 )
 

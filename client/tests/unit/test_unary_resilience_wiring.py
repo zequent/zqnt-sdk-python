@@ -8,7 +8,7 @@ from typing import Any
 
 import grpc
 import pytest
-from zqnt_utils.generated.zqnt import common_pb2
+from zqnt_api.generated.zqnt import common_pb2
 
 from client_sdk import ZequentClientError, ZequentRetryExhaustedError
 from client_sdk.config.resilience import ResilienceConfig

@@ -6,9 +6,9 @@ import asyncio
 
 import grpc
 import grpc.aio
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-from zqnt_utils.generated.zqnt.control.v3 import remote_control_service_pb2 as control_pb2
-from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_pb2
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.control.v3 import remote_control_service_pb2 as control_pb2
+from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_pb2
 
 from .errors import CommandError
 

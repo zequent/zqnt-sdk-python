@@ -19,7 +19,7 @@ from .common import ErrorInfo, ProgressInfo, RemoteControlResponse
 def build_request_base(sn: str, tid: str | None = None):
     """Build a ``RequestBase`` proto with a fresh tid + UTC timestamp."""
     from google.protobuf import timestamp_pb2
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     ts = timestamp_pb2.Timestamp()
     ts.GetCurrentTime()
@@ -32,7 +32,7 @@ def build_request_base(sn: str, tid: str | None = None):
 
 def build_coordinates(latitude: float, longitude: float, altitude: float):
     # Coordinates was renamed GeoCoordinate (same fields) in the current schema.
-    from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
     return common_pb2.GeoCoordinate(
         latitude=latitude,
@@ -89,7 +89,7 @@ def has_field(msg, field: str) -> bool:
 def _resolve_error_code(raw_code) -> str:
     """Decode a proto ``ErrorCode`` enum value to its symbolic name."""
     try:
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         return common_pb2.ErrorCode.Name(raw_code)
     except Exception:  # pragma: no cover - defensive

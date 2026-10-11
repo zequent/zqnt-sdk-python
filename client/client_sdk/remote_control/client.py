@@ -73,7 +73,7 @@ class RemoteControlClient:
     ) -> None:
         # Lazy import: stubs may not be generated yet.
         try:
-            from zqnt_utils.generated.zqnt import remote_control_pb2_grpc  # type: ignore[import]
+            from zqnt_api.generated.zqnt import remote_control_pb2_grpc  # type: ignore[import]
         except ImportError as exc:  # pragma: no cover - generation step
             raise ImportError("Protobuf stubs not found. Run scripts/generate_protos.sh first.") from exc
 
@@ -100,7 +100,7 @@ class RemoteControlClient:
         validate_coordinates(request.latitude, request.longitude, request.altitude)
         logger.info("Takeoff: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.CoordinateCommandRequest(
             base=build_request_base(request.sn),
@@ -122,7 +122,7 @@ class RemoteControlClient:
         validate_coordinates(request.latitude, request.longitude, request.altitude)
         logger.info("GoTo: sn=%s, no_fly_zone_override=%s", request.sn, no_fly_zone_override)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.CoordinateCommandRequest(
             base=build_request_base(request.sn),
@@ -138,7 +138,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("ReturnToHome: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         rth_kwargs: dict = {}
         if request.altitude is not None:
@@ -159,7 +159,7 @@ class RemoteControlClient:
         validate_coordinates(request.latitude, request.longitude, request.altitude)
         logger.info("LookAt: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.LookAtCommandRequest(
             base=build_request_base(request.sn),
@@ -191,7 +191,7 @@ class RemoteControlClient:
             request.sn,
         )
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         mc_kwargs: dict = {
             "client_id": request.client_id,
@@ -242,7 +242,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("OpenCover: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
@@ -257,7 +257,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("CloseCover: sn=%s, force=%s", request.sn, request.value)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         kwargs: dict = {"base": build_request_base(request.sn)}
         if request.value is not None:
@@ -274,7 +274,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("StartCharging: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
@@ -289,7 +289,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("StopCharging: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
@@ -308,7 +308,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("RebootAsset: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.EmptyCommandRequest(
             base=build_request_base(request.sn),
@@ -323,7 +323,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("BootSubAsset: sn=%s, boot=%s", request.sn, request.value)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         # BootSubAsset uses the generic ToggleCommandRequest (field `enabled`), same as edge.proto's
         # own BootSubAsset RPC — despite there also being an unused BootSubAssetCommandRequest
@@ -342,7 +342,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("DebugMode: sn=%s, enabled=%s", request.sn, request.value)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         proto_request = common_pb2.ToggleCommandRequest(
             base=build_request_base(request.sn),
@@ -359,7 +359,7 @@ class RemoteControlClient:
         validate_sn(request.sn)
         logger.info("ChangeAcMode: sn=%s", request.sn)
 
-        from zqnt_utils.generated.zqnt import common_pb2  # type: ignore[import]
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
 
         # NOTE: ChangeAcModeCommandRequest now requires a `mode: AssetAirConditionerStateEnum`
         # (see asset.proto) that DockOperationRequest has no field for -- this was already the case

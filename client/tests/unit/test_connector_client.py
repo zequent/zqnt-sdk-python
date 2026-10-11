@@ -6,17 +6,17 @@ import asyncio
 from typing import Any
 
 import pytest
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     asset_pb2,
     base_pb2,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     connector_pb2 as cp,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     mission_autonomy_contracts_pb2 as mac,
 )
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     mission_autonomy_dto_pb2 as mad,
 )
 
@@ -161,7 +161,7 @@ async def test_list_asset_payloads_returns_list() -> None:
 
 @pytest.mark.asyncio
 async def test_get_organization() -> None:
-    from zqnt_utils.generated.zqnt import common_pb2
+    from zqnt_api.generated.zqnt import common_pb2
 
     org = common_pb2.OrganizationProtoDTO(id="org1", name="Acme")
     stub = _FakeStub(cp.ConnectorResponse(has_errors=False, organization=org))
@@ -320,7 +320,7 @@ async def test_batch_session_rejects_send_after_completion() -> None:
 async def test_batch_session_as_context_manager() -> None:
     stub = _StreamingFakeStub(cp.ConnectorResponse(has_errors=False))
     c = _client(stub)
-    from zqnt_utils.generated.zqnt import events_pb2
+    from zqnt_api.generated.zqnt import events_pb2
 
     async with c.store_notification_batch() as session:
         session.send(events_pb2.ProduceNotificationRequest())

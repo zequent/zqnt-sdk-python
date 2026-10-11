@@ -170,7 +170,7 @@ reachable, an asset of another organization) or the adapter dropped it.
 ### Telemetry (Zequent 3.0)
 
 ```python
-from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2
+from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2
 
 async for item in client.telemetry.watch_telemetry(["DOCK-1"], min_interval=1.0):
     if isinstance(item, telemetry_pb2.TelemetrySample):
