@@ -24,14 +24,14 @@ Usage with automatic service discovery registration::
 
 import asyncio
 import dataclasses
-import json
 import logging
 from typing import Any
 
 import grpc
 import grpc.aio
 from google.protobuf import empty_pb2, timestamp_pb2
-from zqnt_utils.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc
+from zqnt_api.core import EdgeEndpointDTO
+from zqnt_api.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc
 
 from ..adapter.base import EdgeAdapter
 from ..auth import EdgeAuthConfig, PlatformAuthServerInterceptor
@@ -65,6 +65,8 @@ from ._converters import (
     proto_to_return_to_home,
 )
 from .capability_reporter import CapabilityReporter
+
+EDGE_ENDPOINTS_KEY = "zqnt:edge-endpoints:{vendor}"
 
 
 @dataclasses.dataclass
@@ -606,62 +608,27 @@ class EdgeServer:
 
     async def _register(self, *, online: bool) -> None:
         """
-        Write (or update) the EdgeEndpointDTO in Redis via CachingService.
-
-        Uses key ``zqnt:edge-endpoints:{vendor}`` — matches Java CacheKeys.EDGE_ENDPOINTS
-        so the platform's client-side load balancer can resolve the endpoint.
-        Falls back to a direct redis call if zqnt-utils is not installed.
+        Write (or update) the EdgeEndpointDTO in Redis under ``zqnt:edge-endpoints:{vendor}``,
+        the key the platform's endpoint router reads (Java CacheKeys.EDGE_ENDPOINTS).
         """
         cfg = self._registration  # type: ignore[union-attr]
         vendor = proto_enum_name(cfg.asset_vendor)  # e.g. "ASSET_VENDOR_MAVLINK"
         asset_type = proto_enum_name(cfg.asset_type)  # e.g. "ASSET_TYPE_AIRCRAFT"
 
         try:
-            from zqnt_utils.caching import CachingService
-            from zqnt_utils.core import EdgeEndpointDTO
-
-            dto = EdgeEndpointDTO(
-                endpoint=cfg.endpoint,
-                online=online,
-                asset_type=asset_type,
-                asset_vendor=vendor,
-            )
-            async with CachingService(cfg.redis_url) as cache:
-                if online:
-                    await cache.register_edge_endpoint(vendor, dto)
-                else:
-                    await cache.deregister_edge_endpoint(vendor)
-
+            import redis.asyncio as aioredis
         except ImportError:
-            # zqnt-utils not installed – fall back to inline implementation
-            try:
-                import redis.asyncio as aioredis
-            except ImportError:
-                logger.warning(
-                    "Neither zqnt-utils nor redis package installed – "
-                    "endpoint registration skipped. "
-                    "Install with: pip install 'edge-python-sdk[redis]'"
-                )
-                return
-
-            key = f"zqnt:edge-endpoints:{vendor}"
-            dto_json = json.dumps(
-                {
-                    "endpoint": cfg.endpoint,
-                    "online": online,
-                    "assetType": asset_type,
-                    "assetVendor": vendor,
-                }
+            logger.warning(
+                "redis package not installed – endpoint registration skipped. "
+                "Install with: pip install 'edge-python-sdk[redis]'"
             )
-            try:
-                async with aioredis.from_url(cfg.redis_url, decode_responses=True) as r:
-                    await r.set(key, dto_json)
-            except Exception as exc:
-                logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)
-                return
+            return
 
+        dto = EdgeEndpointDTO(endpoint=cfg.endpoint, online=online, asset_type=asset_type, asset_vendor=vendor)
+        try:
+            async with aioredis.from_url(cfg.redis_url, decode_responses=True) as r:
+                await r.set(EDGE_ENDPOINTS_KEY.format(vendor=vendor), dto.to_json())
         except Exception as exc:
-            # Never crash the server because of a registration failure.
             logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)
             return
 

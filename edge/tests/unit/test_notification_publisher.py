@@ -10,7 +10,7 @@ in favor of ``command_execution``, and ``operation`` was renamed ``mission``).
 import asyncio
 
 import pytest
-from zqnt_utils.generated.zqnt import events_pb2
+from zqnt_api.generated.zqnt import events_pb2
 
 from edge_sdk.client.notification_publisher import NotificationPublisher
 from edge_sdk.models.common import CommandExecutionStatus, MissionStatus, MissionType
@@ -152,7 +152,7 @@ def test_build_command_execution_event_uses_critical_severity_on_failure():
 
 
 def common_status_active():
-    from zqnt_utils.generated.zqnt import common_pb2
+    from zqnt_api.generated.zqnt import common_pb2
 
     return common_pb2.MissionStatus.MISSION_STATUS_ACTIVE
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from zqnt_utils.generated.zqnt import mission_autonomy_contracts_pb2 as mac
-from zqnt_utils.generated.zqnt import mission_autonomy_dto_pb2 as mad
+from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2 as mac
+from zqnt_api.generated.zqnt import mission_autonomy_dto_pb2 as mad
 
 from edge_sdk.client.mission_autonomy_client import MissionAutonomyClient
 from edge_sdk.models.common import SchedulerType

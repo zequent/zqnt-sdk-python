@@ -30,14 +30,14 @@ Add to your `pyproject.toml`:
 ```toml
 [project]
 dependencies = [
-    "edge-python-sdk @ git+https://github.com/Zequent/zqnt-framework@main#egg=edge-python-sdk&subdirectory=sdks/edge/edge-python-sdk",
+    "edge-python-sdk @ git+https://github.com/Zequent/zqnt-edge-sdk-python@v3.0.0",
 ]
 ```
 
 Or install directly:
 
 ```bash
-pip install git+https://github.com/Zequent/zqnt-framework@main#egg=edge-python-sdk&subdirectory=sdks/edge/edge-python-sdk
+pip install git+https://github.com/Zequent/zqnt-edge-sdk-python@v3.0.0
 ```
 
 ### From source
@@ -278,7 +278,7 @@ await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain", severity=AlertSe
 
 Long-lived streams to `TelemetryIngestService`, opened on first use and reconnected with backoff.
 `None`/NaN values are not sent. Against a core without v3 samples and detections go over v2
-`ProduceTelemetry`/`ProduceDetection`, mapped by `zqnt_utils.telemetry`: keys of the platform's
+`ProduceTelemetry`/`ProduceDetection`, mapped by `zqnt_api.telemetry`: keys of the platform's
 catalog (`dock.mode`, `wind.speed`, `drone.gear`, …; declare them with
 `declare_standard_telemetry_field`) land in their v2 fields, **other `details` keys are dropped**. A
 sample with a speed or an aircraft key becomes sub-asset (aircraft) telemetry, one with dock keys or

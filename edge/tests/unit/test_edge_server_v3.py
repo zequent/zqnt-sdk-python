@@ -8,9 +8,9 @@ under; capabilities come out of the same registry as v2's.
 """
 
 from google.protobuf import struct_pb2
-from zqnt_utils.generated.zqnt.capability.v3 import command_pb2
-from zqnt_utils.generated.zqnt.common.v3 import common_pb2
-from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
+from zqnt_api.generated.zqnt.capability.v3 import command_pb2
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
 
 from edge_sdk import AssetType, EdgeAdapter, EdgeResponse
 from edge_sdk.models.common import (

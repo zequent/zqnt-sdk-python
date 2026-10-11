@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - feature/v3-agentic
 
 permissions:
   contents: read
@@ -70,6 +71,7 @@ jobs:
           echo "pr_version=${PR_VERSION}" >> $GITHUB_OUTPUT
           echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "commit_hash=${COMMIT_HASH}" >> $GITHUB_OUTPUT
+          echo "Preview version: ${PR_VERSION}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         if: always()
@@ -101,3 +103,29 @@ jobs:
               repo: context.repo.repo,
               body: message
             });
+
+  pr-preview:
+    name: Tag PR preview build
+    needs: [check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Compute preview tag
+        id: tag
+        run: |
+          TAG="pr-${{ github.event.pull_request.number }}-$(git rev-parse --short=7 HEAD)"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Preview tag: ${TAG}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # The checkout keeps no credentials; the push authenticates in this step only.
+      - name: Create and push preview tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag "${{ steps.tag.outputs.tag }}"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${{ steps.tag.outputs.tag }}"

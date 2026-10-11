@@ -16,7 +16,7 @@ import grpc
 import grpc.aio
 import pytest
 import pytest_asyncio
-from zqnt_utils.generated.zqnt import live_data_pb2_grpc, live_data_types_pb2  # type: ignore[import]
+from zqnt_api.generated.zqnt import live_data_pb2_grpc, live_data_types_pb2  # type: ignore[import]
 
 from edge_sdk.auth import platform_channel
 from edge_sdk.client.detection_publisher import DetectionPublisher

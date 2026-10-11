@@ -10,16 +10,16 @@ import socket
 import grpc
 import grpc.aio
 import pytest_asyncio
-from zqnt_utils.generated.zqnt import (
+from zqnt_api.generated.zqnt import (
     asset_pb2,
     device_control_contracts_pb2,
     live_data_pb2_grpc,
     live_data_types_pb2,
     remote_control_pb2_grpc,
 )
-from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
-from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
-from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2, telemetry_pb2_grpc
+from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
+from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
+from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2, telemetry_pb2_grpc
 
 from edge_sdk import (
     Alert,

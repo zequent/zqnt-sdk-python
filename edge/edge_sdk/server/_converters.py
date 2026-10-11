@@ -15,7 +15,7 @@ from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 
-from zqnt_utils.proto_utils import parse_enum
+from zqnt_api.proto_utils import parse_enum
 
 from ..models.asset import Asset, SubAsset
 from ..models.common import (

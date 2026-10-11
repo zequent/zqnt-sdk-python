@@ -161,14 +161,14 @@ wheels = [
 
 [[package]]
 name = "edge-python-sdk"
-version = "2.0.0"
+version = "3.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
     { name = "grpcio" },
     { name = "grpcio-health-checking" },
     { name = "protobuf" },
-    { name = "zqnt-utils" },
+    { name = "zqnt-api" },
 ]
 
 [package.optional-dependencies]
@@ -176,8 +176,8 @@ dev = [
     { name = "fakeredis" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "redis" },
     { name = "ruff" },
-    { name = "zqnt-utils" },
 ]
 redis = [
     { name = "redis" },
@@ -192,10 +192,10 @@ requires-dist = [
     { name = "protobuf", specifier = ">=4.25.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
+    { name = "redis", extras = ["asyncio"], marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-utils", git = "https://github.com/zequent/zqnt-utils-python?branch=feature%2Fv3-agentic" },
-    { name = "zqnt-utils", marker = "extra == 'dev'", git = "https://github.com/zequent/zqnt-utils-python?branch=feature%2Fv3-agentic" },
+    { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api-python?rev=439656edda28052ecb66e7e95f10e944219bd0f0" },
 ]
 provides-extras = ["redis", "dev"]
 
@@ -408,11 +408,10 @@ wheels = [
 ]
 
 [[package]]
-name = "zqnt-utils"
-version = "2.0.0"
-source = { git = "https://github.com/zequent/zqnt-utils-python?branch=feature%2Fv3-agentic#391ef65c837e36a7aff4aa60c60d1b981933f263" }
+name = "zqnt-api"
+version = "3.0.0"
+source = { git = "https://github.com/zequent/zqnt-api-python?rev=439656edda28052ecb66e7e95f10e944219bd0f0#439656edda28052ecb66e7e95f10e944219bd0f0" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
-    { name = "redis" },
 ]

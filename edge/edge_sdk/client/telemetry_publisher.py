@@ -79,7 +79,7 @@ class TelemetryPublisher:
     async def connect(self) -> None:
         """Open the channel and start the background streaming / reconnect task."""
         import grpc.aio  # noqa: F401 – verify availability
-        from zqnt_utils.generated.zqnt import live_data_pb2_grpc  # noqa: F401
+        from zqnt_api.generated.zqnt import live_data_pb2_grpc  # noqa: F401
 
         self._closed = False
         self._stop_event = asyncio.Event()
@@ -142,7 +142,7 @@ class TelemetryPublisher:
         Background task: opens the gRPC stream and feeds it from the queue.
         On failure reconnects with exponential backoff.
         """
-        from zqnt_utils.generated.zqnt import live_data_pb2_grpc
+        from zqnt_api.generated.zqnt import live_data_pb2_grpc
 
         backoff = self._BACKOFF_INITIAL
 
@@ -227,7 +227,7 @@ class TelemetryPublisher:
 
     def _base(self, sn: str | None = None):
         from google.protobuf import timestamp_pb2
-        from zqnt_utils.generated.zqnt import common_pb2
+        from zqnt_api.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
@@ -242,7 +242,7 @@ class TelemetryPublisher:
         # own. Using the wrong module here was the actual root cause of the original
         # AttributeError, and would have kept failing (just with a different missing-attribute
         # error) even after fixing the message names alone.
-        from zqnt_utils.generated.zqnt import live_data_types_pb2 as live_data_pb2
+        from zqnt_api.generated.zqnt import live_data_types_pb2 as live_data_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
@@ -352,7 +352,7 @@ class TelemetryPublisher:
         from google.protobuf import timestamp_pb2
 
         # See _build_asset_request's comment -- same module correction applies here.
-        from zqnt_utils.generated.zqnt import live_data_types_pb2 as live_data_pb2
+        from zqnt_api.generated.zqnt import live_data_types_pb2 as live_data_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()

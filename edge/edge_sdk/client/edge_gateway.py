@@ -99,8 +99,8 @@ def command_event(event: CommandExecutionEvent):
     The adapter's event as a v3 CommandEvent. ``occurred_at`` is always set (now() when the adapter
     gave none) -- the platform refuses an event without it.
     """
-    from zqnt_utils.generated.zqnt.capability.v3 import command_pb2
-    from zqnt_utils.generated.zqnt.common.v3 import common_pb2
+    from zqnt_api.generated.zqnt.capability.v3 import command_pb2
+    from zqnt_api.generated.zqnt.common.v3 import common_pb2
 
     run = CommandRuns.lookup(event.external_execution_id) if not event.command_execution_id else None
     command_execution_id = event.command_execution_id or (run.command_execution_id if run else None)
@@ -172,8 +172,8 @@ class EdgeGatewayClient:
         """Send *event* over v3. False when v3 is not served (the caller uses v2); errors propagate."""
         if not self._events_v3.available():
             return False
-        from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
-        from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
+        from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
+        from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
 
         stub = edge_v3_grpc.EdgeGatewayServiceStub(self._open())
         try:
@@ -190,8 +190,8 @@ class EdgeGatewayClient:
     async def report_capabilities(self, caps: Capabilities) -> str:
         """Report *caps* (v3, else v2 ReportAssetRuntime). Returns the revision the platform stored."""
         if self._capabilities_v3.available():
-            from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
-            from zqnt_utils.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
+            from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
+            from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
 
             from ..server.edge_server_v3 import capability_set
 
@@ -208,7 +208,7 @@ class EdgeGatewayClient:
         return await self._report_asset_runtime(caps)
 
     async def _report_asset_runtime(self, caps: Capabilities) -> str:
-        from zqnt_utils.generated.zqnt import common_pb2, device_control_contracts_pb2, remote_control_pb2_grpc
+        from zqnt_api.generated.zqnt import common_pb2, device_control_contracts_pb2, remote_control_pb2_grpc
 
         from ..server._converters import capabilities_to_proto
 

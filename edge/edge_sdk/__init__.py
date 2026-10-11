@@ -33,7 +33,7 @@ from importlib.metadata import version as _pkg_version
 try:
     __version__ = _pkg_version("edge-python-sdk")
 except PackageNotFoundError:
-    __version__ = "1.0.0"
+    __version__ = "3.0.0"
 
 from .adapter.base import EdgeAdapter
 from .adapter.commands import CATALOG as COMMAND_CATALOG

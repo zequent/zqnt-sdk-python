@@ -78,7 +78,7 @@ class DetectionPublisher:
     async def connect(self) -> None:
         """Open the channel and start the background streaming / reconnect task."""
         import grpc.aio  # noqa: F401 – verify availability
-        from zqnt_utils.generated.zqnt import live_data_pb2_grpc  # noqa: F401
+        from zqnt_api.generated.zqnt import live_data_pb2_grpc  # noqa: F401
 
         self._closed = False
         self._stop_event = asyncio.Event()
@@ -126,7 +126,7 @@ class DetectionPublisher:
     # ------------------------------------------------------------------
 
     async def _run_stream(self) -> None:
-        from zqnt_utils.generated.zqnt import live_data_pb2_grpc
+        from zqnt_api.generated.zqnt import live_data_pb2_grpc
 
         backoff = self._BACKOFF_INITIAL
 
@@ -202,14 +202,14 @@ class DetectionPublisher:
 
     def _base(self, sn: str | None = None):
         from google.protobuf import timestamp_pb2
-        from zqnt_utils.generated.zqnt import common_pb2
+        from zqnt_api.generated.zqnt import common_pb2
 
         ts = timestamp_pb2.Timestamp()
         ts.GetCurrentTime()
         return common_pb2.RequestBase(tid=str(uuid.uuid4()), sn=sn if sn is not None else self._sn, timestamp=ts)
 
     def _build_detection_request(self, batch: DetectionBatch):
-        from zqnt_utils.generated.zqnt import common_pb2
+        from zqnt_api.generated.zqnt import common_pb2
 
         detections = [_detection_to_proto(common_pb2, d) for d in batch.detections]
 
