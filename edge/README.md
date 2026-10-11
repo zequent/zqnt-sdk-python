@@ -30,14 +30,14 @@ Add to your `pyproject.toml`:
 ```toml
 [project]
 dependencies = [
-    "edge-python-sdk @ git+https://github.com/Zequent/zqnt-framework@main#egg=edge-python-sdk&subdirectory=sdks/edge/edge-python-sdk",
+    "edge-python-sdk @ git+https://github.com/Zequent/zqnt-edge-sdk-python@v3.0.0",
 ]
 ```
 
 Or install directly:
 
 ```bash
-pip install git+https://github.com/Zequent/zqnt-framework@main#egg=edge-python-sdk&subdirectory=sdks/edge/edge-python-sdk
+pip install git+https://github.com/Zequent/zqnt-edge-sdk-python@v3.0.0
 ```
 
 ### From source
