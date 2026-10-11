@@ -376,8 +376,8 @@ wheels = [
 
 [[package]]
 name = "zqnt-api"
-version = "1.0.0"
-source = { git = "https://github.com/zequent/zqnt-api-python?branch=feature%2Fpublic-api-split#fa7ea4f663cbaba94b93d62ec3adaf2ed57ea11c" }
+version = "3.0.0"
+source = { git = "https://github.com/zequent/zqnt-api-python?branch=feature%2Fpublic-api-split#9d78b1ab53e5750771388c7cadb622db013f6fee" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
