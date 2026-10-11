@@ -52,7 +52,7 @@ packages = ["edge_sdk"]
 [tool.uv.sources]
 # A git source, not a local path: CI and Docker builds check out only this repository.
 # uv allows one URL per package across a graph, so every consumer pins the same ref.
-zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", rev = "439656edda28052ecb66e7e95f10e944219bd0f0" }  # zqnt-api 3.0.0 preview (#4, ASSET_VENDOR_AI); the release tag once it is cut
+zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", rev = "89b611a0ba4a99b7182d6e439a95c233f8784991" }  # zqnt-api 3.0.0 preview (#6, detection radar geometry); the release tag once it is cut
 # Swap to this for day-to-day monorepo development (offline-friendly, picks up sibling edits
 # immediately, no push-then-pull round trip) -- but keep it local-only; don't commit it back to
 # main, or every downstream adapter's CI breaks again the same way this fix closes.
