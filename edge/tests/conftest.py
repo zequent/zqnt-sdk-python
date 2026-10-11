@@ -1,0 +1,180 @@
+"""
+Shared test fixtures.
+
+Design decisions:
+- No gRPC mocks: the integration tests spin up a real in-process server.
+  This gives confidence that protobuf serialisation, servicer routing, and
+  status codes all work exactly as they would in production.
+- fakeredis replaces a real Redis instance so registration tests run without
+  any external infrastructure.
+- The behaviour fixtures run with platform authentication switched off (these tests are about
+  what the servicer does); tests/integration/test_server_auth.py covers authentication itself.
+"""
+
+import asyncio
+import socket
+from contextlib import suppress
+from datetime import datetime, timezone
+
+import pytest
+import pytest_asyncio
+
+from edge_sdk import AssetType, EdgeAdapter, EdgeAuthConfig, EdgeResponse, EdgeServer
+from edge_sdk.models.common import Capabilities, CustomCommandRequest, CustomCommandResponse, RequestContext
+
+#: Behaviour tests call the server without a platform token.
+NO_AUTH = EdgeAuthConfig(disabled=True)
+
+# ---------------------------------------------------------------------------
+# Minimal adapter used across all tests
+# ---------------------------------------------------------------------------
+
+
+class _TestAdapter(EdgeAdapter):
+    """
+    A minimal adapter that implements only the operations needed for tests.
+    Anything not overridden intentionally returns ``not_supported``.
+    """
+
+    async def get_capabilities(self, sn: str, asset_id: str | None) -> Capabilities:
+        return self._auto_capabilities(sn, AssetType.SENSOR)
+
+    async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
+        return EdgeResponse.ok(ctx.tid, ctx.sn, f"started:{task_id}", external_execution_id=f"vendor-{task_id}")
+
+    async def stop_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
+        return EdgeResponse.ok(ctx.tid, ctx.sn, f"stopped:{task_id}")
+
+    async def send_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
+        return CustomCommandResponse.ok(
+            ctx.tid,
+            ctx.sn,
+            request.command_type,
+            external_execution_id=f"vendor-{request.command_type}",
+        )
+
+
+class _RegistryOnlyAdapter(EdgeAdapter):
+    """
+    Declares its commands through ``register_command`` and overrides nothing else.
+
+    This is the shape every 2.0 adapter is meant to have, and the shape no test covered
+    end-to-end: ``_TestAdapter`` overrides ``send_custom_command``, which hid the fact that the
+    servicer refused the call for any adapter that does not. Served over a real gRPC server, this
+    adapter must be able to run every command it advertises.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict]] = []
+        self.register_command("mission.waypoint.execute", self._record)
+        self.register_command("flight.takeoff", self._record)
+
+    async def get_capabilities(self, sn: str, asset_id: str | None) -> Capabilities:
+        return self._auto_capabilities(sn, AssetType.AIRCRAFT)
+
+    async def _record(self, ctx: RequestContext, params: dict) -> CustomCommandResponse:
+        self.calls.append((ctx.tid, dict(params)))
+        return CustomCommandResponse.ok(
+            ctx.tid,
+            ctx.sn,
+            "recorded",
+            result={"ok": True},
+            external_execution_id=f"vendor-{ctx.tid}",
+        )
+
+
+class _CrashingAdapter(_TestAdapter):
+    """Adapter that deliberately raises exceptions – for error-handling tests."""
+
+    async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
+        raise RuntimeError("hardware exploded")
+
+
+# ---------------------------------------------------------------------------
+# Port helper
+# ---------------------------------------------------------------------------
+
+
+def _free_port() -> int:
+    """Return an available TCP port on localhost."""
+    with socket.socket() as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+def test_adapter() -> _TestAdapter:
+    return _TestAdapter()
+
+
+@pytest_asyncio.fixture
+def crashing_adapter() -> _CrashingAdapter:
+    return _CrashingAdapter()
+
+
+@pytest_asyncio.fixture
+async def server_port(test_adapter):
+    """
+    Start a real EdgeServer on a random port; yield the port number.
+    The server is stopped after the test completes.
+    """
+    port = _free_port()
+    server = EdgeServer(adapter=test_adapter, port=port, auth=NO_AUTH)
+    task = asyncio.create_task(server.serve())
+    await asyncio.sleep(0.05)  # give the server time to bind
+    yield port
+    await server.stop(grace=0)
+    with suppress(asyncio.CancelledError, Exception):
+        await task
+
+
+@pytest_asyncio.fixture
+async def crashing_server_port(crashing_adapter):
+    """Same as server_port but uses the crashing adapter."""
+    port = _free_port()
+    server = EdgeServer(adapter=crashing_adapter, port=port, auth=NO_AUTH)
+    task = asyncio.create_task(server.serve())
+    await asyncio.sleep(0.05)
+    yield port
+    await server.stop(grace=0)
+    with suppress(asyncio.CancelledError, Exception):
+        await task
+
+
+@pytest_asyncio.fixture
+def registry_adapter() -> _RegistryOnlyAdapter:
+    return _RegistryOnlyAdapter()
+
+
+@pytest_asyncio.fixture
+async def registry_server_port(registry_adapter):
+    """Same as server_port but serves the registration-only adapter."""
+    port = _free_port()
+    server = EdgeServer(adapter=registry_adapter, port=port, auth=NO_AUTH)
+    task = asyncio.create_task(server.serve())
+    await asyncio.sleep(0.05)
+    yield port
+    await server.stop(grace=0)
+    with suppress(asyncio.CancelledError, Exception):
+        await task
+
+
+def make_ctx(tid: str = "test-tid", sn: str = "TEST-001") -> RequestContext:
+    return RequestContext(tid=tid, sn=sn, timestamp=datetime.now(tz=timezone.utc))
+
+
+@pytest.fixture(autouse=True)
+def _fresh_v3_state():
+    """v3 availability and accepted runs are per process; every test starts without either."""
+    from edge_sdk.client.edge_gateway import CommandRuns, V3Fallback
+
+    V3Fallback.reset()
+    CommandRuns.clear()
+    yield
+    V3Fallback.reset()
+    CommandRuns.clear()

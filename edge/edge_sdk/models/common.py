@@ -1,0 +1,772 @@
+"""
+Plain-Python models that mirror the common.proto definitions.
+No protobuf types are exposed here.
+"""
+
+import re
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import IntEnum
+from typing import Type, TypeVar
+
+_E = TypeVar("_E", bound=IntEnum)
+
+
+def proto_enum_lookup(enum_cls: Type[_E], name: str) -> _E:
+    """
+    Resolve a proto-style full enum name to the Python IntEnum value.
+
+    The prefix is derived from the class name (CamelCase → SCREAMING_SNAKE_CASE):
+    ``AssetType`` → ``ASSET_TYPE_``, ``AssetVendor`` → ``ASSET_VENDOR_``.
+
+    Examples::
+
+        proto_enum_lookup(AssetType, "ASSET_TYPE_AIRCRAFT")    # → AssetType.AIRCRAFT
+        proto_enum_lookup(AssetVendor, "ASSET_VENDOR_MAVLINK") # → AssetVendor.MAVLINK
+    """
+    prefix = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", enum_cls.__name__).upper() + "_"
+    if not name.upper().startswith(prefix):
+        raise KeyError(
+            f"{name!r} is not a valid {enum_cls.__name__} proto name — "
+            f"expected prefix {prefix!r} (e.g. {prefix}AIRCRAFT)"
+        )
+    return enum_cls[name.upper()[len(prefix) :]]
+
+
+def proto_enum_name(value: IntEnum) -> str:
+    """
+    Convert a Python IntEnum value to its proto-style full name.
+
+    The prefix is derived from the class name (CamelCase → SCREAMING_SNAKE_CASE).
+
+    Examples::
+
+        proto_enum_name(AssetType.AIRCRAFT)    # → "ASSET_TYPE_AIRCRAFT"
+        proto_enum_name(AssetVendor.MAVLINK)   # → "ASSET_VENDOR_MAVLINK"
+    """
+    prefix = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", type(value).__name__).upper() + "_"
+    return prefix + value.name
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+
+class AssetType(IntEnum):
+    UNKNOWN = 0
+    AIRCRAFT = 1
+    DOCK = 2
+    SENSOR = 3
+    CAMERA = 4
+    OTHER = 5
+    JAMMER = 6
+    CYBER_ATTACK = 7
+    SAPIENT = 8
+    RNS = 9
+
+
+class AssetVendor(IntEnum):
+    DJI = 0
+    AUTEL = 1
+    ROS = 2
+    MAVLINK = 3
+    RTMP_RTSP = 4
+    SAPIENT = 5
+    BETAFLIGHT = 6
+    RNS = 7
+    # Non-hardware bridge/integration assets (e.g. the Integration Hub platform bridge) that
+    # register themselves as an EdgeAdapterService endpoint without owning a physical vendor
+    # protocol -- matches asset.proto's ASSET_VENDOR_ZQNT exactly.
+    ZQNT = 8
+    # The load/telemetry simulator registering as an asset of its own, so a simulated fleet is
+    # addressable exactly like a real one -- matches asset.proto's ASSET_VENDOR_SIMULATOR.
+    SIMULATOR = 9
+    # The AI detection adapter -- matches asset.proto's ASSET_VENDOR_AI. Its own slot so it never
+    # takes the routing endpoint of real RTMP/RTSP cameras.
+    AI = 10
+
+
+class AssetConnection(IntEnum):
+    MQTT = 0
+    TCP = 1
+    SERIAL = 2
+
+
+class LiveStreamType(IntEnum):
+    UNKNOWN = 0
+    RTMP = 1
+    RTSP = 2
+    WEBRTC = 3
+
+
+class AssetMode(IntEnum):
+    IDLE = 0
+    DEBUGGING = 1
+    REMOTE_DEBUGGING = 2
+    UPGRADING = 3
+    WORKING = 4
+    TO_BE_CALIBRATED = 5
+    OFFLINE = 6
+
+
+class SubAssetMode(IntEnum):
+    IDLE = 0
+    TAKEOFF_PREPARE = 1
+    TAKEOFF_FINISHED = 2
+    MANUAL = 3
+    TAKEOFF_AUTO = 4
+    WAYLINE = 5
+    PANORAMIC_SHOT = 6
+    ACTIVE_TRACK = 7
+    ADS_B_AVOIDANCE = 8
+    RETURN_AUTO = 9
+    LANDING_AUTO = 10
+    LANDING_FORCE = 11
+    LANDING_THREE_PROPELLER = 12
+    UPGRADING = 13
+    DISCONNECTED = 14
+    APAS = 15
+    VIRTUAL_JOYSTICK = 16
+    LIVE_FLIGHT_CONTROLS = 17
+    AERIAL_RTK_FIXED = 18
+    DOCK_SITE_EVALUATION = 19
+    POI = 20
+
+
+class ManualControlState(IntEnum):
+    DISCONNECTED = 0
+    CONNECTING = 1
+    CONNECTED = 2
+
+
+class AssetCoverState(IntEnum):
+    CLOSED = 0
+    OPENED = 1
+    HALF_OPEN = 2
+    ABNORMAL = 3
+
+
+class AssetAirConditionerState(IntEnum):
+    IDLE = 0
+    COOL = 1
+    HEAT = 2
+    DEHUMIDIFICATION = 3
+    COOLING_EXIT = 4
+    HEATING_EXIT = 5
+    DEHUMIDIFICATION_EXIT = 6
+    COOLING_PREPARATION = 7
+    HEATING_PREPARATION = 8
+    DEHUMIDIFICATION_PREPARATION = 9
+    DISCONNECTED = 10
+
+
+class TaskType(IntEnum):
+    UNSPECIFIED = 0
+    DETECT = 1
+    AREA_MAPPING = 2
+    WAYPOINT = 3
+    POI = 4
+    FOLLOW = 5
+    TRACK = 6
+    COUNTER_DRONE = 7
+
+
+class TaskStatus(IntEnum):
+    UNKNOWN = 0
+    DRAFT = 1
+    SCHEDULED = 2
+    RUNNING = 3
+    ERROR = 4
+    COMPLETED = 5
+    PREPARED = 6
+    PAUSED = 7
+
+
+class MissionType(IntEnum):
+    STANDARD = 0
+    REMOTE_OPS = 1
+    DRF = 2
+    MISSION = 3
+
+
+class MissionStatus(IntEnum):
+    UNKNOWN = 0
+    DRAFT = 1
+    ACTIVE = 2
+    INACTIVE = 3
+    ERROR = 4
+
+
+class SchedulerType(IntEnum):
+    """Mirrors ``mission-autonomy-types.proto`` :proto:`SchedulerType`."""
+
+    MISSION = 0
+    TASK = 1
+    SYSTEM_JOBS = 2
+    ORGANIZATION = 3
+    DATABASE = 4
+    CONNECTORS = 5
+
+
+class CommandExecutionStatus(IntEnum):
+    """Mirrors ``events.proto`` :proto:`CommandExecutionStatus` — vendor-neutral lifecycle
+    feedback for one physical command dispatched to an edge adapter. Replaces the retired
+    task-event notification model."""
+
+    UNSPECIFIED = 0
+    ACCEPTED = 1
+    RUNNING = 2
+    SUCCEEDED = 3
+    FAILED = 4
+    CANCELLED = 5
+
+
+INVALID_PARAMS_CODE = "command.invalid_params"
+
+
+class ErrorCode(IntEnum):
+    SYSTEM_ERROR = 0
+    CLIENT_ERROR = 1
+    SDK_ERROR = 2
+    SERVICE_ERROR = 3
+    ASSET_ERROR = 4
+
+
+class Rainfall(IntEnum):
+    NO = 0
+    LIGHT = 1
+    MODERATE = 2
+    HEAVY = 3
+
+
+class NetworkType(IntEnum):
+    NETWORK_4G = 0
+    ETHERNET = 1
+
+
+class NetworkStateQuality(IntEnum):
+    NO_SIGNAL = 0
+    BAD = 1
+    POOR = 2
+    FAIR = 3
+    GOOD = 4
+    EXCELLENT = 5
+
+
+class VehicleAction(IntEnum):
+    NONE = 0
+    TAKEOFF = 1
+    LAND = 2
+
+
+# ---------------------------------------------------------------------------
+# Base / shared dataclasses
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Coordinates:
+    latitude: float
+    longitude: float
+    altitude: float
+
+
+@dataclass
+class RequestContext:
+    """
+    Extracted from gRPC RequestBase – identifies the incoming request.
+
+    Attributes:
+        tid:       Transaction ID (unique per request).
+        sn:        Asset serial number the command is addressed to.
+        timestamp: Time the request was created on the sender side.
+        command_execution_id: The platform's id of this command run (v3 ``ExecuteCommand``). An
+            adapter that answers ACCEPTED reports progress and completion under it.
+    """
+
+    tid: str
+    sn: str
+    timestamp: datetime
+    command_execution_id: str | None = None
+
+
+@dataclass
+class ErrorMessage:
+    message: str
+    code: ErrorCode
+    timestamp: datetime | None = None
+    #: Stable, machine-readable code such as ``command.invalid_params``.
+    reason: str | None = None
+
+
+@dataclass
+class CommandProgress:
+    progress: float  # 0.0 – 100.0
+    state: str
+    left_time_seconds: float
+
+
+@dataclass
+class EdgeResponse:
+    """
+    Return this from every adapter method.
+
+    Use the factory methods :meth:`ok` and :meth:`fail` for convenience.
+    """
+
+    tid: str
+    sn: str
+    success: bool
+    asset_id: str | None = None
+    message: str | None = None
+    error: ErrorMessage | None = None
+    progress: CommandProgress | None = None
+    # Populated only for StartLiveStream responses
+    stream_url: str | None = None
+    video_id: str | None = None
+    # The id mission-autonomy should track this dispatch by for later correlation — physical
+    # cancellation (StopTask with task_id = this value, not a Connector Task id — that model is
+    # retired) and async CommandExecutionEvent completion binding both key off it. Prefer your own
+    # vendor execution id when you have one (e.g. a DJI flightId); otherwise leave unset and the
+    # platform falls back to its own internally-generated correlation id, which still works for
+    # cancellation but only if your adapter's own completion/cancel handling doesn't need to
+    # distinguish between concurrent executions on the same asset.
+    external_execution_id: str | None = None
+
+    @classmethod
+    def ok(
+        cls,
+        tid: str,
+        sn: str,
+        message: str | None = None,
+        *,
+        asset_id: str | None = None,
+        stream_url: str | None = None,
+        video_id: str | None = None,
+        progress: CommandProgress | None = None,
+        external_execution_id: str | None = None,
+    ) -> "EdgeResponse":
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=True,
+            message=message,
+            asset_id=asset_id,
+            stream_url=stream_url,
+            video_id=video_id,
+            progress=progress,
+            external_execution_id=external_execution_id,
+        )
+
+    @classmethod
+    def fail(
+        cls,
+        tid: str,
+        sn: str,
+        error: ErrorMessage,
+        asset_id: str | None = None,
+    ) -> "EdgeResponse":
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=False,
+            error=error,
+            asset_id=asset_id,
+        )
+
+    @classmethod
+    def not_supported(cls, tid: str = "", sn: str = "") -> "EdgeResponse":
+        """Return this from default adapter methods that are not implemented."""
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=False,
+            error=ErrorMessage(
+                message="This operation is not supported by this adapter",
+                code=ErrorCode.SDK_ERROR,
+            ),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Capability
+# ---------------------------------------------------------------------------
+
+
+class CapabilityState(IntEnum):
+    UNSPECIFIED = 0
+    AVAILABLE = 1
+    TEMPORARILY_UNAVAILABLE = 2
+    UNSUPPORTED = 3
+    REQUIRES_AUTHORIZATION = 4
+
+
+class CapabilityTargetType(IntEnum):
+    UNSPECIFIED = 0
+    ASSET = 1
+    SUB_ASSET = 2
+    PAYLOAD = 3
+    COMPONENT = 4
+
+
+class CapabilitySource(IntEnum):
+    UNSPECIFIED = 0
+    BUILT_IN = 1
+    EDGE_ADAPTER = 2
+    RUNTIME = 3
+    USER = 4
+    APPLICATION = 5
+    INTEGRATION = 6
+    AI_GENERATED = 7
+
+
+class CompletionMode(IntEnum):
+    """
+    Whether the reply finishes a command (``ON_REPLY``: a cover, a light) or a later command
+    event does (``ASYNCHRONOUS``: take-off, go-to, return home, a mission). ``UNSPECIFIED`` leaves
+    it to the response: one with an ``external_execution_id`` waits, any other success is done.
+    """
+
+    UNSPECIFIED = 0
+    ON_REPLY = 1
+    ASYNCHRONOUS = 2
+
+
+class CommandRisk(IntEnum):
+    """
+    How much a command changes the world; the platform's safety gate, approvals and the agent go
+    by it, and ``MOVE``/``CRITICAL`` are high-risk. Values match ``zqnt.capability.v3.CommandRisk``.
+    """
+
+    UNSPECIFIED = 0
+    OBSERVE = 1
+    ADJUST = 2
+    MOVE = 3
+    CRITICAL = 4
+
+
+@dataclass(frozen=True)
+class CommandSafety:
+    """What a command declares about its risk."""
+
+    risk: CommandRisk
+    reversible: bool = False
+    #: The command that undoes this one, e.g. ``dock.close_cover`` for ``dock.open_cover``.
+    undo_command_id: str | None = None
+    #: Plain-language conditions, e.g. "aircraft is airborne".
+    preconditions: tuple[str, ...] = ()
+    #: Plain-language effects, e.g. "aircraft climbs to the given altitude".
+    effects: tuple[str, ...] = ()
+
+
+@dataclass
+class CapabilityTarget:
+    """What a command acts on. ``target_ref`` is empty only when the type is ASSET."""
+
+    type: CapabilityTargetType = CapabilityTargetType.ASSET
+    target_ref: str | None = None
+
+
+@dataclass
+class Capability:
+    """
+    One command this asset can be asked to run.
+
+    ``command_id`` is a dotted, vendor-neutral id (``flight.takeoff``, ``dock.open_cover``) —
+    the same id core's dispatcher routes and its safety gate checks for. ``input_schema`` and
+    ``output_schema`` are JSON Schema objects describing the ``params`` the command accepts and
+    the ``result`` it returns, which is what lets the console build a parameter form and lets
+    the platform validate a stored Application against contract drift.
+
+    The pre-2.0 fields ``command``/``available`` remain readable as properties so existing
+    code that only inspected those keeps working.
+    """
+
+    command_id: str
+    description: str = ""
+    state: CapabilityState = CapabilityState.AVAILABLE
+    display_name: str | None = None
+    unavailable_reason: str | None = None
+    metadata: dict[str, str] = field(default_factory=dict)
+    input_schema: dict | None = None
+    output_schema: dict | None = None
+    target: CapabilityTarget | None = None
+    schema_version: str | None = None
+    skill_id: str | None = None
+    source: CapabilitySource = CapabilitySource.EDGE_ADAPTER
+    provider: str | None = None
+    #: Whether the reply finishes the command or a later event does. Not the same as the events a
+    #: Skill can react to: DJI reports cover motion as an event, yet the reply is the outcome.
+    completion: CompletionMode = CompletionMode.UNSPECIFIED
+    #: For ASYNCHRONOUS: the event that reports the outcome, e.g. ``flight.takeoff.completed``.
+    completion_event: str | None = None
+    #: The command's risk. Unset, a standard command id is advertised with its catalog rating
+    #: (:func:`~edge_sdk.adapter.commands.catalog_safety`).
+    safety: CommandSafety | None = None
+
+    @property
+    def command(self) -> str:
+        """Backwards-compatible alias for :attr:`command_id`."""
+        return self.command_id
+
+    @property
+    def available(self) -> bool:
+        """Backwards-compatible alias: True when the state is AVAILABLE."""
+        return self.state is CapabilityState.AVAILABLE
+
+
+@dataclass
+class Capabilities:
+    asset_sn: str
+    asset_type: AssetType
+    capabilities: list[Capability] = field(default_factory=list)
+    timestamp: datetime | None = None
+    #: The device-specific keys this asset sends in ``TelemetrySample.details``.
+    telemetry_fields: list["TelemetryField"] = field(default_factory=list)
+    #: The devices mounted on the asset, a full snapshot: one left out of the next report is detached.
+    payloads: list["Payload"] = field(default_factory=list)
+
+
+@dataclass
+class Payload:
+    """
+    A device mounted on the asset: camera, gimbal, speaker, spotlight, sprayer, sensor.
+
+    ``ref`` is stable within the asset; a command acting on this payload names it in its
+    ``CapabilityTarget(type=PAYLOAD, target_ref=ref)``. ``mounted_on`` None means the asset itself.
+    """
+
+    ref: str
+    kind: str
+    vendor: str = ""
+    model: str = ""
+    serial_number: str = ""
+    slot_index: int | None = None
+    firmware_version: str = ""
+    external_id: str = ""
+    mounted_on: CapabilityTarget | None = None
+    metadata: dict[str, str] = field(default_factory=dict)
+
+
+class TelemetryValueType(IntEnum):
+    UNSPECIFIED = 0
+    NUMBER = 1
+    STRING = 2
+    BOOLEAN = 3
+
+
+@dataclass
+class TelemetryField:
+    """One device-specific value in ``TelemetrySample.details``, e.g. ``dock.cover_state``."""
+
+    key: str
+    type: TelemetryValueType
+    unit: str = ""
+    description: str = ""
+    allowed_values: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Control requests
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ReturnToHomeRequest:
+    altitude: float | None = None
+
+
+@dataclass
+class ManualControlRequest:
+    client_id: str
+    user_id: str
+    session_id: str
+    reason: str | None = None
+
+
+@dataclass
+class ManualControlInput:
+    roll: float | None = None
+    pitch: float | None = None
+    yaw: float | None = None
+    throttle: float | None = None
+    gimbal_pitch: float | None = None
+
+
+# ---------------------------------------------------------------------------
+# Live stream
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class LiveStreamStartRequest:
+    video_id: str
+    stream_server: str
+    stream_type: LiveStreamType
+    asset_type: AssetType
+
+
+@dataclass
+class LiveStreamStopRequest:
+    video_id: str
+
+
+# ---------------------------------------------------------------------------
+# Camera
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ChangeCameraLensRequest:
+    lens: str | None = None
+
+
+@dataclass
+class ChangeCameraZoomRequest:
+    lens: str | None = None
+    zoom: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Detection
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class BoundingBox:
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+@dataclass
+class DetectionPosition:
+    """
+    Where a detected object is, for sensors that locate what they see (a radar, RF direction
+    finding, a geolocated camera target). Degrees WGS84; range/bearing/elevation are relative to
+    the sensor, bearing clockwise from true north; speed/heading are the object's own.
+    """
+
+    latitude: float
+    longitude: float
+    altitude: float | None = None
+    range_m: float | None = None
+    bearing_deg: float | None = None
+    elevation_deg: float | None = None
+    speed_mps: float | None = None
+    heading_deg: float | None = None
+
+
+@dataclass
+class DetectionResult:
+    object_id: str
+    object_type: str
+    confidence: float
+    # Image-space box for camera detections; a radar has none.
+    bounding_box: BoundingBox | None = None
+    position: DetectionPosition | None = None
+
+
+@dataclass
+class DetectionResponse:
+    detections: list[DetectionResult] = field(default_factory=list)
+
+
+@dataclass
+class DetectionBatch:
+    """Batch of detection results to publish via DetectionPublisher."""
+
+    sn: str = ""  # asset serial number – required for multi-asset adapters
+    detections: list[DetectionResult] = field(default_factory=list)
+    stream_url: str | None = None
+    #: When the frame was analysed; v3 publishing uses now() when unset.
+    observed_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Custom command
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CustomCommandRequest:
+    command_type: str
+    params: dict = field(default_factory=dict)
+
+
+@dataclass
+class CustomCommandResponse:
+    """
+    Return this from :meth:`~edge_sdk.EdgeAdapter.send_custom_command`.
+
+    Use the factory methods :meth:`ok` and :meth:`fail` for convenience.
+    """
+
+    tid: str
+    sn: str
+    success: bool
+    command_type: str
+    result: dict | None = None
+    message: str | None = None
+    error: ErrorMessage | None = None
+    # Same purpose as EdgeResponse.external_execution_id — set this when the command you just
+    # accepted keeps running asynchronously (e.g. a waypoint mission) so mission-autonomy can
+    # later cancel it (StopTask) and correlate CommandExecutionEvent notifications back to this
+    # execution. Leave unset for commands that are already fully done by the time you return.
+    external_execution_id: str | None = None
+
+    @classmethod
+    def ok(
+        cls,
+        tid: str,
+        sn: str,
+        command_type: str,
+        result: dict | None = None,
+        message: str | None = None,
+        *,
+        external_execution_id: str | None = None,
+    ) -> "CustomCommandResponse":
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=True,
+            command_type=command_type,
+            result=result,
+            message=message,
+            external_execution_id=external_execution_id,
+        )
+
+    @classmethod
+    def fail(
+        cls,
+        tid: str,
+        sn: str,
+        command_type: str,
+        error: ErrorMessage,
+    ) -> "CustomCommandResponse":
+        return cls(tid=tid, sn=sn, success=False, command_type=command_type, error=error)
+
+    @classmethod
+    def invalid_params(cls, tid: str, sn: str, command_type: str, message: str) -> "CustomCommandResponse":
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=False,
+            command_type=command_type,
+            error=ErrorMessage(message=message, code=ErrorCode.CLIENT_ERROR, reason=INVALID_PARAMS_CODE),
+        )
+
+    @classmethod
+    def not_supported(cls, tid: str = "", sn: str = "", command_type: str = "") -> "CustomCommandResponse":
+        return cls(
+            tid=tid,
+            sn=sn,
+            success=False,
+            command_type=command_type,
+            error=ErrorMessage(
+                message="This operation is not supported by this adapter",
+                code=ErrorCode.SDK_ERROR,
+            ),
+        )

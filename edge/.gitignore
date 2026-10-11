@@ -1,0 +1,50 @@
+# IDE
+.idea
+.idea/**
+*.iml
+.vscode
+*.swp
+*.swo
+*~
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+*.whl
+
+# Editor/IDE specific
+.claude
+.DS_Store
+
+# Testing
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+
+__pycache__/
+*.py[cod]
+
+# Secrets and local credentials: never committed (SEC-3). .env.example is the template.
+.env*
+!.env.example
+*.zqnt
+kubeconfig*
+*.pem
