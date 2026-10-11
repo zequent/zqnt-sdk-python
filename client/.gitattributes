@@ -1,0 +1,24 @@
+# Auto detect text files and normalize line endings to LF
+* text=auto
+
+# Python files
+*.py text eol=lf
+*.pyx text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows batch files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.whl binary
+*.so binary
+*.o binary
+*.a binary
+
+# Documentation
+*.md text eol=lf
+*.rst text eol=lf

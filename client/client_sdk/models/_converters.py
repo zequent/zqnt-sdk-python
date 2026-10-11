@@ -1,0 +1,109 @@
+"""Shared proto <-> dataclass converters.
+
+Per-domain converters live alongside their sub-clients (``mission_autonomy/_converters.py``).
+This module only contains helpers used by **multiple** sub-clients.
+
+Generated proto modules are imported lazily inside the helpers so the
+package remains importable before ``scripts/generate_protos.sh`` has run.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+
+from .common import ErrorInfo, ProgressInfo
+
+
+def build_request_base(sn: str, tid: str | None = None):
+    """Build a ``RequestBase`` proto with a fresh tid + UTC timestamp."""
+    from google.protobuf import timestamp_pb2
+    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
+
+    ts = timestamp_pb2.Timestamp()
+    ts.GetCurrentTime()
+    return common_pb2.RequestBase(
+        tid=tid or str(uuid.uuid4()),
+        sn=sn,
+        timestamp=ts,
+    )
+
+
+def proto_ts_to_datetime(ts) -> datetime | None:
+    """Convert a ``google.protobuf.Timestamp`` to a UTC ``datetime`` (or None)."""
+    if ts is None:
+        return None
+    seconds = getattr(ts, "seconds", 0)
+    nanos = getattr(ts, "nanos", 0)
+    if seconds == 0 and nanos == 0:
+        return None
+    return datetime.fromtimestamp(seconds + nanos / 1e9, tz=timezone.utc)
+
+
+def datetime_to_proto_ts(dt: datetime | None):
+    """Build a ``google.protobuf.Timestamp`` from a ``datetime`` (or current UTC)."""
+    from google.protobuf import timestamp_pb2
+
+    ts = timestamp_pb2.Timestamp()
+    if dt is None:
+        ts.GetCurrentTime()
+    else:
+        ts.FromDatetime(dt)
+    return ts
+
+
+def opt_field(msg, field: str):
+    """Return ``msg.field`` if the field is set, else ``None``.
+
+    Works for proto3 ``optional`` scalars and oneof members.
+    """
+    try:
+        return getattr(msg, field) if msg.HasField(field) else None  # type: ignore[attr-defined]
+    except (ValueError, AttributeError):
+        return getattr(msg, field, None)
+
+
+def _resolve_error_code(raw_code) -> str:
+    """Decode a proto ``ErrorCode`` enum value to its symbolic name."""
+    try:
+        from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
+
+        return common_pb2.ErrorCode.Name(raw_code)
+    except Exception:  # pragma: no cover - defensive
+        return str(raw_code)
+
+
+def proto_to_error_info(err) -> ErrorInfo:
+    """Convert a ``GlobalErrorMessage`` proto into :class:`ErrorInfo`."""
+    return ErrorInfo(
+        error_code=_resolve_error_code(err.error_code),
+        error_message=err.error_message,
+        timestamp=proto_ts_to_datetime(err.timestamp) if err.HasField("timestamp") else None,  # type: ignore[attr-defined]
+    )
+
+
+def proto_to_progress_info(p) -> ProgressInfo:
+    return ProgressInfo(
+        progress=p.progress,
+        state=p.state,
+        left_time_in_seconds=p.left_time_in_seconds,
+    )
+
+
+def dict_to_struct(d: dict | None):
+    """Build a ``google.protobuf.Struct`` from a plain dict (``None``/``{}`` -> empty Struct)."""
+    from google.protobuf import struct_pb2
+
+    s = struct_pb2.Struct()
+    if d:
+        s.update(d)
+    return s
+
+
+def struct_to_dict(s) -> dict:
+    """Decode a ``google.protobuf.Struct`` (or ``None``) into a plain dict."""
+    if s is None:
+        return {}
+    from google.protobuf import json_format
+
+    return json_format.MessageToDict(s)

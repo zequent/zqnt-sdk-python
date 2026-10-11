@@ -1,0 +1,19 @@
+# uv configuration for edge-python-sdk
+# See UV_SETUP.md for more details
+
+[pip]
+# Option 1: Use GitHub releases (uncomment to use .whl files)
+# index = [
+#     "https://github.com/Zequent/zqnt-utils-python/releases/download/v{version}/zqnt_utils-{version}-py3-none-any.whl",
+# ]
+
+# Option 2: Use git URL for development (default - simpler, works with private repos)
+# This is already in pyproject.toml as dependency, but you can add it here too
+
+# Fall back to PyPI for other packages
+index-fallback = true
+
+# Project-level settings
+[build]
+# Build backend
+requires = ["hatchling"]
