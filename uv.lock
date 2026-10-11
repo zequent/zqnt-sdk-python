@@ -297,8 +297,8 @@ requires-dist = [
     { name = "protobuf", specifier = ">=4.25.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
-    { name = "redis", extras = ["asyncio"], marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=8.0.0" },
+    { name = "redis", extras = ["asyncio"], marker = "extra == 'dev'", specifier = ">=8.1.0" },
+    { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=8.1.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
     { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api?subdirectory=python&rev=390b5e2f0fa6faa16bf175ce63a3a0481879e9cb" },
 ]
