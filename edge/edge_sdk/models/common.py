@@ -82,6 +82,9 @@ class AssetVendor(IntEnum):
     # The load/telemetry simulator registering as an asset of its own, so a simulated fleet is
     # addressable exactly like a real one -- matches asset.proto's ASSET_VENDOR_SIMULATOR.
     SIMULATOR = 9
+    # The AI detection adapter -- matches asset.proto's ASSET_VENDOR_AI. Its own slot so it never
+    # takes the routing endpoint of real RTMP/RTSP cameras.
+    AI = 10
 
 
 class AssetConnection(IntEnum):
