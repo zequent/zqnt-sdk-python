@@ -39,6 +39,7 @@ from ..models.common import (
     CustomCommandResponse,
     ErrorCode,
     ManualControlInput,
+    Payload,
     RequestContext,
 )
 
@@ -217,12 +218,33 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
             )
             for f in caps.telemetry_fields
         ],
+        payloads=[_payload(p) for p in caps.payloads],
     )
     if caps.timestamp is not None:
         snapshot.observed_at.FromDatetime(caps.timestamp)
     else:
         snapshot.observed_at.CopyFrom(_now())
     return snapshot
+
+
+def _payload(payload: Payload) -> capability_pb2.Payload:
+    proto = capability_pb2.Payload(
+        ref=payload.ref,
+        kind=payload.kind,
+        vendor=payload.vendor,
+        model=payload.model,
+        serial_number=payload.serial_number,
+        firmware_version=payload.firmware_version,
+        external_id=payload.external_id,
+        metadata=dict(payload.metadata),
+    )
+    if payload.slot_index is not None:
+        proto.slot_index = payload.slot_index
+    if payload.mounted_on is not None:
+        proto.mounted_on.CopyFrom(
+            capability_pb2.Target(type=int(payload.mounted_on.type), ref=payload.mounted_on.target_ref or "")
+        )
+    return proto
 
 
 class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):

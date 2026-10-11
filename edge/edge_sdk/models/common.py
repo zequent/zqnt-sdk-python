@@ -524,6 +524,29 @@ class Capabilities:
     timestamp: datetime | None = None
     #: The device-specific keys this asset sends in ``TelemetrySample.details``.
     telemetry_fields: list["TelemetryField"] = field(default_factory=list)
+    #: The devices mounted on the asset, a full snapshot: one left out of the next report is detached.
+    payloads: list["Payload"] = field(default_factory=list)
+
+
+@dataclass
+class Payload:
+    """
+    A device mounted on the asset: camera, gimbal, speaker, spotlight, sprayer, sensor.
+
+    ``ref`` is stable within the asset; a command acting on this payload names it in its
+    ``CapabilityTarget(type=PAYLOAD, target_ref=ref)``. ``mounted_on`` None means the asset itself.
+    """
+
+    ref: str
+    kind: str
+    vendor: str = ""
+    model: str = ""
+    serial_number: str = ""
+    slot_index: int | None = None
+    firmware_version: str = ""
+    external_id: str = ""
+    mounted_on: CapabilityTarget | None = None
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 class TelemetryValueType(IntEnum):

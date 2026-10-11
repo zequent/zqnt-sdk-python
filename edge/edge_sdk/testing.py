@@ -7,7 +7,8 @@ Conformance kit for adapter test suites::
         await assert_conformant(MyAdapter(fake_device), sn="SIM-1")
 
 Checks: every advertised (AVAILABLE) id is executable, every executable id is advertised, every
-schema parses and accepts a minimal example, telemetry field keys are unique, and a completion
+schema parses and accepts a minimal example, telemetry field keys and payload refs are unique, a
+command targeting a payload names a reported one, and a completion
 event built by the SDK carries ``occurred_at``. ``execute=True`` also runs each advertised command
 through v3 ``ExecuteCommand`` with minimal params -- only against a fake or simulated device.
 
@@ -24,7 +25,13 @@ from google.protobuf import struct_pb2
 from .adapter.base import _STREAMING_COMMANDS, EdgeAdapter
 from .adapter.validation import check_schema, example_params, validate_params
 from .client.edge_gateway import EdgeGatewayClient, command_event
-from .models.common import INVALID_PARAMS_CODE, Capabilities, CapabilityState, CommandExecutionStatus
+from .models.common import (
+    INVALID_PARAMS_CODE,
+    Capabilities,
+    CapabilityState,
+    CapabilityTargetType,
+    CommandExecutionStatus,
+)
 from .models.notification import CommandExecutionEvent
 
 
@@ -69,6 +76,15 @@ async def check_conformance(adapter: EdgeAdapter, sn: str = "CONFORMANCE-1", *, 
         report.problems.append(f"telemetry field {key} is declared more than once")
     if any(not k for k in keys):
         report.problems.append("a telemetry field has no key")
+
+    refs = [p.ref for p in caps.payloads]
+    for ref in sorted({r for r in refs if refs.count(r) > 1}):
+        report.problems.append(f"payload {ref} is reported more than once")
+    if any(not r for r in refs):
+        report.problems.append("a payload has no ref")
+    for command_id, c in sorted(advertised.items()):
+        if c.target is not None and c.target.type == CapabilityTargetType.PAYLOAD and c.target.target_ref not in refs:
+            report.problems.append(f"{command_id} targets payload '{c.target.target_ref}', which is not reported")
 
     event = command_event(
         CommandExecutionEvent(external_execution_id="conformance", status=CommandExecutionStatus.SUCCEEDED, sn=sn)

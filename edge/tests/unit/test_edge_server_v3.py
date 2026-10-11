@@ -7,6 +7,7 @@ is refused as REJECTED (never an aborted call); a long command is ACCEPTED with 
 under; capabilities come out of the same registry as v2's.
 """
 
+import pytest
 from google.protobuf import struct_pb2
 from zqnt_api.generated.zqnt.capability.v3 import command_pb2
 from zqnt_api.generated.zqnt.common.v3 import common_pb2
@@ -15,11 +16,14 @@ from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
 from edge_sdk import AssetType, EdgeAdapter, EdgeResponse
 from edge_sdk.models.common import (
     CapabilityState,
+    CapabilityTarget,
+    CapabilityTargetType,
     CompletionMode,
     Coordinates,
     CustomCommandResponse,
     ErrorCode,
     ErrorMessage,
+    Payload,
 )
 from edge_sdk.server.edge_server_v3 import NOT_SUPPORTED_CODE, EdgeAdapterV3Servicer
 
@@ -200,3 +204,53 @@ async def test_unreadable_capabilities_leave_the_command_to_its_response():
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
+
+
+async def test_mounted_payloads_are_reported_and_a_change_is_announced():
+    adapter = _Adapter()
+    changed: list[str | None] = []
+    adapter.add_capability_listener(changed.append)
+    camera = Payload(
+        ref="camera-0",
+        kind="camera",
+        vendor="DJI",
+        model="H30T",
+        slot_index=0,
+        external_id="99-0-0",
+        mounted_on=CapabilityTarget(type=CapabilityTargetType.SUB_ASSET, target_ref="drone-1"),
+        metadata={"lens": "wide"},
+    )
+
+    adapter.set_payloads("SN-1", [camera])
+    adapter.set_payloads("SN-1", [camera])
+    response = await EdgeAdapterV3Servicer(adapter).GetCapabilities(
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+    )
+    reported = response.capabilities.payloads[0]
+
+    assert changed == ["SN-1"]
+    assert (reported.ref, reported.kind, reported.model, reported.external_id) == (
+        "camera-0",
+        "camera",
+        "H30T",
+        "99-0-0",
+    )
+    assert reported.HasField("slot_index") and reported.slot_index == 0
+    assert (reported.mounted_on.type, reported.mounted_on.ref) == (int(CapabilityTargetType.SUB_ASSET), "drone-1")
+    assert dict(reported.metadata) == {"lens": "wide"}
+
+    adapter.set_payloads("SN-1", [Payload(ref="speaker-1", kind="speaker")])
+    response = await EdgeAdapterV3Servicer(adapter).GetCapabilities(
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+    )
+    assert [p.ref for p in response.capabilities.payloads] == ["speaker-1"]
+    assert not response.capabilities.payloads[0].HasField("slot_index")
+    assert changed == ["SN-1", "SN-1"]
+
+
+def test_payloads_need_unique_refs():
+    adapter = _Adapter()
+    with pytest.raises(ValueError):
+        adapter.set_payloads("SN-1", [Payload(ref="a", kind="camera"), Payload(ref="a", kind="camera")])
+    with pytest.raises(ValueError):
+        adapter.set_payloads("SN-1", [Payload(ref="", kind="camera")])

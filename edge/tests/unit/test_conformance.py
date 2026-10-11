@@ -2,8 +2,15 @@
 
 import pytest
 
-from edge_sdk import AssetType, EdgeAdapter, EdgeResponse, TelemetryValueType, schema
-from edge_sdk.models.common import Capabilities, Capability, CommandExecutionStatus, CustomCommandResponse
+from edge_sdk import AssetType, EdgeAdapter, EdgeResponse, Payload, TelemetryValueType, schema
+from edge_sdk.models.common import (
+    Capabilities,
+    Capability,
+    CapabilityTarget,
+    CapabilityTargetType,
+    CommandExecutionStatus,
+    CustomCommandResponse,
+)
 from edge_sdk.models.notification import CommandExecutionEvent
 from edge_sdk.testing import RecordingGateway, assert_conformant, check_conformance
 
@@ -101,3 +108,16 @@ async def test_the_recording_gateway_checks_published_events():
 
     gateway.assert_events_complete()
     assert gateway.events[0].command_execution_id == "v-1"
+
+
+async def test_a_command_targeting_an_unreported_payload_is_reported():
+    adapter = _Good()
+    adapter.register_command(
+        "vendor.acme.announce", _ok, target=CapabilityTarget(type=CapabilityTargetType.PAYLOAD, target_ref="speaker-1")
+    )
+
+    report = await check_conformance(adapter)
+    assert "vendor.acme.announce targets payload 'speaker-1', which is not reported" in report.problems
+
+    adapter.set_payloads("CONFORMANCE-1", [Payload(ref="speaker-1", kind="speaker")])
+    await assert_conformant(adapter)
