@@ -22,12 +22,18 @@ registered by the adapter itself, never added here.
 
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
+from functools import cache
+from importlib import resources
 from typing import Any, Awaitable, Callable
 
 from ..models.common import (
     CapabilityState,
     CapabilityTarget,
+    CommandRisk,
+    CommandSafety,
     CustomCommandResponse,
     RequestContext,
 )
@@ -286,6 +292,43 @@ def spec_for(command_id: str) -> CommandSpec | None:
     return CATALOG.get(command_id)
 
 
+_PLACEHOLDER = re.compile(r"<[a-z_]+>")
+
+
+@cache
+def _risk_catalog() -> tuple[dict[str, CommandSafety], list[tuple[re.Pattern[str], CommandSafety]]]:
+    data = json.loads(resources.files(__package__).joinpath("command_catalog.json").read_text(encoding="utf-8"))
+    exact: dict[str, CommandSafety] = {}
+    patterns: list[tuple[re.Pattern[str], CommandSafety]] = []
+    for entry in data["commands"]:
+        undo = entry.get("undo_command_id") or None
+        safety = CommandSafety(
+            risk=CommandRisk[entry["risk"]] if entry.get("risk") else CommandRisk.CRITICAL,
+            reversible=undo is not None,
+            undo_command_id=undo,
+        )
+        command_id = entry["command_id"]
+        if _PLACEHOLDER.search(command_id):
+            parts = (re.escape(part) for part in _PLACEHOLDER.split(command_id))
+            patterns.append((re.compile("[A-Za-z0-9_]+".join(parts)), safety))
+        else:
+            exact[command_id] = safety
+    return exact, patterns
+
+
+def catalog_safety(command_id: str) -> CommandSafety | None:
+    """
+    The platform catalog's rating of a standard command id (zqnt-api ``command_catalog.json``).
+
+    An id the catalog lists without a rating counts as CRITICAL; an id it does not list returns
+    ``None``, and the adapter declares its risk itself.
+    """
+    exact, patterns = _risk_catalog()
+    if command_id in exact:
+        return exact[command_id]
+    return next((safety for pattern, safety in patterns if pattern.fullmatch(command_id)), None)
+
+
 @dataclass
 class RegisteredCommand:
     """One command an adapter has declared: its contract and, optionally, how to run it."""
@@ -302,6 +345,7 @@ class RegisteredCommand:
     state: CapabilityState = CapabilityState.AVAILABLE
     unavailable_reason: str | None = None
     metadata: dict[str, str] = field(default_factory=dict)
+    safety: CommandSafety | None = None
 
     @property
     def dispatchable(self) -> bool:

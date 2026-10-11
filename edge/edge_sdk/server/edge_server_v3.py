@@ -28,6 +28,7 @@ from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
 from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
 
 from ..adapter.base import EdgeAdapter
+from ..adapter.commands import catalog_safety
 from ..client.edge_gateway import CommandRuns
 from ..client.telemetry_ingest import detection_to_v3
 from ..models.common import (
@@ -191,6 +192,15 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
             kwargs["completion"] = int(c.completion)
         if c.completion_event:
             kwargs["completion_event"] = c.completion_event
+        safety = c.safety or catalog_safety(c.command_id)
+        if safety is not None:
+            kwargs["safety"] = capability_pb2.CommandSafety(
+                risk=int(safety.risk),
+                reversible=safety.reversible,
+                undo_command_id=safety.undo_command_id or "",
+                preconditions=list(safety.preconditions),
+                effects=list(safety.effects),
+            )
         proto.append(capability_pb2.Capability(**kwargs))
     snapshot = capability_pb2.CapabilitySet(
         asset_sn=caps.asset_sn,

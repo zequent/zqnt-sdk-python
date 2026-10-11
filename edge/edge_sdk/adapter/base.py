@@ -52,6 +52,8 @@ from ..models.common import (
     CapabilityTarget,
     ChangeCameraLensRequest,
     ChangeCameraZoomRequest,
+    CommandRisk,
+    CommandSafety,
     Coordinates,
     CustomCommandRequest,
     CustomCommandResponse,
@@ -69,7 +71,7 @@ from ..models.common import (
     TelemetryField,
     TelemetryValueType,
 )
-from .commands import CATALOG, CommandHandler, RegisteredCommand, spec_for
+from .commands import CATALOG, CommandHandler, RegisteredCommand, catalog_safety, spec_for
 from .validation import validate_params
 
 logger = logging.getLogger(__name__)
@@ -199,6 +201,7 @@ class EdgeAdapter(ABC):
         state: CapabilityState = CapabilityState.AVAILABLE,
         unavailable_reason: str | None = None,
         metadata: dict[str, str] | None = None,
+        safety: CommandSafety | CommandRisk | None = None,
     ) -> None:
         """
         Declare one command this adapter can run.
@@ -233,6 +236,12 @@ class EdgeAdapter(ABC):
         has no catalog entry, so pass ``skill_id`` to file it alongside the commands it belongs
         with -- otherwise the console groups it under the literal segment ``vendor``, together with
         every unrelated vendor command in the fleet.
+
+        ``safety`` declares the command's risk (a :class:`CommandRisk` alone is enough). A
+        standard id defaults to its catalog rating (:func:`~edge_sdk.adapter.commands.catalog_safety`);
+        a ``vendor.*`` command that moves or affects the asset must declare it::
+
+            self.register_command("vendor.acme.spray", self._spray, safety=CommandRisk.CRITICAL)
         """
         spec = spec_for(command_id)
         self._commands[command_id] = RegisteredCommand(
@@ -248,6 +257,7 @@ class EdgeAdapter(ABC):
             state=state,
             unavailable_reason=unavailable_reason,
             metadata=dict(metadata or {}),
+            safety=CommandSafety(risk=safety) if isinstance(safety, CommandRisk) else safety,
         )
         self.notify_capabilities_changed()
 
@@ -437,6 +447,7 @@ class EdgeAdapter(ABC):
                 schema_version=spec.schema_version,
                 skill_id=spec.skill_id,
                 target=CapabilityTarget(),
+                safety=catalog_safety(command_id),
             )
 
         for command_id, registered in self._commands.items():
@@ -452,6 +463,7 @@ class EdgeAdapter(ABC):
                 target=registered.target or CapabilityTarget(),
                 schema_version=registered.schema_version,
                 skill_id=registered.skill_id,
+                safety=registered.safety or catalog_safety(command_id),
             )
 
         return Capabilities(

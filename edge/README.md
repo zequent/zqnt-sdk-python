@@ -240,6 +240,11 @@ class MyDockAdapter(EdgeAdapter):
   with `command.invalid_params`. Omitted coordinates arrive as NaN: NaN is a number, but never
   satisfies `required`.
 - A handler sees the platform's run id as `ctx.command_execution_id`.
+- Every capability carries its risk (`CommandSafety`). A standard id gets the rating of the
+  platform's command catalog (`catalog_safety`, e.g. `flight.takeoff` MOVE, `flight.land` CRITICAL);
+  `register_command(..., safety=CommandRisk.CRITICAL)` or a full `CommandSafety` overrides it. A
+  `vendor.*` command that moves or affects the asset must declare its own: an id outside the catalog
+  declares none, and the platform then falls back to the 2.x prefix rule.
 - With `REMOTE_CONTROL_HOST` set, capabilities (with `telemetry_fields`) are reported via
   `EdgeGatewayService.ReportCapabilities` on start and whenever the registry changes
   (`notify_capabilities_changed(sn)` for anything else). An older core gets v2 `ReportAssetRuntime`.
