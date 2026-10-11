@@ -433,6 +433,33 @@ class CompletionMode(IntEnum):
     ASYNCHRONOUS = 2
 
 
+class CommandRisk(IntEnum):
+    """
+    How much a command changes the world; the platform's safety gate, approvals and the agent go
+    by it, and ``MOVE``/``CRITICAL`` are high-risk. Values match ``zqnt.capability.v3.CommandRisk``.
+    """
+
+    UNSPECIFIED = 0
+    OBSERVE = 1
+    ADJUST = 2
+    MOVE = 3
+    CRITICAL = 4
+
+
+@dataclass(frozen=True)
+class CommandSafety:
+    """What a command declares about its risk."""
+
+    risk: CommandRisk
+    reversible: bool = False
+    #: The command that undoes this one, e.g. ``dock.close_cover`` for ``dock.open_cover``.
+    undo_command_id: str | None = None
+    #: Plain-language conditions, e.g. "aircraft is airborne".
+    preconditions: tuple[str, ...] = ()
+    #: Plain-language effects, e.g. "aircraft climbs to the given altitude".
+    effects: tuple[str, ...] = ()
+
+
 @dataclass
 class CapabilityTarget:
     """What a command acts on. ``target_ref`` is empty only when the type is ASSET."""
@@ -474,6 +501,9 @@ class Capability:
     completion: CompletionMode = CompletionMode.UNSPECIFIED
     #: For ASYNCHRONOUS: the event that reports the outcome, e.g. ``flight.takeoff.completed``.
     completion_event: str | None = None
+    #: The command's risk. Unset, a standard command id is advertised with its catalog rating
+    #: (:func:`~edge_sdk.adapter.commands.catalog_safety`).
+    safety: CommandSafety | None = None
 
     @property
     def command(self) -> str:
