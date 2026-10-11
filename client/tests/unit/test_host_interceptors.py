@@ -15,15 +15,14 @@ import pytest
 from zqnt_api.generated.zqnt import (  # type: ignore[import]
     connector_pb2,
     connector_pb2_grpc,
-    live_data_pb2_grpc,
-    live_data_types_pb2,
 )
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2, telemetry_pb2_grpc
 
 from client_sdk import ZequentClient
 from client_sdk.auth import ENV_VAR, ZequentAuthError
 from client_sdk.config.resilience import ResilienceConfig
 from client_sdk.config.service_config import ServiceConfig
-from client_sdk.models.live_data import StreamTelemetryRequest
 
 
 class _Recorder:
@@ -46,13 +45,15 @@ class _Connector(connector_pb2_grpc.ConnectorServiceServicer):
         return connector_pb2.SkillContractListResponse(has_errors=False)
 
 
-class _LiveData(live_data_pb2_grpc.LiveDataServiceServicer):
+class _Telemetry(telemetry_pb2_grpc.TelemetryServiceServicer):
     def __init__(self, recorder: _Recorder) -> None:
         self._recorder = recorder
 
-    async def StreamTelemetry(self, request, context):  # noqa: N802 - gRPC naming
+    async def WatchTelemetry(self, request, context):  # noqa: N802 - gRPC naming
         await self._recorder.check(context)
-        yield live_data_types_pb2.LiveDataTelemetryResponse(sn=request.base.sn)
+        yield telemetry_pb2.WatchTelemetryResponse(
+            sample=telemetry_pb2.TelemetrySample(asset=common_pb2.AssetRef(sn=request.assets[0].sn))
+        )
 
 
 @pytest.fixture
@@ -60,7 +61,7 @@ async def server():
     recorder = _Recorder()
     srv = grpc.aio.server()
     connector_pb2_grpc.add_ConnectorServiceServicer_to_server(_Connector(recorder), srv)
-    live_data_pb2_grpc.add_LiveDataServiceServicer_to_server(_LiveData(recorder), srv)
+    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(_Telemetry(recorder), srv)
     port = srv.add_insecure_port("127.0.0.1:0")
     await srv.start()
     yield recorder, port
@@ -119,12 +120,10 @@ async def test_the_host_interceptor_reaches_unary_and_streaming_calls(server, mo
     async with _client(port, None, interceptors) as client:
         await client.connector.list_skill_contracts()
         current["token"] = "service-token"
-        handle = client.live_data.stream_telemetry(StreamTelemetryRequest(sn="DOCK-1"), lambda r: received.append(r.sn))
-        for _ in range(100):
-            if received:
+        async with asyncio.timeout(5):
+            async for sample in client.telemetry.watch_telemetry(["DOCK-1"]):
+                received.append(sample.asset.sn)
                 break
-            await asyncio.sleep(0.02)
-        await handle.stop()
     assert recorder.headers[0] == ["Bearer user-token"]
     assert received and recorder.headers[1] == ["Bearer service-token"]
 

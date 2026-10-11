@@ -5,8 +5,8 @@ Mirrors the Java client SDK (``com.zqnt.sdk.client.ZequentClient``) so that
 ``.env`` files and configuration concepts are interchangeable between the
 Java and Python SDKs.
 
-Sub-clients (connector, remote_control, mission_autonomy, live_data) are all wired; the channel
-lifecycle below is complete.
+Sub-clients: commands and telemetry (the 3.0 command and live data API), connector and
+mission_autonomy.
 """
 
 from __future__ import annotations
@@ -25,9 +25,7 @@ from .grpc_.channel_factory import create_channel
 if TYPE_CHECKING:
     from .commands.client import CommandsClient
     from .connector.client import ConnectorClient
-    from .live_data.client import LiveDataClient
     from .mission_autonomy.client import MissionAutonomyClient
-    from .remote_control.client import RemoteControlClient
     from .telemetry.client import TelemetryClient
 
 logger = logging.getLogger(__name__)
@@ -41,9 +39,7 @@ class ZequentClient:
         client.commands
         client.telemetry
         client.connector
-        client.remote_control
         client.mission_autonomy
-        client.live_data
 
     Use as an async context manager to ensure channels are closed::
 
@@ -108,9 +104,7 @@ class ZequentClient:
         # Lazy sub-clients.
         self._commands: "CommandsClient | None" = None
         self._connector: "ConnectorClient | None" = None
-        self._remote_control: "RemoteControlClient | None" = None
         self._mission_autonomy: "MissionAutonomyClient | None" = None
-        self._live_data: "LiveDataClient | None" = None
         self._telemetry: "TelemetryClient | None" = None
 
         logger.info("ZequentClient initialized with %d channels", len(self._channels))
@@ -170,7 +164,7 @@ class ZequentClient:
     def commands(self) -> "CommandsClient":
         """Command any asset by id: ``list_capabilities(asset)`` and
         ``execute_command(asset, command_id, params)``, plus command events and cancel. The command
-        API of Zequent 3.0; needs a 3.0 platform."""
+        API of Zequent 3.0."""
         if self._commands is None:
             from .commands.client import CommandsClient
 
@@ -179,8 +173,8 @@ class ZequentClient:
 
     @property
     def telemetry(self) -> "TelemetryClient":
-        """Live telemetry of Zequent 3.0: samples and source status of assets, as one stream
-        (``watch_telemetry``). Needs a 3.0 platform; :attr:`live_data` streams 2.x telemetry."""
+        """Live data of Zequent 3.0: telemetry samples and source status (``watch_telemetry``),
+        detections (``watch_detections``) and alerts (``watch_alerts``)."""
         if self._telemetry is None:
             from .telemetry.client import TelemetryClient
 
@@ -196,29 +190,12 @@ class ZequentClient:
         return self._connector
 
     @property
-    def remote_control(self) -> "RemoteControlClient":
-        """The 2.x typed remote control, kept for 2.x platforms; on 3.0 use :attr:`commands`."""
-        if self._remote_control is None:
-            from .remote_control.client import RemoteControlClient
-
-            self._remote_control = RemoteControlClient(self._remote_control_channel, self._resilience)
-        return self._remote_control
-
-    @property
     def mission_autonomy(self) -> "MissionAutonomyClient":
         if self._mission_autonomy is None:
             from .mission_autonomy.client import MissionAutonomyClient
 
             self._mission_autonomy = MissionAutonomyClient(self._mission_autonomy_channel, self._resilience)
         return self._mission_autonomy
-
-    @property
-    def live_data(self) -> "LiveDataClient":
-        if self._live_data is None:
-            from .live_data.client import LiveDataClient
-
-            self._live_data = LiveDataClient(self._live_data_channel, self._resilience)
-        return self._live_data
 
     # ------------------------------------------------------------------
     # Lifecycle

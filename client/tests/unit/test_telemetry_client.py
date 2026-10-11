@@ -21,10 +21,22 @@ class FakeTelemetryV3(telemetry_pb2_grpc.TelemetryServiceServicer):
     def __init__(self) -> None:
         self.request: telemetry_pb2.WatchTelemetryRequest | None = None
         self.refuse_with: tuple[grpc.StatusCode, str] | None = None
-        self.responses: list[telemetry_pb2.WatchTelemetryResponse] = []
+        self.responses: list = []
         self.cancelled = asyncio.Event()
 
     async def WatchTelemetry(self, request, context):  # noqa: N802
+        async for response in self._serve(request, context):
+            yield response
+
+    async def WatchDetections(self, request, context):  # noqa: N802
+        async for response in self._serve(request, context):
+            yield response
+
+    async def WatchAlerts(self, request, context):  # noqa: N802
+        async for response in self._serve(request, context):
+            yield response
+
+    async def _serve(self, request, context):
         self.request = request
         if self.refuse_with is not None:
             await context.abort(*self.refuse_with)
@@ -129,3 +141,60 @@ async def test_a_blank_serial_is_refused(client: TelemetryClient):
     with pytest.raises(ValueError):
         async for _ in client.watch_telemetry(["DRONE-1", " "]):
             pass
+
+
+async def test_watches_detection_batches_and_skips_heartbeats(client: TelemetryClient, fake: FakeTelemetryV3):
+    fake.responses = [
+        telemetry_pb2.WatchDetectionsResponse(heartbeat=timestamp_pb2.Timestamp(seconds=1)),
+        telemetry_pb2.WatchDetectionsResponse(
+            batch=telemetry_pb2.DetectionBatch(asset=common_pb2.AssetRef(sn="DRONE-1"), stream_url="rtsp://s")
+        ),
+    ]
+
+    async with asyncio.timeout(5):
+        async for batch in client.watch_detections(["DRONE-1"]):
+            break
+
+    assert [a.sn for a in fake.request.assets] == ["DRONE-1"]
+    assert isinstance(batch, telemetry_pb2.DetectionBatch)
+    assert batch.stream_url == "rtsp://s"
+    await asyncio.wait_for(fake.cancelled.wait(), timeout=5)
+
+
+async def test_watches_alerts_from_a_minimum_severity(client: TelemetryClient, fake: FakeTelemetryV3):
+    fake.responses = [
+        telemetry_pb2.WatchAlertsResponse(heartbeat=timestamp_pb2.Timestamp(seconds=1)),
+        telemetry_pb2.WatchAlertsResponse(
+            alert=telemetry_pb2.Alert(
+                asset=common_pb2.AssetRef(sn="DOCK-1"), severity=telemetry_pb2.ALERT_SEVERITY_CRITICAL, code="dock.rain"
+            )
+        ),
+    ]
+
+    async with asyncio.timeout(5):
+        async for alert in client.watch_alerts(min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING):
+            break
+
+    assert len(fake.request.assets) == 0
+    assert fake.request.min_severity == telemetry_pb2.ALERT_SEVERITY_WARNING
+    assert fake.request.context.request_id
+    assert alert.code == "dock.rain"
+
+
+async def test_a_refused_alert_watch_raises_its_category(client: TelemetryClient, fake: FakeTelemetryV3):
+    fake.refuse_with = (grpc.StatusCode.PERMISSION_DENIED, "live data is not licensed")
+
+    with pytest.raises(CommandError) as raised:
+        async for _ in client.watch_alerts(["DOCK-1"]):
+            pass
+
+    assert raised.value.category == common_pb2.ERROR_CATEGORY_PERMISSION_DENIED
+
+
+async def test_a_silent_detection_watch_raises_after_the_heartbeat_timeout(client: TelemetryClient):
+    with pytest.raises(CommandError) as raised:
+        async with asyncio.timeout(5):
+            async for _ in client.watch_detections(heartbeat_timeout=0.3):
+                pass
+
+    assert raised.value.retryable

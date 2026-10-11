@@ -6,10 +6,9 @@ Python client for the Zequent Framework. Connects to:
 
   * zqnt.control.v3.RemoteControlService (any command by id: list_capabilities, execute_command,
     stream_manual_control)
-  * zqnt.telemetry.v3.TelemetryService (watch_telemetry)
-  * RemoteControlService     (2.x typed flight, dock & asset ops; deprecated on 3.0)
-  * MissionAutonomyService   (mission / task / scheduler CRUD + start/stop)
-  * LiveDataService          (telemetry streaming, live stream, camera control)
+  * zqnt.telemetry.v3.TelemetryService (watch_telemetry, watch_detections, watch_alerts)
+  * ConnectorService         (assets, organizations, skill registry, schedulers)
+  * MissionAutonomyService   (Applications, Skill executions, schedulers)
 
 Quick-start
 -----------
@@ -32,7 +31,7 @@ from importlib.metadata import version as _pkg_version
 
 from .commands import CommandError, CommandsClient, ManualControlStream
 from .exceptions import ZequentClientError, ZequentRetryExhaustedError
-from .live_data.stream_handle import StreamHandle
+from .stream_handle import StreamHandle
 from .telemetry import TelemetryClient
 
 try:
@@ -41,34 +40,14 @@ except PackageNotFoundError:
     __version__ = "3.0.0"
 
 from .models import (
-    AssetSdrState,
-    AssetTelemetry,
-    AssetWirelessLinkInfo,
-    ChangeLensRequest,
-    ChangeZoomRequest,
-    DockOperationRequest,
     ErrorInfo,
-    GoToRequest,
-    LiveDataResponse,
-    LiveDataStartLiveStreamRequest,
-    LiveDataStopLiveStreamRequest,
-    LookAtRequest,
-    ManualControlInput,
-    ManualControlRequest,
     MissionDTO,
     MissionResponse,
     MissionStatus,
     MissionType,
     ProgressInfo,
-    RemoteControlResponse,
-    ReturnToHomeRequest,
     SchedulerDTO,
     SchedulerResponse,
-    StreamTelemetryRequest,
-    StreamTelemetryResponse,
-    SubAssetTelemetry,
-    TakeoffRequest,
-    TakeoffResponse,
     TaskDTO,
     TaskResponse,
     TaskStatus,
@@ -76,7 +55,6 @@ from .models import (
     WaypointDTO,
     WaypointTaskConfig,
 )
-from .remote_control.manual_control_session import ManualControlInputSession
 from .zequent_client import ZequentClient
 
 __all__ = [
@@ -87,36 +65,11 @@ __all__ = [
     "ManualControlStream",
     "TelemetryClient",
     "StreamHandle",
-    "ManualControlInputSession",
-    # core responses
     "ErrorInfo",
     "ProgressInfo",
-    "RemoteControlResponse",
-    "TakeoffResponse",
-    "LiveDataResponse",
     "MissionResponse",
     "TaskResponse",
     "SchedulerResponse",
-    # remote-control
-    "TakeoffRequest",
-    "GoToRequest",
-    "ReturnToHomeRequest",
-    "LookAtRequest",
-    "ManualControlRequest",
-    "ManualControlInput",
-    "DockOperationRequest",
-    # live-data
-    "StreamTelemetryRequest",
-    "StreamTelemetryResponse",
-    "AssetTelemetry",
-    "AssetWirelessLinkInfo",
-    "AssetSdrState",
-    "SubAssetTelemetry",
-    "LiveDataStartLiveStreamRequest",
-    "LiveDataStopLiveStreamRequest",
-    "ChangeLensRequest",
-    "ChangeZoomRequest",
-    # mission-autonomy
     "MissionDTO",
     "TaskDTO",
     "SchedulerDTO",
@@ -126,7 +79,6 @@ __all__ = [
     "MissionType",
     "TaskStatus",
     "TaskType",
-    # exceptions
     "ZequentClientError",
     "ZequentRetryExhaustedError",
 ]

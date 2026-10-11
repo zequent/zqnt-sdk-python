@@ -19,60 +19,6 @@ class ErrorCode(IntEnum):
     ASSET_ERROR = 4
 
 
-class AssetType(IntEnum):
-    """Mirrors ``common.proto`` :proto:`AssetTypeEnum`."""
-
-    UNKNOWN = 0
-    AIRCRAFT = 1
-    DOCK = 2
-    SENSOR = 3
-    CAMERA = 4
-    OTHER = 5
-
-
-class LiveStreamType(IntEnum):
-    """Mirrors ``common.proto`` :proto:`LiveStreamTypeEnum`."""
-
-    UNKNOWN = 0
-    RTMP = 1
-    RTSP = 2
-    WEBRTC = 3
-
-
-class LiveDataServiceCommand(IntEnum):
-    """Mirrors ``common.proto`` :proto:`LiveDataServiceCommand`."""
-
-    START_TELEMETRY_STREAM = 0
-    GET_TELEMETRY_DATA = 1
-    STOP_TELEMETRY_STREAM = 2
-    START_LIVE_STREAM = 3
-    STOP_LIVE_STREAM = 4
-
-
-class NotificationEventType(IntEnum):
-    """Mirrors ``events.proto`` :proto:`NotificationEventType`.
-
-    Value 2 (``TASK``) is permanently reserved on the wire — the legacy Task/Mission
-    model retired it in favor of ``COMMAND_EXECUTION`` events; it is intentionally
-    absent here rather than kept as a dead member.
-    """
-
-    UNSPECIFIED = 0
-    ASSET_STATUS = 1
-    MISSION = 3
-    ASSET_RUNTIME = 4
-    CAPABILITY_EXECUTION = 5
-    COMMAND_EXECUTION = 6
-
-
-class NotificationSeverity(IntEnum):
-    """Mirrors ``live-data.proto`` :proto:`NotificationSeverity`."""
-
-    INFO = 0
-    WARN = 1
-    CRITICAL = 2
-
-
 class TaskType(IntEnum):
     """Mirrors ``common.proto`` :proto:`TaskTypeProto`."""
 

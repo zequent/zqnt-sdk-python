@@ -1,4 +1,4 @@
-# Migrating from 2.x typed calls to `execute_command`
+# Migrating from the 2.x client SDK to 3.0
 
 Zequent 3.0 commands every asset the same way: ask the asset what it can do, then run a command by
 its dotted id with a dict of params.
@@ -10,10 +10,13 @@ result = await client.commands.execute_command(
 )
 ```
 
-The 2.x typed methods on `client.remote_control` still work against 2.x platforms; they are
-deprecated and emit a `DeprecationWarning` naming the command id to use instead.
-`remote_control.start_manual_control_input(...)` stays for stick input on 2.x platforms; on 3.0 use
-`commands.stream_manual_control(...)`.
+3.0 removes the 2.x typed command calls: `client.remote_control` (every typed command, the
+capability snapshot, custom commands, the 2.x manual control session) and `client.live_data`
+(camera and live stream calls, the 2.x telemetry and notification streams), together with their
+request/response models (`TakeoffRequest`, `GoToRequest`, `DockOperationRequest`,
+`RemoteControlResponse`, `StreamTelemetryRequest`, `ChangeLensRequest`, ...). The tables below
+map each of them to its 3.0 replacement. `client.connector` and `client.mission_autonomy` are
+unchanged.
 
 ## Typed call → command id + params
 
@@ -37,9 +40,11 @@ below are the ones the built-in commands of every Zequent adapter accept.
 | `boot_sub_asset(DockOperationRequest(value=...))` | `asset.boot_sub_asset` | `enabled` (bool: `True` boots, `False` shuts down) |
 | `debug_mode(DockOperationRequest(value=...))` | `asset.remote_debug` | `enabled` (bool) |
 | `change_ac_mode(...)` | `asset.change_ac_mode` | `mode` (one of the values in the capability's schema; 2.x could not choose one) |
+| `live_data.change_lens(ChangeLensRequest)` | `camera.change_lens` | `lens`, `videoId` |
+| `live_data.change_zoom(ChangeZoomRequest)` | `camera.change_zoom` | `lens`, `payloadIndex`, `zoom` |
+| `live_data.start_live_stream(LiveDataStartLiveStreamRequest)` | `stream.start` | as in the capability's `input_schema` |
+| `live_data.stop_live_stream(LiveDataStopLiveStreamRequest)` | `stream.stop` | as in the capability's `input_schema` |
 
-The camera calls on `client.live_data` (`change_lens`, `change_zoom`) are also commands on 3.0:
-`camera.change_lens` (`lens`, `videoId`) and `camera.change_zoom` (`lens`, `payloadIndex`, `zoom`).
 `camera.take_photo` and `stream.split_screen` (`enabled`) had no typed call in the Python SDK.
 
 **Leave a param out when you have no value.** The platform reads a missing coordinate as "not
@@ -80,16 +85,19 @@ instead of its serial number, `target=` a payload or sub-asset (`capability_pb2.
 | 2.x | 3.0 |
 |---|---|
 | `remote_control.start_manual_control_input(sn)` | `commands.stream_manual_control(asset_sn)` |
+| `remote_control.enter_manual_control(...)` / `exit_manual_control(...)` | `commands.execute_and_wait(asset_sn, "flight.manual.enter")` / `"flight.manual.exit"` |
 | `session.send_input(ManualControlInput(...))` | `await stick.send(roll, pitch, yaw, throttle, gimbal_pitch=...)` |
 | `session.complete()` (a response) | leave the `async with` block or `await stick.close()`: the number of inputs passed on to the asset |
 | a broken stream | `CommandError` from `send` / `close` |
 
 Enter and leave manual control with the commands `flight.manual.enter` and `flight.manual.exit`.
 
-## Telemetry
+## Telemetry, detections and alerts
 
 | 2.x | 3.0 |
 |---|---|
 | `live_data.stream_telemetry(...)` | `async for item in telemetry.watch_telemetry(asset_sns, min_interval=...)` |
+| `live_data.stream_notifications(...)` | `async for alert in telemetry.watch_alerts(asset_sns, min_severity=...)`; command progress via `commands.watch_asset(asset_sn)` |
+| a `StreamHandle` and callbacks | an async iterator: leave the loop to stop |
 | per-vendor telemetry types | `TelemetrySample`: position, relative altitude, heading, speeds, battery; the rest in `details` under the capabilities' `telemetry_fields` |
 | reconnects on its own | raises `CommandError` on a refusal, a dropped stream or missing heartbeats; watch again |

@@ -1,5 +1,5 @@
-"""Tests for the B1+B2 wiring: unary RPCs go through GrpcResilience and
-exhausted-retry failures surface as ``ZequentRetryExhaustedError``.
+"""Unary RPCs go through GrpcResilience and exhausted-retry failures surface as
+``ZequentRetryExhaustedError``.
 """
 
 from __future__ import annotations
@@ -12,9 +12,8 @@ from zqnt_api.generated.zqnt import common_pb2
 
 from client_sdk import ZequentClientError, ZequentRetryExhaustedError
 from client_sdk.config.resilience import ResilienceConfig
+from client_sdk.connector.client import ConnectorClient
 from client_sdk.grpc_.resilience import GrpcResilience
-from client_sdk.models import TakeoffRequest
-from client_sdk.remote_control.client import RemoteControlClient
 
 
 class _FakeAioRpcError(grpc.aio.AioRpcError):
@@ -23,33 +22,27 @@ class _FakeAioRpcError(grpc.aio.AioRpcError):
 
 
 class _FlakyStub:
-    """Stub whose TakeOff fails N times then succeeds."""
+    """Stub whose DeregisterAsset fails N times then succeeds."""
 
     def __init__(self, fail_count: int, code: grpc.StatusCode) -> None:
         self._remaining = fail_count
         self._code = code
         self.calls = 0
 
-    def TakeOff(self, request, timeout=None):  # noqa: N802 - gRPC convention
+    def DeregisterAsset(self, request, timeout=None):  # noqa: N802 - gRPC convention
         self.calls += 1
 
         async def _coro():
             if self._remaining > 0:
                 self._remaining -= 1
                 raise _FakeAioRpcError(self._code)
-            from google.protobuf import empty_pb2
-
-            return common_pb2.CommandResponse(
-                has_errors=False,
-                meta=common_pb2.ResponseMeta(tid="tid-1", sn="DOCK-1", response_message="ok"),
-                empty=empty_pb2.Empty(),
-            )
+            return common_pb2.CommandResponse(has_errors=False)
 
         return _coro()
 
 
-def _build_client(stub: Any, max_retries: int = 3) -> RemoteControlClient:
-    c = RemoteControlClient.__new__(RemoteControlClient)
+def _build_client(stub: Any, max_retries: int = 3) -> ConnectorClient:
+    c = ConnectorClient.__new__(ConnectorClient)
     c._channel = None
     c._resilience = ResilienceConfig(
         max_retry_attempts=max_retries,
@@ -61,19 +54,14 @@ def _build_client(stub: Any, max_retries: int = 3) -> RemoteControlClient:
     return c
 
 
-def _takeoff() -> TakeoffRequest:
-    return TakeoffRequest(sn="DOCK-1", latitude=1.0, longitude=2.0, altitude=10.0)
-
-
 @pytest.mark.asyncio
 async def test_unary_retries_on_unavailable_then_succeeds() -> None:
     stub = _FlakyStub(fail_count=2, code=grpc.StatusCode.UNAVAILABLE)
     client = _build_client(stub)
 
-    resp = await client.takeoff(_takeoff())
+    await client.deregister_asset("DOCK-1")
 
-    assert resp is not None
-    assert stub.calls == 3  # 2 failures + 1 success
+    assert stub.calls == 3
 
 
 @pytest.mark.asyncio
@@ -82,12 +70,10 @@ async def test_unary_retries_exhausted_raises_typed_error() -> None:
     client = _build_client(stub, max_retries=2)
 
     with pytest.raises(ZequentRetryExhaustedError) as excinfo:
-        await client.takeoff(_takeoff())
+        await client.deregister_asset("DOCK-1")
 
-    assert excinfo.value.attempts == 3  # initial + 2 retries
-    # Original error preserved.
+    assert excinfo.value.attempts == 3
     assert isinstance(excinfo.value.__cause__, grpc.aio.AioRpcError)
-    # Inherits SDK base.
     assert isinstance(excinfo.value, ZequentClientError)
 
 
@@ -96,8 +82,7 @@ async def test_unary_non_retryable_propagates_as_grpc_error() -> None:
     stub = _FlakyStub(fail_count=99, code=grpc.StatusCode.INVALID_ARGUMENT)
     client = _build_client(stub)
 
-    # Non-retryable: raw gRPC error.
     with pytest.raises(grpc.aio.AioRpcError):
-        await client.takeoff(_takeoff())
+        await client.deregister_asset("DOCK-1")
 
-    assert stub.calls == 1  # no retries
+    assert stub.calls == 1

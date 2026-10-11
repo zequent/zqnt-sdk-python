@@ -81,14 +81,15 @@ client-python-sdk/
 ├── client_sdk/                 # Library source
 │   ├── __init__.py             # Public exports + __version__
 │   ├── zequent_client.py       # Top-level ZequentClient
+│   ├── commands/               # 3.0 command API (capabilities, execute, watch, manual control)
+│   ├── telemetry/              # 3.0 live data (telemetry, detections, alerts)
+│   ├── connector/              # Connector sub-client
 │   ├── config/                 # Connection + resilience config
 │   ├── exceptions.py
 │   ├── generated/              # Generated protobuf (gitignored at build)
 │   ├── grpc_/                  # gRPC plumbing (channels, resilience)
-│   ├── live_data/              # LiveData sub-client + converters
 │   ├── mission_autonomy/       # MissionAutonomy sub-client + converters
-│   ├── models/                 # Pydantic-style request/response models
-│   └── remote_control/         # RemoteControl sub-client
+│   └── models/                 # Request/response models of the mission-autonomy API
 ├── tests/
 │   └── unit/                   # Async unit tests w/ mocked stubs
 ├── scripts/
@@ -110,13 +111,14 @@ client-python-sdk/
    ```bash
    uv run bash scripts/generate_protos.sh
    ```
-2. Add the typed request / response models in `client_sdk/models/`.
-3. Implement the method on the sub-client (e.g. `remote_control/client.py`).
+2. Add request / response models in `client_sdk/models/` where the sub-client does not expose
+   the generated messages directly.
+3. Implement the method on the sub-client (e.g. `connector/client.py`).
    Wrap unary calls with `GrpcResilience` so they get retry + breaker behaviour
    for free.
 4. Re-export from `client_sdk/__init__.py` if it is part of the public API.
 5. Add a unit test in `tests/unit/` using the mocked-stub pattern already in
-   place (see `test_remote_control_client.py` for examples).
+   place (see `test_telemetry_client.py` for an in-process fake server).
 
 ## Releasing
 
