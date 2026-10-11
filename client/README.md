@@ -29,7 +29,7 @@ After installation you can verify the version:
 ```python
 import client_sdk
 
-print(client_sdk.__version__)  # "1.0.1"
+print(client_sdk.__version__)  # "3.0.0"
 ```
 
 ---

@@ -38,7 +38,7 @@ from .telemetry import TelemetryClient
 try:
     __version__ = _pkg_version("zqnt-client-sdk")
 except PackageNotFoundError:
-    __version__ = "1.0.1"
+    __version__ = "3.0.0"
 
 from .models import (
     AssetSdrState,

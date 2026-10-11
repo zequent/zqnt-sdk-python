@@ -71,6 +71,7 @@ jobs:
           echo "pr_version=${PR_VERSION}" >> $GITHUB_OUTPUT
           echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "commit_hash=${COMMIT_HASH}" >> $GITHUB_OUTPUT
+          echo "Preview version: ${PR_VERSION}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         if: always()
