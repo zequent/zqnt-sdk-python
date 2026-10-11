@@ -33,11 +33,11 @@ from ..auth import explain
 from ..config.resilience import ResilienceConfig
 from ..exceptions import ConnectorError
 from ..grpc_.resilience import GrpcResilience
-from ..live_data.stream_handle import StreamHandle
 from ..mission_autonomy._converters import proto_to_scheduler_response, scheduler_to_proto
 from ..models._converters import build_request_base
 from ..models._validation import validate_non_blank
 from ..models.mission_autonomy import SchedulerDTO, SchedulerResponse
+from ..stream_handle import StreamHandle
 from .batch_session import ConnectorBatchSession
 
 logger = logging.getLogger(__name__)
@@ -429,7 +429,7 @@ class ConnectorClient:
     def asset_monitoring(self, sn: str, on_data: OnAssetMonitoring, on_error: OnError | None = None) -> StreamHandle:
         """Subscribe to asset-monitoring updates. ``on_data`` receives the raw
         ``AssetMonitoringResponse`` proto frame; reconnects transparently on transient gRPC
-        errors, same policy as :meth:`LiveDataClient.stream_telemetry`."""
+        errors."""
         validate_non_blank("sn", sn)
         handle = StreamHandle()
         task = asyncio.create_task(

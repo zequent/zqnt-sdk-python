@@ -1,10 +1,5 @@
-"""Async-friendly stream handle returned by LiveData streaming subscriptions.
-
-Mirrors :java:`com.zqnt.sdk.client.livedata.domains.StreamHandle` adapted for
-``asyncio``. The handle owns the background task that pumps telemetry frames
-into the user-supplied callback and transparently reconnects on transient
-gRPC errors.
-"""
+"""Handle of a long-lived subscription that runs in a background task and reconnects on transient
+gRPC errors (``ConnectorClient.asset_monitoring``)."""
 
 from __future__ import annotations
 
@@ -28,17 +23,9 @@ class StreamHandle:
         self._task: asyncio.Task | None = None
         self._done = asyncio.Event()
 
-    # ------------------------------------------------------------------
-    # Internal — set by LiveDataClient.stream_telemetry
-    # ------------------------------------------------------------------
-
     def _bind(self, task: asyncio.Task) -> None:
         self._task = task
         task.add_done_callback(lambda _t: self._done.set())
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     @property
     def is_stopped(self) -> bool:

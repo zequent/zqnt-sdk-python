@@ -29,10 +29,9 @@ class ZequentRetryExhaustedError(ZequentClientError):
 class MissionAutonomyError(ZequentClientError):
     """Raised when an Application/SkillExecution RPC completes but reports ``has_errors``.
 
-    Unlike ``RemoteControlResponse``/``LiveDataResponse``, the Application and SkillExecution
-    RPCs return the raw payload DTO directly on success (``ApplicationProtoDTO``,
-    ``SkillExecutionProtoDTO``, ...) rather than a wrapping response dataclass with a
-    ``success`` flag — there is nowhere to carry a failure inline, so failures raise instead,
+    The Application and SkillExecution RPCs return the raw payload DTO directly on success
+    (``ApplicationProtoDTO``, ``SkillExecutionProtoDTO``, ...) rather than a wrapping response
+    dataclass with a ``success`` flag — there is nowhere to carry a failure inline, so failures raise instead,
     mirroring ``MissionAutonomyClientException`` in the Java client SDK.
     """
 

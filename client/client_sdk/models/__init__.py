@@ -4,48 +4,14 @@ Generated proto types are kept internal – converters in this package
 translate proto <-> dataclass so the public API never leaks protobuf.
 """
 
-from .common import ErrorInfo, ProgressInfo, RemoteControlResponse, TakeoffResponse
+from .common import ErrorInfo, ProgressInfo
 from .enums import (
-    AssetType,
     ErrorCode,
-    LiveDataServiceCommand,
-    LiveStreamType,
     MissionStatus,
     MissionType,
-    NotificationEventType,
-    NotificationSeverity,
     SchedulerType,
     TaskStatus,
     TaskType,
-)
-from .live_data import (
-    AssetAirConditioner,
-    AssetNetworkInfo,
-    AssetPositionState,
-    AssetSdrState,
-    AssetSubAssetInformation,
-    AssetTelemetry,
-    AssetWirelessLinkInfo,
-    CameraData,
-    ChangeLensRequest,
-    ChangeZoomRequest,
-    LiveDataResponse,
-    LiveDataStartLiveStreamRequest,
-    LiveDataStopLiveStreamRequest,
-    LiveStreamStartResult,
-    NotificationAssetStatus,
-    NotificationCommandExecutionEvent,
-    NotificationOperationEvent,
-    PayloadTelemetry,
-    RangeFinderData,
-    SensorData,
-    StreamNotificationRequest,
-    StreamNotificationResponse,
-    StreamTelemetryError,
-    StreamTelemetryRequest,
-    StreamTelemetryResponse,
-    SubAssetBatteryInfo,
-    SubAssetTelemetry,
 )
 from .mission_autonomy import (
     MissionDTO,
@@ -56,15 +22,6 @@ from .mission_autonomy import (
     TaskResponse,
     WaypointDTO,
 )
-from .remote_control import (
-    DockOperationRequest,
-    GoToRequest,
-    LookAtRequest,
-    ManualControlRequest,
-    ReturnToHomeRequest,
-    TakeoffRequest,
-)
-from .remote_control_input import ManualControlInput
 from .task_config import (
     AreaMappingTaskConfig,
     AreaVertex,
@@ -78,60 +35,14 @@ from .task_config import (
 )
 
 __all__ = [
-    # core responses & error/progress
     "ErrorInfo",
     "ProgressInfo",
-    "RemoteControlResponse",
-    "TakeoffResponse",
-    # enums
-    "AssetType",
     "ErrorCode",
-    "LiveDataServiceCommand",
-    "LiveStreamType",
-    "NotificationEventType",
-    "NotificationSeverity",
     "MissionStatus",
     "MissionType",
     "SchedulerType",
     "TaskStatus",
     "TaskType",
-    # remote-control requests
-    "DockOperationRequest",
-    "GoToRequest",
-    "LookAtRequest",
-    "ManualControlInput",
-    "ManualControlRequest",
-    "ReturnToHomeRequest",
-    "TakeoffRequest",
-    # live-data requests + responses + telemetry payloads
-    "ChangeLensRequest",
-    "ChangeZoomRequest",
-    "LiveDataResponse",
-    "LiveDataStartLiveStreamRequest",
-    "LiveDataStopLiveStreamRequest",
-    "LiveStreamStartResult",
-    "NotificationAssetStatus",
-    "NotificationCommandExecutionEvent",
-    "NotificationOperationEvent",
-    "StreamNotificationRequest",
-    "StreamNotificationResponse",
-    "StreamTelemetryError",
-    "StreamTelemetryRequest",
-    "StreamTelemetryResponse",
-    "AssetAirConditioner",
-    "AssetNetworkInfo",
-    "AssetPositionState",
-    "AssetSubAssetInformation",
-    "AssetTelemetry",
-    "AssetWirelessLinkInfo",
-    "AssetSdrState",
-    "CameraData",
-    "PayloadTelemetry",
-    "RangeFinderData",
-    "SensorData",
-    "SubAssetBatteryInfo",
-    "SubAssetTelemetry",
-    # mission-autonomy DTOs + responses
     "MissionDTO",
     "MissionResponse",
     "SchedulerDTO",
@@ -139,7 +50,6 @@ __all__ = [
     "TaskDTO",
     "TaskResponse",
     "WaypointDTO",
-    # task config variants
     "TaskConfig",
     "AreaMappingTaskConfig",
     "AreaVertex",

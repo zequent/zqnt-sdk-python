@@ -2,8 +2,7 @@
 batch-upload RPCs.
 
 Mirrors :java:`com.zqnt.sdk.client.connector.domains.ConnectorBatchSession` adapted for
-``asyncio`` + ``grpc.aio``, using the same queue-backed request-iterator approach as
-:class:`client_sdk.remote_control.manual_control_session.ManualControlInputSession`. Items are
+``asyncio`` + ``grpc.aio`` with a queue-backed request iterator. Items are
 raw generated proto request messages (``ConnectorStoreTelemetryRequest``,
 ``ConnectorStoreDetectionRequest``, ``ProduceNotificationRequest``) — the caller builds each one;
 this class only owns the stream lifecycle.

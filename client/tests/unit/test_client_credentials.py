@@ -13,15 +13,14 @@ import pytest
 from zqnt_api.generated.zqnt import (  # type: ignore[import]
     connector_pb2,
     connector_pb2_grpc,
-    live_data_pb2_grpc,
-    live_data_types_pb2,
 )
+from zqnt_api.generated.zqnt.common.v3 import common_pb2
+from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2, telemetry_pb2_grpc
 
-from client_sdk import ZequentClient
+from client_sdk import CommandError, ZequentClient
 from client_sdk.auth import ENV_VAR, ZequentAuthError, resolve_token
 from client_sdk.config.resilience import ResilienceConfig
 from client_sdk.config.service_config import ServiceConfig
-from client_sdk.models.live_data import StreamTelemetryRequest
 
 
 class _Recorder:
@@ -45,13 +44,15 @@ class _Connector(connector_pb2_grpc.ConnectorServiceServicer):
         return connector_pb2.SkillContractListResponse(has_errors=False)
 
 
-class _LiveData(live_data_pb2_grpc.LiveDataServiceServicer):
+class _Telemetry(telemetry_pb2_grpc.TelemetryServiceServicer):
     def __init__(self, recorder: _Recorder) -> None:
         self._recorder = recorder
 
-    async def StreamTelemetry(self, request, context):  # noqa: N802 - gRPC naming
+    async def WatchTelemetry(self, request, context):  # noqa: N802 - gRPC naming
         await self._recorder.check(context)
-        yield live_data_types_pb2.LiveDataTelemetryResponse(sn=request.base.sn)
+        yield telemetry_pb2.WatchTelemetryResponse(
+            sample=telemetry_pb2.TelemetrySample(asset=common_pb2.AssetRef(sn=request.assets[0].sn))
+        )
 
 
 @pytest.fixture
@@ -59,7 +60,7 @@ async def server():
     recorder = _Recorder()
     srv = grpc.aio.server()
     connector_pb2_grpc.add_ConnectorServiceServicer_to_server(_Connector(recorder), srv)
-    live_data_pb2_grpc.add_LiveDataServiceServicer_to_server(_LiveData(recorder), srv)
+    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(_Telemetry(recorder), srv)
     port = srv.add_insecure_port("127.0.0.1:0")
     await srv.start()
     yield recorder, port
@@ -94,14 +95,11 @@ async def test_a_stream_carries_the_credential_too(server, monkeypatch) -> None:
     monkeypatch.delenv(ENV_VAR, raising=False)
     recorder, port = server
     received: list[str] = []
-    async with _client(port, "tok-stream") as client:
-        handle = client.live_data.stream_telemetry(StreamTelemetryRequest(sn="DOCK-1"), lambda r: received.append(r.sn))
-        for _ in range(100):
-            if received:
-                break
-            await asyncio.sleep(0.02)
-        await handle.stop()
-    assert received and recorder.headers[0] == "Bearer tok-stream"
+    async with _client(port, "tok-stream") as client, asyncio.timeout(5):
+        async for sample in client.telemetry.watch_telemetry(["DOCK-1"]):
+            received.append(sample.asset.sn)
+            break
+    assert received == ["DOCK-1"] and recorder.headers[0] == "Bearer tok-stream"
 
 
 async def test_the_environment_variable_is_used_when_no_token_is_passed(server, monkeypatch) -> None:
@@ -143,17 +141,14 @@ async def test_a_call_outside_the_credentials_scope_says_so_and_is_not_retried(s
     assert len(recorder.headers) == 1
 
 
-async def test_a_refused_stream_reports_the_explained_error(server, monkeypatch) -> None:
+async def test_a_refused_stream_reports_the_platforms_reason(server, monkeypatch) -> None:
     monkeypatch.delenv(ENV_VAR, raising=False)
     recorder, port = server
     recorder.refuse = (grpc.StatusCode.UNAUTHENTICATED, "Credential has been revoked")
-    errors: list[BaseException] = []
-    async with _client(port, "revoked") as client:
-        handle = client.live_data.stream_telemetry(StreamTelemetryRequest(sn="DOCK-1"), lambda r: None, errors.append)
-        for _ in range(100):
-            if errors:
-                break
-            await asyncio.sleep(0.02)
-        await handle.stop()
-    assert errors and isinstance(errors[0], ZequentAuthError)
-    assert "revoked" in errors[0].details()
+    async with _client(port, "revoked") as client, asyncio.timeout(5):
+        with pytest.raises(CommandError) as refused:
+            async for _ in client.telemetry.watch_telemetry(["DOCK-1"]):
+                pass
+    assert refused.value.status == grpc.StatusCode.UNAUTHENTICATED
+    assert refused.value.category == common_pb2.ERROR_CATEGORY_PERMISSION_DENIED
+    assert "revoked" in str(refused.value)

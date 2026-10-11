@@ -1,7 +1,6 @@
 """Shared proto <-> dataclass converters.
 
-Per-domain converters live alongside their sub-clients
-(``mission_autonomy/_converters.py``, ``live_data/_converters.py``).
+Per-domain converters live alongside their sub-clients (``mission_autonomy/_converters.py``).
 This module only contains helpers used by **multiple** sub-clients.
 
 Generated proto modules are imported lazily inside the helpers so the
@@ -13,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from .common import ErrorInfo, ProgressInfo, RemoteControlResponse
+from .common import ErrorInfo, ProgressInfo
 
 
 def build_request_base(sn: str, tid: str | None = None):
@@ -27,17 +26,6 @@ def build_request_base(sn: str, tid: str | None = None):
         tid=tid or str(uuid.uuid4()),
         sn=sn,
         timestamp=ts,
-    )
-
-
-def build_coordinates(latitude: float, longitude: float, altitude: float):
-    # Coordinates was renamed GeoCoordinate (same fields) in the current schema.
-    from zqnt_api.generated.zqnt import common_pb2  # type: ignore[import]
-
-    return common_pb2.GeoCoordinate(
-        latitude=latitude,
-        longitude=longitude,
-        altitude=altitude,
     )
 
 
@@ -73,17 +61,6 @@ def opt_field(msg, field: str):
         return getattr(msg, field) if msg.HasField(field) else None  # type: ignore[attr-defined]
     except (ValueError, AttributeError):
         return getattr(msg, field, None)
-
-
-def has_field(msg, field: str) -> bool:
-    """Return whether a proto field is set.
-
-    Safe for generated classes that do not expose the field yet.
-    """
-    try:
-        return msg.HasField(field)  # type: ignore[attr-defined]
-    except (ValueError, AttributeError):
-        return False
 
 
 def _resolve_error_code(raw_code) -> str:
@@ -130,31 +107,3 @@ def struct_to_dict(s) -> dict:
     from google.protobuf import json_format
 
     return json_format.MessageToDict(s)
-
-
-def proto_to_response(proto, sn: str) -> RemoteControlResponse:
-    """Convert a ``CommandResponse`` proto into the SDK dataclass.
-
-    tid/sn/asset_id/response_message live under ``proto.meta`` (a ``ResponseMeta``)
-    now, not flat on the response itself — the *sn* parameter is still accepted
-    (and preferred over ``meta.sn``, matching prior behaviour) because callers
-    already know it from the request and meta may not always be populated.
-    """
-    error: ErrorInfo | None = None
-    progress: ProgressInfo | None = None
-
-    if proto.HasField("error"):
-        error = proto_to_error_info(proto.error)
-    if proto.HasField("progress"):
-        progress = proto_to_progress_info(proto.progress)
-
-    meta = proto.meta if proto.HasField("meta") else None
-    return RemoteControlResponse(
-        success=not proto.has_errors,
-        tid=meta.tid if meta is not None else "",
-        sn=sn,
-        asset_id=(meta.asset_id if meta.HasField("asset_id") else None) if meta is not None else None,
-        message=(meta.response_message if meta.HasField("response_message") else None) if meta is not None else None,
-        error=error,
-        progress=progress,
-    )
