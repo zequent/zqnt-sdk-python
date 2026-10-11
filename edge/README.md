@@ -232,6 +232,9 @@ class MyDockAdapter(EdgeAdapter):
         return CustomCommandResponse.ok(ctx.tid, ctx.sn, "vendor.acme.spray")
 ```
 
+- `set_payloads(sn, [Payload(ref="speaker-1", kind="speaker", ...)])` sets the devices mounted on
+  an asset; they go out with the capabilities as a full snapshot, so a payload left out is detached.
+  A command acting on one is registered with `target=CapabilityTarget(type=PAYLOAD, target_ref=ref)`.
 - `EdgeServer` serves `zqnt.edge.v3.EdgeAdapterService` (`ExecuteCommand`) and v2 side by side
   from the same registrations. The typed methods (`take_off`, `open_cover`, ...) are the v2
   compatibility layer: overriding one still works but is deprecated.

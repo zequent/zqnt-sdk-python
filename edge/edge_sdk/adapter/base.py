@@ -66,6 +66,7 @@ from ..models.common import (
     LiveStreamType,
     ManualControlInput,
     ManualControlRequest,
+    Payload,
     RequestContext,
     ReturnToHomeRequest,
     TelemetryField,
@@ -316,6 +317,30 @@ class EdgeAdapter(ABC):
     def _telemetry_fields(self) -> dict[str, TelemetryField]:
         return self.__dict__.setdefault("_declared_telemetry_fields", {})
 
+    def set_payloads(self, sn: str, payloads: list[Payload]) -> None:
+        """
+        The devices mounted on *sn*, as a full snapshot: a payload left out is detached. Reported
+        with the capabilities (``CapabilitySet.payloads``) whenever the snapshot changes.
+        """
+        refs = [p.ref for p in payloads]
+        if any(not ref for ref in refs):
+            raise ValueError(f"a payload of {sn} has no ref")
+        if len(set(refs)) != len(refs):
+            raise ValueError(f"two payloads of {sn} share a ref")
+        mounted: dict[str, list[Payload]] = self.__dict__.setdefault("_mounted_payloads", {})
+        snapshot = list(payloads)
+        if mounted.get(sn, []) == snapshot:
+            return
+        if snapshot:
+            mounted[sn] = snapshot
+        else:
+            mounted.pop(sn, None)
+        self.notify_capabilities_changed(sn)
+
+    def payloads(self, sn: str) -> list[Payload]:
+        """What :meth:`set_payloads` last set for *sn*."""
+        return list(self.__dict__.get("_mounted_payloads", {}).get(sn, []))
+
     def reported_asset_sns(self) -> list[str]:
         """
         Serials whose capabilities the SDK reports to the platform on start and on every change.
@@ -472,6 +497,7 @@ class EdgeAdapter(ABC):
             capabilities=list(derived.values()),
             timestamp=datetime.now(tz=timezone.utc),
             telemetry_fields=list(self._telemetry_fields.values()),
+            payloads=self.payloads(sn),
         )
 
     async def _dispatch_registered(

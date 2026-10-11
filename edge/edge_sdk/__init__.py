@@ -126,13 +126,14 @@ from .models import (
     Waypoint,
     WaypointTaskConfig,
 )
-from .models.common import CustomCommandResponse, DetectionBatch, TelemetryField, TelemetryValueType
+from .models.common import CustomCommandResponse, DetectionBatch, Payload, TelemetryField, TelemetryValueType
 from .models.live import Alert, AlertSeverity, TelemetrySample
 from .server.edge_server import EdgeServer, RegistrationConfig
 
 __all__ = [
     "EdgeGatewayClient",
     "TelemetryIngestPublisher",
+    "Payload",
     "TelemetryField",
     "DetectionBatch",
     "CustomCommandResponse",
