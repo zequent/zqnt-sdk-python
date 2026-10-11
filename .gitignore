@@ -39,8 +39,6 @@ htmlcov/
 .tox/
 
 
-__pycache__/
-*.py[cod]
 
 # Secrets and local credentials: never committed (SEC-3). .env.example is the template.
 .env*
@@ -48,3 +46,19 @@ __pycache__/
 *.zqnt
 kubeconfig*
 *.pem
+# Python
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+.idea/
+.vscode/
+
+# Env files
+.env
+.env.local
+

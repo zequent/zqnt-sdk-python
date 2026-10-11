@@ -50,10 +50,4 @@ build-backend = "hatchling.build"
 packages = ["edge_sdk"]
 
 [tool.uv.sources]
-# A git source, not a local path: CI and Docker builds check out only this repository.
-# uv allows one URL per package across a graph, so every consumer pins the same ref.
-zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", rev = "af1907588750d9147c49fab38ec5a9d2649ebb77" }  # zqnt-api 3.0.0 preview (#8, capability payloads); the release tag once it is cut
-# Swap to this for day-to-day monorepo development (offline-friendly, picks up sibling edits
-# immediately, no push-then-pull round trip) -- but keep it local-only; don't commit it back to
-# main, or every downstream adapter's CI breaks again the same way this fix closes.
-#zqnt-api = { path = "../../../utils/zqnt-api-python", editable = true }
+zqnt-api = { git = "https://github.com/zequent/zqnt-api", subdirectory = "python", rev = "390b5e2f0fa6faa16bf175ce63a3a0481879e9cb" }
