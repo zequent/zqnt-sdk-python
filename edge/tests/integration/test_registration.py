@@ -8,7 +8,7 @@ and JSON structure (compatible with Java EdgeEndpointDTO) are used.
 
 import json
 
-import fakeredis.aioredis as fakeredis
+import fakeredis
 import pytest
 
 from edge_sdk import AssetType, AssetVendor
@@ -56,9 +56,9 @@ def fake_redis(monkeypatch):
 
     server = fakeredis.FakeServer()
     monkeypatch.setattr(
-        aioredis, "from_url", lambda url, **kw: fakeredis.FakeRedis(server=server, decode_responses=True)
+        aioredis, "from_url", lambda url, **kw: fakeredis.FakeAsyncRedis(server=server, decode_responses=True)
     )
-    return fakeredis.FakeRedis(server=server, decode_responses=True)
+    return fakeredis.FakeAsyncRedis(server=server, decode_responses=True)
 
 
 def _server() -> EdgeServer:
