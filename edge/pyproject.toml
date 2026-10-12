@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 dependencies = [
-    "grpcio>=1.60.0",
+    "grpcio>=1.84.0",
     "protobuf>=4.25.0",
     "grpcio-health-checking>=1.60.0",
     "cryptography>=42.0.0",
