@@ -60,11 +60,9 @@ async def check_conformance(adapter: EdgeAdapter, sn: str = "CONFORMANCE-1", *, 
     }
     listed = {command_id for command_id, c in advertised.items() if c.state != CapabilityState.UNSUPPORTED}
     executable = adapter.executable_command_ids()
-    routes_itself = adapter._is_overridden("send_custom_command")
 
-    if not routes_itself:
-        for command_id in sorted(available - executable):
-            report.problems.append(f"{command_id} is advertised but has no handler")
+    for command_id in sorted(available - executable):
+        report.problems.append(f"{command_id} is advertised but has no handler")
     for command_id in sorted(executable - listed):
         report.problems.append(f"{command_id} is executable but not advertised")
 
