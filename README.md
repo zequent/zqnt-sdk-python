@@ -280,7 +280,11 @@ class MyDockAdapter(EdgeAdapter):
 - Params are validated against the command's input schema before the handler runs. Integral
   doubles become `int` where the schema says `integer`; invalid params come back as `REJECTED`
   with `command.invalid_params`. Omitted coordinates arrive as NaN: NaN is a number, but never
-  satisfies `required`.
+  satisfies `required`. v3 params are validated as sent; on v2 the SDK first converts text the
+  schema does not accept as text (`"13.405"` for a number, `"true"` for a boolean, `"pitch_down"`
+  for the enum value `PITCH_DOWN`), exact conversions only. Enum aliases (a DJI name such as
+  `SDR_ONLY` or `IRONBOW1` for a standard value) are not converted: a 2.x platform must send the
+  standard value.
 - A handler sees the platform's run id as `ctx.command_execution_id`.
 - Every capability carries its risk (`CommandSafety`). A standard id gets the rating of the
   platform's command catalog (`catalog_safety`, e.g. `flight.takeoff` MOVE, `flight.land` CRITICAL);
