@@ -45,7 +45,7 @@ class _TestAdapter(EdgeAdapter):
     async def stop_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         return EdgeResponse.ok(ctx.tid, ctx.sn, f"stopped:{task_id}")
 
-    async def send_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
+    async def legacy_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
         return CustomCommandResponse.ok(
             ctx.tid,
             ctx.sn,
@@ -59,7 +59,7 @@ class _RegistryOnlyAdapter(EdgeAdapter):
     Declares its commands through ``register_command`` and overrides nothing else.
 
     This is the shape every 2.0 adapter is meant to have, and the shape no test covered
-    end-to-end: ``_TestAdapter`` overrides ``send_custom_command``, which hid the fact that the
+    end-to-end: ``_TestAdapter`` used to override ``send_custom_command``, which hid the fact that the
     servicer refused the call for any adapter that does not. Served over a real gRPC server, this
     adapter must be able to run every command it advertises.
     """
