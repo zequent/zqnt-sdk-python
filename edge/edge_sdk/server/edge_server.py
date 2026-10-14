@@ -462,7 +462,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
         ctx = proto_to_request_context(request.base)
         cmd = proto_to_custom_command(request)
         try:
-            result = await self._adapter.execute_command(ctx, cmd)
+            result = await self._adapter.execute_v2_command(ctx, cmd)
             return custom_command_response_to_proto(result, edge_pb2, timestamp_pb2, empty_pb2, common_pb2)
         except Exception as exc:
             logger.exception("Adapter error in SendCustomCommand [tid=%s sn=%s]", ctx.tid, ctx.sn)
