@@ -281,8 +281,9 @@ class RequestContext:
         tid:       Transaction ID (unique per request).
         sn:        Asset serial number the command is addressed to.
         timestamp: Time the request was created on the sender side.
-        command_execution_id: The platform's id of this command run (v3 ``ExecuteCommand``). An
-            adapter that answers ACCEPTED reports progress and completion under it.
+        command_execution_id: The platform's id of this command run: v3 ``ExecuteCommand``'s
+            ``command_execution_id``, on 2.x calls ``RequestBase.external_id``. An adapter that
+            answers ACCEPTED reports progress and completion under it.
     """
 
     tid: str

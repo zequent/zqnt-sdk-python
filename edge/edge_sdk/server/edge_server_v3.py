@@ -2,12 +2,12 @@
 The v3 edge contract (``zqnt.edge.v3.EdgeAdapterService``), served next to v2 on the same port.
 
 v3 has no per-command RPCs: every command arrives as ``ExecuteCommand`` with a dotted command id
-and runs through the same dispatch an adapter already has for ``send_custom_command`` -- handlers
-registered with :meth:`EdgeAdapter.register_command` first, then built-in ids routed onto the typed
-methods an older adapter overrides. An adapter therefore serves v2 and v3 from one set of
-declarations and needs no change to answer v3 calls.
+and runs only if the adapter published it -- a handler registered with
+:meth:`EdgeAdapter.register_command`, or a built-in id routed onto the typed method an older adapter
+overrides. Any other id is ``REJECTED`` with ``command.not_supported``; free-form commands
+(:meth:`EdgeAdapter.legacy_custom_command`) are reachable from 2.x ``SendCustomCommand`` only.
 
-Params are checked against the command's input schema before the handler runs (invalid:
+Params are checked strictly against the command's input schema before the handler runs (invalid:
 ``REJECTED`` with ``command.invalid_params``). The handler sees the platform's id of the run as
 ``ctx.command_execution_id``.
 
