@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from .commands.client import CommandsClient
     from .connector.client import ConnectorClient
     from .mission_autonomy.client import MissionAutonomyClient
+    from .streams.client import LiveStreamsClient
     from .telemetry.client import TelemetryClient
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class ZequentClient:
 
         client.commands
         client.telemetry
+        client.live_streams
         client.connector
         client.mission_autonomy
 
@@ -106,6 +108,7 @@ class ZequentClient:
         self._connector: "ConnectorClient | None" = None
         self._mission_autonomy: "MissionAutonomyClient | None" = None
         self._telemetry: "TelemetryClient | None" = None
+        self._live_streams: "LiveStreamsClient | None" = None
 
         logger.info("ZequentClient initialized with %d channels", len(self._channels))
 
@@ -180,6 +183,16 @@ class ZequentClient:
 
             self._telemetry = TelemetryClient(self._live_data_channel)
         return self._telemetry
+
+    @property
+    def live_streams(self) -> "LiveStreamsClient":
+        """Live video of Zequent 3.0: the streams of the caller's organization that are live right
+        now (``list_live_streams``)."""
+        if self._live_streams is None:
+            from .streams.client import LiveStreamsClient
+
+            self._live_streams = LiveStreamsClient(self._live_data_channel, self._resilience)
+        return self._live_streams
 
     @property
     def connector(self) -> "ConnectorClient":

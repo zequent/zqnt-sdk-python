@@ -83,6 +83,7 @@ client-python-sdk/
 │   ├── zequent_client.py       # Top-level ZequentClient
 │   ├── commands/               # 3.0 command API (capabilities, execute, watch, manual control)
 │   ├── telemetry/              # 3.0 live data (telemetry, detections, alerts)
+│   ├── streams/                # 3.0 live video streams of the organization
 │   ├── connector/              # Connector sub-client
 │   ├── config/                 # Connection + resilience config
 │   ├── exceptions.py
