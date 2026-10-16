@@ -109,13 +109,19 @@ class MyDroneAdapter(EdgeAdapter):
         """Return capabilities supported by this asset."""
         return self._auto_capabilities(sn, AssetType.AIRCRAFT)
 
-    async def take_off(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
+    async def take_off(
+        self, ctx: RequestContext, coordinates: Coordinates
+    ) -> EdgeResponse:
         """Handle take-off command."""
         # Call your drone SDK here
-        await hardware.take_off(coordinates.latitude, coordinates.longitude, coordinates.altitude)
+        await hardware.take_off(
+            coordinates.latitude, coordinates.longitude, coordinates.altitude
+        )
         return EdgeResponse.ok(ctx.tid, ctx.sn, "Take-off initiated")
 
-    async def go_to(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
+    async def go_to(
+        self, ctx: RequestContext, coordinates: Coordinates
+    ) -> EdgeResponse:
         """Handle go-to command."""
         await hardware.fly_to(coordinates)
         return EdgeResponse.ok(ctx.tid, ctx.sn)
@@ -242,7 +248,13 @@ await publisher.publish_sub_asset_telemetry(
 Declare each command once; the registration is both what the platform discovers and what runs:
 
 ```python
-from edge_sdk import EdgeAdapter, AssetType, CustomCommandResponse, TelemetryValueType, schema
+from edge_sdk import (
+    EdgeAdapter,
+    AssetType,
+    CustomCommandResponse,
+    TelemetryValueType,
+    schema,
+)
 
 
 class MyDockAdapter(EdgeAdapter):
@@ -251,10 +263,14 @@ class MyDockAdapter(EdgeAdapter):
         self.register_command(
             "vendor.acme.spray",
             self._spray,
-            input_schema=schema({"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]),
+            input_schema=schema(
+                {"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]
+            ),
         )
         self.declare_standard_telemetry_field("dock.cover_state")
-        self.declare_telemetry_field("vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%")
+        self.declare_telemetry_field(
+            "vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%"
+        )
 
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.DOCK)
@@ -303,7 +319,10 @@ outcome later, as before:
 ```python
 await notifier.publish_command_execution_event(
     CommandExecutionEvent(
-        external_execution_id="vendor-42", status=CommandExecutionStatus.SUCCEEDED, sn="DOCK-1", output={"photos": 12}
+        external_execution_id="vendor-42",
+        status=CommandExecutionStatus.SUCCEEDED,
+        sn="DOCK-1",
+        output={"photos": 12},
     )
 )
 ```
@@ -317,14 +336,24 @@ not tried again for 10 minutes.
 #### v3 live data
 
 ```python
-from edge_sdk import Alert, AlertSeverity, DetectionBatch, TelemetryIngestPublisher, TelemetrySample
+from edge_sdk import (
+    Alert,
+    AlertSeverity,
+    DetectionBatch,
+    TelemetryIngestPublisher,
+    TelemetrySample,
+)
 
 ingest = TelemetryIngestPublisher(host="live-data", port=8003)
 await ingest.publish_sample(
-    TelemetrySample(sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"})
+    TelemetrySample(
+        sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"}
+    )
 )
 await ingest.publish_detections(DetectionBatch(sn="RADAR-1", detections=[...]))
-await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING))
+await ingest.publish_alert(
+    Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING)
+)
 ```
 
 Long-lived streams to `TelemetryIngestService`, opened on first use and reconnected with backoff.
@@ -362,7 +391,9 @@ async def some_operation(self, ctx: RequestContext) -> EdgeResponse:
         result = await hardware.do_something()
         return EdgeResponse.ok(ctx.tid, ctx.sn)
     except HardwareError as e:
-        return EdgeResponse.fail(ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR))
+        return EdgeResponse.fail(
+            ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR)
+        )
 ```
 
 #### Server Registration (with Redis)
@@ -516,7 +547,8 @@ pytest tests/ --cov=edge_sdk --cov-report=html
 
 
 Python client SDK for Zequent 3.0. Every asset is commanded the same way, by command id, through
-`client.commands`; live telemetry, detections and alerts come from `client.telemetry`;
+`client.commands`; live telemetry, detections and alerts come from `client.telemetry`, the live video streams from
+`client.live_streams`;
 Applications, Skill executions and schedulers from `client.mission_autonomy` and
 `client.connector`.
 
@@ -558,7 +590,9 @@ from client_sdk import ZequentClient
 
 async def main():
     async with ZequentClient.from_env() as client:
-        await client.commands.execute_command("DRONE-1", "flight.takeoff", {"altitude": 40})
+        await client.commands.execute_command(
+            "DRONE-1", "flight.takeoff", {"altitude": 40}
+        )
 
         async for item in client.telemetry.watch_telemetry(["DRONE-1"]):
             print(item)
@@ -591,9 +625,15 @@ from client_sdk import ZequentClient
 from client_sdk.config import ServiceConfig
 
 async with ZequentClient(
-    connector_config=ServiceConfig("connector", host="connector.example.com", port=8010),
-    remote_control_config=ServiceConfig("remote-control", host="rc.example.com", port=8002),
-    mission_autonomy_config=ServiceConfig("mission-autonomy", host="ma.example.com", port=8004),
+    connector_config=ServiceConfig(
+        "connector", host="connector.example.com", port=8010
+    ),
+    remote_control_config=ServiceConfig(
+        "remote-control", host="rc.example.com", port=8002
+    ),
+    mission_autonomy_config=ServiceConfig(
+        "mission-autonomy", host="ma.example.com", port=8004
+    ),
     live_data_config=ServiceConfig("live-data", host="ld.example.com", port=8003),
 ) as client:
     ...
@@ -618,10 +658,14 @@ async with ZequentClient.from_env() as client:
     try:
         async with asyncio.timeout(300):
             result = await client.commands.execute_and_wait(
-                "DOCK-1", "navigation.go_to", {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60}
+                "DOCK-1",
+                "navigation.go_to",
+                {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60},
             )
     except CommandError as error:
-        print(error.category_name, error.code, error)  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
+        print(
+            error.category_name, error.code, error
+        )  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
     else:
         print(to_dict(result.result))
 
@@ -702,14 +746,34 @@ watch does not reconnect: watch again.
 async for batch in client.telemetry.watch_detections(["DRONE-1"]):
     print(batch.asset.sn, batch.stream_url, len(batch.detections))
 
-async for alert in client.telemetry.watch_alerts(min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING):
-    print(alert.asset.sn, telemetry_pb2.AlertSeverity.Name(alert.severity), alert.code, alert.message)
+async for alert in client.telemetry.watch_alerts(
+    min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING
+):
+    print(
+        alert.asset.sn,
+        telemetry_pb2.AlertSeverity.Name(alert.severity),
+        alert.code,
+        alert.message,
+    )
 ```
 
 `watch_detections(asset_sns=None, *, heartbeat_timeout=35s)` yields `DetectionBatch`es,
 `watch_alerts(asset_sns=None, *, min_severity=ALERT_SEVERITY_UNSPECIFIED, heartbeat_timeout=35s)`
 yields `Alert`s (stable `code` such as `dock.rain`, `message`, `details`) of at least
 `min_severity`. Heartbeats, refusals and a dropped stream behave as for `watch_telemetry`.
+
+#### Live video streams
+
+```python
+for stream in await client.live_streams.list_live_streams():
+    print(stream.asset.sn, stream.path, stream.since.ToDatetime(), stream.viewers)
+```
+
+`list_live_streams()` returns every `LiveStream` of the caller's organization that is live right
+now: the asset publishing it (for a docked aircraft, the aircraft), the media server's `path`,
+`since` when it is received and how many `viewers` read it. It raises `CommandError` with the gRPC
+`status` `PERMISSION_DENIED` when the organization's license does not include live streams and
+`UNAVAILABLE` when the platform has no current answer from the media server.
 
 **Upgrading from 2.x:** the typed per-command methods (`client.remote_control`) and the 2.x live
 data client (`client.live_data`) are removed in 3.0. [MIGRATION.md](client/MIGRATION.md) maps every typed
