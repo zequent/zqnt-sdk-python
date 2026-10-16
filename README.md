@@ -516,9 +516,9 @@ pytest tests/ --cov=edge_sdk --cov-report=html
 
 
 Python client SDK for Zequent 3.0. Every asset is commanded the same way, by command id, through
-`client.commands`; live telemetry, detections and alerts come from `client.telemetry`;
-Applications, Skill executions and schedulers from `client.mission_autonomy` and
-`client.connector`.
+`client.commands`; live telemetry, detections and alerts come from `client.telemetry`, live video
+streams from `client.live_streams`; Applications, Skill executions and schedulers from
+`client.mission_autonomy` and `client.connector`.
 
 - Python 3.12+
 - Async-first (`asyncio` / `grpc.aio`)
@@ -711,6 +711,20 @@ async for alert in client.telemetry.watch_alerts(min_severity=telemetry_pb2.ALER
 yields `Alert`s (stable `code` such as `dock.rain`, `message`, `details`) of at least
 `min_severity`. Heartbeats, refusals and a dropped stream behave as for `watch_telemetry`.
 
+#### Live video streams
+
+```python
+for stream in await client.live_streams.list_live_streams():
+    print(stream.asset.sn, stream.path, stream.since.ToDatetime(), stream.viewers)
+```
+
+`list_live_streams()` returns every live video stream of the caller's organization right now, as
+the media server sees it, whatever started it: the publishing asset (for a docked aircraft the
+aircraft itself), the media server `path`, `since` (when the media server started receiving it) and
+the number of `viewers`. It calls the live-data service with the client credential. When the
+platform has no current answer from the media server it raises a retryable `CommandError` with
+category `SERVICE` (status `UNAVAILABLE`).
+
 **Upgrading from 2.x:** the typed per-command methods (`client.remote_control`) and the 2.x live
 data client (`client.live_data`) are removed in 3.0. [MIGRATION.md](client/MIGRATION.md) maps every typed
 call to its command id and params.
@@ -779,7 +793,7 @@ except ZequentClientError as e:
     print("client error:", e)
 ```
 
-`client.commands` and `client.telemetry` raise `CommandError` for every refusal, including
+`client.commands`, `client.telemetry` and `client.live_streams` raise `CommandError` for every refusal, including
 exhausted retries (`retryable=True`) and authentication (`ERROR_CATEGORY_PERMISSION_DENIED`).
 `client.connector` and `client.mission_autonomy` raise `ZequentRetryExhaustedError` when retries
 give up.
@@ -819,6 +833,7 @@ level when needed.
 ZequentClient
  |- CommandsClient        -> zqnt.control.v3 RemoteControlService (remote-control channel)
  |- TelemetryClient       -> zqnt.telemetry.v3 TelemetryService (live-data channel)
+ |- LiveStreamsClient     -> zqnt.stream.v3 LiveStreamService (live-data channel)
  |- ConnectorClient       -> ConnectorService (connector channel)
  |- MissionAutonomyClient -> MissionAutonomyService (mission-autonomy channel)
 ```
