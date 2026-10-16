@@ -7,6 +7,7 @@ Python client for the Zequent Framework. Connects to:
   * zqnt.control.v3.RemoteControlService (any command by id: list_capabilities, execute_command,
     stream_manual_control)
   * zqnt.telemetry.v3.TelemetryService (watch_telemetry, watch_detections, watch_alerts)
+  * zqnt.stream.v3.LiveStreamService (list_live_streams)
   * ConnectorService         (assets, organizations, skill registry, schedulers)
   * MissionAutonomyService   (Applications, Skill executions, schedulers)
 
@@ -32,6 +33,7 @@ from importlib.metadata import version as _pkg_version
 from .commands import CommandError, CommandsClient, ManualControlStream
 from .exceptions import ZequentClientError, ZequentRetryExhaustedError
 from .stream_handle import StreamHandle
+from .streams import LiveStreamsClient
 from .telemetry import TelemetryClient
 
 try:
@@ -64,6 +66,7 @@ __all__ = [
     "CommandError",
     "ManualControlStream",
     "TelemetryClient",
+    "LiveStreamsClient",
     "StreamHandle",
     "ErrorInfo",
     "ProgressInfo",
