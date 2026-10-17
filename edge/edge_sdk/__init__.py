@@ -38,7 +38,7 @@ except PackageNotFoundError:
 from .adapter.base import EdgeAdapter
 from .adapter.commands import CATALOG as COMMAND_CATALOG
 from .adapter.commands import CommandSpec, RegisteredCommand, schema
-from .auth import EdgeAuthConfig, PlatformTokenVerifier, TokenVerificationError
+from .auth import EdgeAuthConfig, PlatformTokenVerifier, TokenVerificationError, UnknownSigningKeyError
 from .client.connector_client import ConnectorClient
 from .client.edge_gateway import EdgeGatewayClient
 from .client.live_data_service import LiveDataService
@@ -128,6 +128,7 @@ from .models import (
 )
 from .models.common import CustomCommandResponse, DetectionBatch, Payload, TelemetryField, TelemetryValueType
 from .models.live import Alert, AlertSeverity, TelemetrySample
+from .platform_keys import PlatformKeySet
 from .server.edge_server import EdgeServer, RegistrationConfig
 
 __all__ = [
@@ -150,6 +151,8 @@ __all__ = [
     "EdgeAuthConfig",
     "PlatformTokenVerifier",
     "TokenVerificationError",
+    "UnknownSigningKeyError",
+    "PlatformKeySet",
     "EdgeServer",
     "RegistrationConfig",
     "TelemetryPublisher",

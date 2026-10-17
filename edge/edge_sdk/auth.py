@@ -14,11 +14,15 @@ GRPC-1 / SAST-3):
 
 * **Platform -> adapter.** The platform signs a short-lived *service token* (audience
   ``zqnt-edge``) for every command it sends. :class:`EdgeServer` verifies it with the platform's
-  service public key (``ZQNT_PLATFORM_PUBLIC_KEY``, alias ``SERVICE_AUTH_PUBLIC_KEY``) and refuses
-  everything else, so only the platform can command the device.
+  published signing keys (``ZQNT_PLATFORM_KEYS_URL``, see :mod:`edge_sdk.platform_keys`) — a token
+  names its key in the ``kid`` header — and a token without ``kid`` with the platform's service
+  public key (``ZQNT_PLATFORM_PUBLIC_KEY``, alias ``SERVICE_AUTH_PUBLIC_KEY``) or, without one, the
+  key the set lists without ``kid``. Everything else is refused, so only the platform can command
+  the device.
 
 ``ZQNT_EDGE_AUTH_DISABLED=true`` turns the inbound check off — for a local SITL/simulator stack
-only. Without a public key and without that switch the server refuses every call (fail closed).
+only. Without a key set URL or public key and without that switch the server refuses every call
+(fail closed).
 
 Token contract (must match ``core/components/tenancy/.../ServiceTokens.java``): compact JWS,
 ``alg=EdDSA`` (Ed25519), ``iss=zqnt-service``, ``aud=zqnt-edge``, ``scope`` contains
@@ -27,6 +31,7 @@ Token contract (must match ``core/components/tenancy/.../ServiceTokens.java``): 
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import dataclasses
 import json
@@ -36,6 +41,8 @@ import time
 from typing import Any
 
 import grpc
+
+from .platform_keys import PlatformKeySet
 
 logger = logging.getLogger(__name__)
 
@@ -67,16 +74,66 @@ def _load_public_key(value: str):
     return load_der_public_key(base64.b64decode(value))
 
 
+class UnknownSigningKeyError(TokenVerificationError):
+    """The token names a key that is not in the platform's published key set."""
+
+    def __init__(self, kid: str) -> None:
+        super().__init__(f"token is signed with an unknown key {kid}")
+        self.kid = kid
+
+
 class PlatformTokenVerifier:
     """Verifies the service token the platform puts on every call into this adapter."""
 
-    def __init__(self, public_key: str) -> None:
-        try:
-            self._key = _load_public_key(public_key)
-        except Exception as exc:  # noqa: BLE001 - any parse failure is a configuration error
-            raise ValueError(f"ZQNT_PLATFORM_PUBLIC_KEY is not a valid Ed25519 public key: {exc}") from exc
+    def __init__(self, public_key: str | None = None, key_set: PlatformKeySet | None = None) -> None:
+        self._key = None
+        if public_key:
+            try:
+                self._key = _load_public_key(public_key)
+            except Exception as exc:  # noqa: BLE001 - any parse failure is a configuration error
+                raise ValueError(f"ZQNT_PLATFORM_PUBLIC_KEY is not a valid Ed25519 public key: {exc}") from exc
+        self._key_set = key_set
+
+    @property
+    def key_set(self) -> PlatformKeySet | None:
+        return self._key_set
 
     def verify(self, token: str) -> dict[str, Any]:
+        """The token's claims; a key the set does not know yet triggers a (rate-limited) refresh."""
+        try:
+            return self._verify(token)
+        except UnknownSigningKeyError:
+            if self._key_set is None:
+                raise
+            self._key_set.refresh_if_due()
+        return self._verify(token)
+
+    async def verify_async(self, token: str) -> dict[str, Any]:
+        """:meth:`verify`, fetching the key set off the event loop."""
+        try:
+            return self._verify(token)
+        except UnknownSigningKeyError:
+            if self._key_set is None:
+                raise
+            await asyncio.to_thread(self._key_set.refresh_if_due)
+        return self._verify(token)
+
+    def _verification_key(self, kid: Any):
+        if kid is None:
+            key = self._key or (self._key_set.key(None) if self._key_set is not None else None)
+            if key is None:
+                raise TokenVerificationError("token names no signing key and no key without kid is configured")
+            return key
+        if not isinstance(kid, str):
+            raise TokenVerificationError("token is not well-formed")
+        if self._key_set is None:
+            raise TokenVerificationError("token names a signing key but ZQNT_PLATFORM_KEYS_URL is not configured")
+        key = self._key_set.key(kid)
+        if key is None:
+            raise UnknownSigningKeyError(kid)
+        return key
+
+    def _verify(self, token: str) -> dict[str, Any]:
         from cryptography.exceptions import InvalidSignature
 
         parts = token.split(".")
@@ -88,10 +145,13 @@ class PlatformTokenVerifier:
             signature = _b64url_decode(parts[2])
         except Exception as exc:  # noqa: BLE001
             raise TokenVerificationError("token is not well-formed") from exc
+        if not isinstance(header, dict) or not isinstance(payload, dict):
+            raise TokenVerificationError("token is not well-formed")
         if header.get("alg") != "EdDSA":
             raise TokenVerificationError("only EdDSA tokens are accepted")
+        key = self._verification_key(header.get("kid"))
         try:
-            self._key.verify(signature, f"{parts[0]}.{parts[1]}".encode("ascii"))
+            key.verify(signature, f"{parts[0]}.{parts[1]}".encode("ascii"))
         except InvalidSignature as exc:
             raise TokenVerificationError("token signature is invalid") from exc
         if payload.get("iss") != ISSUER:
@@ -118,13 +178,16 @@ class EdgeAuthConfig:
 
     Attributes:
         edge_token:          Credential for calls INTO the platform (``ZQNT_EDGE_TOKEN``).
-        platform_public_key: Key the platform's commands are verified with
+        platform_public_key: Key tokens without ``kid`` are verified with
                              (``ZQNT_PLATFORM_PUBLIC_KEY`` / ``SERVICE_AUTH_PUBLIC_KEY``).
+        platform_keys_url:   The platform's JWK set (``ZQNT_PLATFORM_KEYS_URL``, e.g.
+                             ``http://admin-console:8005/api/admin-console/auth/service-keys``).
         disabled:            Skip the inbound check (``ZQNT_EDGE_AUTH_DISABLED``) — local SITL only.
     """
 
     edge_token: str | None = None
     platform_public_key: str | None = None
+    platform_keys_url: str | None = None
     disabled: bool = False
 
     @classmethod
@@ -132,6 +195,7 @@ class EdgeAuthConfig:
         return cls(
             edge_token=os.getenv("ZQNT_EDGE_TOKEN") or None,
             platform_public_key=os.getenv("ZQNT_PLATFORM_PUBLIC_KEY") or os.getenv("SERVICE_AUTH_PUBLIC_KEY") or None,
+            platform_keys_url=os.getenv("ZQNT_PLATFORM_KEYS_URL") or None,
             disabled=os.getenv("ZQNT_EDGE_AUTH_DISABLED", "").strip().lower() in _TRUE,
         )
 
@@ -219,7 +283,7 @@ def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channe
 class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
     """Refuses every call into the adapter that does not carry a valid platform service token."""
 
-    def __init__(self, config: EdgeAuthConfig) -> None:
+    def __init__(self, config: EdgeAuthConfig, key_set: PlatformKeySet | None = None) -> None:
         self._disabled = config.disabled
         self._verifier: PlatformTokenVerifier | None = None
         self._misconfigured: str | None = None
@@ -228,16 +292,28 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
                 "ZQNT_EDGE_AUTH_DISABLED is set: this adapter accepts commands from ANYONE who can reach "
                 "its port. Local SITL/simulator use only."
             )
-        elif not config.platform_public_key:
-            self._misconfigured = "ZQNT_PLATFORM_PUBLIC_KEY is not configured"
+        elif not config.platform_public_key and not config.platform_keys_url and key_set is None:
+            self._misconfigured = "neither ZQNT_PLATFORM_KEYS_URL nor ZQNT_PLATFORM_PUBLIC_KEY is configured"
             logger.error(
-                "ZQNT_PLATFORM_PUBLIC_KEY is not set: every platform command will be refused. Set it to the "
-                "platform's SERVICE_AUTH_PUBLIC_KEY (or ZQNT_EDGE_AUTH_DISABLED=true for local SITL)."
+                "Neither ZQNT_PLATFORM_KEYS_URL nor ZQNT_PLATFORM_PUBLIC_KEY is set: every platform command will "
+                "be refused. Set ZQNT_PLATFORM_KEYS_URL to the platform's /api/admin-console/auth/service-keys "
+                "(or ZQNT_EDGE_AUTH_DISABLED=true for local SITL)."
             )
         else:
-            self._verifier = PlatformTokenVerifier(config.platform_public_key)
+            if key_set is None and config.platform_keys_url:
+                key_set = PlatformKeySet(config.platform_keys_url)
+            self._verifier = PlatformTokenVerifier(config.platform_public_key, key_set)
 
-    def check(self, method: str, metadata) -> tuple[grpc.StatusCode, str] | None:
+    def start(self) -> None:
+        """Begin fetching and refreshing the platform's key set, if one is configured."""
+        if self._verifier is not None and self._verifier.key_set is not None:
+            self._verifier.key_set.start()
+
+    def close(self) -> None:
+        if self._verifier is not None and self._verifier.key_set is not None:
+            self._verifier.key_set.stop()
+
+    async def check(self, method: str, metadata) -> tuple[grpc.StatusCode, str] | None:
         """``None`` when the call may proceed, else the status to refuse it with."""
         if self._disabled or method in UNAUTHENTICATED_METHODS:
             return None
@@ -251,14 +327,14 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
         if not header or not header.startswith("Bearer "):
             return grpc.StatusCode.UNAUTHENTICATED, "authentication required"
         try:
-            self._verifier.verify(header[len("Bearer ") :])
+            await self._verifier.verify_async(header[len("Bearer ") :])
         except TokenVerificationError as exc:
             logger.warning("Refused %s: %s", method, exc)
             return grpc.StatusCode.UNAUTHENTICATED, str(exc)
         return None
 
     async def intercept_service(self, continuation, handler_call_details):
-        refusal = self.check(handler_call_details.method, handler_call_details.invocation_metadata)
+        refusal = await self.check(handler_call_details.method, handler_call_details.invocation_metadata)
         handler = await continuation(handler_call_details)
         if refusal is None or handler is None:
             return handler
