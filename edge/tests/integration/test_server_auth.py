@@ -15,7 +15,7 @@ from zqnt_api.generated.zqnt import (  # type: ignore[import]
 )
 
 from edge_sdk import EdgeAuthConfig, EdgeServer
-from tests.auth_tokens import new_key, public_key_b64, token
+from tests.auth_tokens import FakeJwksServer, jwk, new_key, public_key_b64, token
 from tests.conftest import _TestAdapter
 
 KEY = new_key()
@@ -86,3 +86,30 @@ async def test_health_is_open(secured_port):
     async with grpc.aio.insecure_channel(f"localhost:{secured_port}") as ch:
         response = await health_pb2_grpc.HealthStub(ch).Check(health_pb2.HealthCheckRequest(service=""))
     assert response.status == health_pb2.HealthCheckResponse.SERVING
+
+
+@pytest.mark.asyncio
+async def test_a_server_with_only_the_key_set_url_accepts_listed_keys_only():
+    jwks = FakeJwksServer()
+    v1, v2 = new_key(), new_key()
+    jwks.keys = [jwk(v1, "service-token:v1")]
+    port = _free_port()
+    server = EdgeServer(adapter=_TestAdapter(), port=port, auth=EdgeAuthConfig(platform_keys_url=jwks.url))
+    task = asyncio.create_task(server.serve())
+    try:
+        await asyncio.sleep(0.1)
+        response = await _capabilities(
+            port, metadata=(("authorization", f"Bearer {token(v1, kid='service-token:v1')}"),)
+        )
+        assert response.HasField("capabilities")
+
+        jwks.keys = [jwk(v1, "service-token:v1"), jwk(v2, "service-token:v2")]
+        with pytest.raises(grpc.aio.AioRpcError) as refused:
+            await _capabilities(port, metadata=(("authorization", f"Bearer {token(v2, kid='service-token:v2')}"),))
+        assert refused.value.code() == grpc.StatusCode.UNAUTHENTICATED
+        assert jwks.requests == 1
+    finally:
+        await server.stop(grace=0)
+        with suppress(asyncio.CancelledError, Exception):
+            await task
+        jwks.close()
