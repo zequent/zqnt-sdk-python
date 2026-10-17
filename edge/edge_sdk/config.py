@@ -40,8 +40,11 @@ Environment variables (all optional, sensible defaults provided):
 
     Authentication (see edge_sdk.auth):
     ZQNT_EDGE_TOKEN           Edge credential for calls into the platform (issued in the console)
-    ZQNT_PLATFORM_PUBLIC_KEY  The platform's service public key (SERVICE_AUTH_PUBLIC_KEY); commands
-                              without a token it verifies are refused. Alias: SERVICE_AUTH_PUBLIC_KEY
+    ZQNT_PLATFORM_KEYS_URL    The platform's published signing keys (JWK set), e.g.
+                              http://admin-console:8005/api/admin-console/auth/service-keys; commands
+                              signed with a key it does not list are refused
+    ZQNT_PLATFORM_PUBLIC_KEY  The platform's service public key, for tokens without a key id.
+                              Optional with ZQNT_PLATFORM_KEYS_URL. Alias: SERVICE_AUTH_PUBLIC_KEY
     ZQNT_EDGE_AUTH_DISABLED   "true" accepts unauthenticated commands — local SITL/simulators only
 """
 

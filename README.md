@@ -492,9 +492,15 @@ Both directions of an adapter's gRPC traffic are authenticated (see `edge_sdk/au
   Issue one in the console (Edge Credentials, `POST /api/admin-console/edge-credentials`) or with
   `core/scripts/mint-edge-credential.py`. The platform refuses calls without it, except claim
   redemption (`ZQNT_CLAIM_CODE`).
-- `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) - the platform's service public key.
-  `EdgeServer` refuses every command that does not carry a token signed with it; without the key
-  it refuses everything.
+- `ZQNT_PLATFORM_KEYS_URL` - the platform's published signing keys, a JWK set
+  (`http://<admin-console>:8005/api/admin-console/auth/service-keys`). `EdgeServer` verifies every
+  command's token with the key its `kid` names. The set is fetched at start (retried until it
+  answers), refreshed every 5 minutes and, at most every 30 seconds, when a token names a key it
+  does not know yet, so the platform can rotate its keys without touching the adapter. A token
+  signed with a key the set does not list is refused.
+- `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) - the platform's service public key,
+  for tokens without `kid`. Optional with `ZQNT_PLATFORM_KEYS_URL`: without it, the key the set
+  lists without `kid` is used. Without either variable `EdgeServer` refuses everything.
 - `ZQNT_EDGE_AUTH_DISABLED=true` - accept unauthenticated commands. Local SITL/simulators only.
 
 ### API Reference
