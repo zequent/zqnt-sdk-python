@@ -57,27 +57,27 @@ class TestVerifier:
 
 
 class TestServerInterceptor:
-    def test_no_token_is_refused(self):
-        code, _ = _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, ())
+    async def test_no_token_is_refused(self):
+        code, _ = await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, ())
         assert code == grpc.StatusCode.UNAUTHENTICATED
 
-    def test_a_valid_token_passes(self):
-        assert _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, _bearer(token(KEY))) is None
+    async def test_a_valid_token_passes(self):
+        assert await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, _bearer(token(KEY))) is None
 
-    def test_a_forged_token_is_refused(self):
-        code, _ = _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, _bearer(token(OTHER_KEY)))
+    async def test_a_forged_token_is_refused(self):
+        code, _ = await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, _bearer(token(OTHER_KEY)))
         assert code == grpc.StatusCode.UNAUTHENTICATED
 
-    def test_without_a_public_key_everything_is_refused(self):
-        code, details = _interceptor().check(METHOD, _bearer(token(KEY)))
+    async def test_without_a_public_key_everything_is_refused(self):
+        code, details = await _interceptor().check(METHOD, _bearer(token(KEY)))
         assert code == grpc.StatusCode.UNAUTHENTICATED
         assert "ZQNT_PLATFORM_PUBLIC_KEY" in details
 
-    def test_health_probes_need_no_token(self):
-        assert _interceptor().check("/grpc.health.v1.Health/Check", ()) is None
+    async def test_health_probes_need_no_token(self):
+        assert await _interceptor().check("/grpc.health.v1.Health/Check", ()) is None
 
-    def test_the_dev_switch_lets_everything_through(self):
-        assert _interceptor(disabled=True).check(METHOD, ()) is None
+    async def test_the_dev_switch_lets_everything_through(self):
+        assert await _interceptor(disabled=True).check(METHOD, ()) is None
 
 
 class TestConfig:

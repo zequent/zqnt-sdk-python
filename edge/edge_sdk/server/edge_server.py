@@ -546,11 +546,14 @@ class EdgeServer:
         self._registration = registration
         self._server: grpc.aio.Server | None = None
         self._health_servicer = None
+        self._auth_interceptor: PlatformAuthServerInterceptor | None = None
 
     async def serve(self) -> None:
         """Start the server and block until it is terminated."""
         # Only the platform may command the device: every call must carry its service token.
-        self._server = grpc.aio.server(interceptors=[PlatformAuthServerInterceptor(self._auth)])
+        self._auth_interceptor = PlatformAuthServerInterceptor(self._auth)
+        self._auth_interceptor.start()
+        self._server = grpc.aio.server(interceptors=[self._auth_interceptor])
 
         # Register EdgeAdapterService: v2 (typed RPCs, frozen) and v3 (ExecuteCommand only) side by
         # side on one port, both served from the same adapter and its registered commands.
@@ -605,6 +608,8 @@ class EdgeServer:
         if self._server:
             await self._server.stop(grace)
             logger.info("EdgeServer stopped")
+        if self._auth_interceptor is not None:
+            await asyncio.to_thread(self._auth_interceptor.close)
 
     async def _register(self, *, online: bool) -> None:
         """
