@@ -8,6 +8,8 @@ Python client for the Zequent Framework. Connects to:
     stream_manual_control)
   * zqnt.telemetry.v3.TelemetryService (watch_telemetry, watch_detections, watch_alerts)
   * zqnt.stream.v3.LiveStreamService (list_live_streams)
+  * zqnt.application_simulation.v3.SimulationService (start_simulation, simulation_trace,
+    cancel_simulation, wait_for_simulation)
   * ConnectorService         (assets, organizations, skill registry, schedulers)
   * MissionAutonomyService   (Applications, Skill executions, schedulers)
 
@@ -33,6 +35,7 @@ from importlib.metadata import version as _pkg_version
 from .commands import CommandError, CommandsClient, ManualControlStream
 from .exceptions import ZequentClientError, ZequentRetryExhaustedError
 from .live_streams import LiveStreamsClient
+from .simulations import SimulationsClient
 from .stream_handle import StreamHandle
 from .telemetry import TelemetryClient
 
@@ -67,6 +70,7 @@ __all__ = [
     "ManualControlStream",
     "TelemetryClient",
     "LiveStreamsClient",
+    "SimulationsClient",
     "StreamHandle",
     "ErrorInfo",
     "ProgressInfo",
