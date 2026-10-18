@@ -554,7 +554,7 @@ pytest tests/ --cov=edge_sdk --cov-report=html
 
 Python client SDK for Zequent 3.0. Every asset is commanded the same way, by command id, through
 `client.commands`; live telemetry, detections and alerts come from `client.telemetry`, the live video streams from
-`client.live_streams`;
+`client.live_streams`, simulated Application runs from `client.simulations`;
 Applications, Skill executions and schedulers from `client.mission_autonomy` and
 `client.connector`.
 
@@ -780,6 +780,39 @@ now: the asset publishing it (for a docked aircraft, the aircraft), the media se
 `since` when it is received and how many `viewers` read it. It raises `CommandError` with the gRPC
 `status` `PERMISSION_DENIED` when the organization's license does not include live streams and
 `UNAVAILABLE` when the platform has no current answer from the media server.
+
+#### Simulating an Application
+
+```python
+from zqnt_api.generated.zqnt.application_simulation.v3 import application_simulation_pb2 as sim
+
+request = sim.StartSimulationRequest(
+    application_id=application_id,
+    nodes=[
+        sim.NodeScenario(
+            command_id="flight.takeoff",
+            outcome=sim.NODE_OUTCOME_FAILURE,
+            error_code="flight.not_airborne",
+        )
+    ],
+    fleet=[sim.VirtualAsset(sn="DRONE-1", battery_percent=18)],
+)
+trace = await client.simulations.simulate(request, interval=1.0, timeout=120)
+for step in trace.steps:
+    print(step.node_id, sim.NodeStatus.Name(step.status), step.simulated_by)
+```
+
+`client.simulations` runs an Application on a virtual fleet through
+`zqnt.application_simulation.v3.SimulationService` on mission-autonomy: the platform's engine runs
+the graph, every command is answered from its contract and the request's `NodeScenario`s (success,
+failure, timeout, delay, fixed output, approval answer), and nothing reaches a real asset.
+`start_simulation(request)` returns the execution id and status (a request without
+`context.idempotency_key` gets a new one), `simulation_trace(execution_id)` the path the run took so
+far, `cancel_simulation(execution_id)` stops it. `wait_for_simulation(execution_id, *, interval=1.0,
+timeout=None)` polls the trace until `SUCCEEDED`, `FAILED`, `CANCELLED` or `TIMED_OUT` and returns
+it; when `timeout` elapses first it raises `CommandError` with category `TIMEOUT` and the run keeps
+going. `simulate(request, ...)` does both. Refusals raise `CommandError`: `INVALID_ARGUMENT` for an
+unusable scenario or fleet, `NOT_FOUND` for an Application or run of another organization.
 
 **Upgrading from 2.x:** the typed per-command methods (`client.remote_control`) and the 2.x live
 data client (`client.live_data`) are removed in 3.0. [MIGRATION.md](client/MIGRATION.md) maps every typed
