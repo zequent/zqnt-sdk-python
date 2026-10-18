@@ -5,8 +5,8 @@ Mirrors the Java client SDK (``com.zqnt.sdk.client.ZequentClient``) so that
 ``.env`` files and configuration concepts are interchangeable between the
 Java and Python SDKs.
 
-Sub-clients: commands, telemetry and live_streams (the 3.0 command and live data API), connector
-and mission_autonomy.
+Sub-clients: commands, telemetry and live_streams (the 3.0 command and live data API), simulations,
+connector and mission_autonomy.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from .connector.client import ConnectorClient
     from .live_streams.client import LiveStreamsClient
     from .mission_autonomy.client import MissionAutonomyClient
+    from .simulations.client import SimulationsClient
     from .telemetry.client import TelemetryClient
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class ZequentClient:
         client.commands
         client.telemetry
         client.live_streams
+        client.simulations
         client.connector
         client.mission_autonomy
 
@@ -109,6 +111,7 @@ class ZequentClient:
         self._mission_autonomy: "MissionAutonomyClient | None" = None
         self._telemetry: "TelemetryClient | None" = None
         self._live_streams: "LiveStreamsClient | None" = None
+        self._simulations: "SimulationsClient | None" = None
 
         logger.info("ZequentClient initialized with %d channels", len(self._channels))
 
@@ -192,6 +195,16 @@ class ZequentClient:
 
             self._live_streams = LiveStreamsClient(self._live_data_channel, self._resilience)
         return self._live_streams
+
+    @property
+    def simulations(self) -> "SimulationsClient":
+        """Simulated runs of an Application on a virtual fleet (``start_simulation``,
+        ``simulation_trace``, ``cancel_simulation``, ``wait_for_simulation``), Zequent 3.0."""
+        if self._simulations is None:
+            from .simulations.client import SimulationsClient
+
+            self._simulations = SimulationsClient(self._mission_autonomy_channel, self._resilience)
+        return self._simulations
 
     @property
     def connector(self) -> "ConnectorClient":
