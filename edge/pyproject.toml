@@ -21,7 +21,7 @@ dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
     "fakeredis[aioredis]>=2.39.0",
-    "ruff>=0.15.12",
+    "ruff>=0.17.1",
     "redis[asyncio]>=8.1.0",
 ]
 
