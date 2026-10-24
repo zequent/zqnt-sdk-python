@@ -32,6 +32,7 @@ from google.protobuf import struct_pb2, timestamp_pb2
 from ..auth import default_edge_token, platform_channel
 from ..models.common import DetectionBatch
 from ..models.live import Alert, TelemetrySample
+from ._reconnect import ReconnectBackoff
 from .edge_gateway import V3Fallback, is_unimplemented
 
 logger = logging.getLogger(__name__)
@@ -225,12 +226,13 @@ class _IngestStream:
                     pass
 
     async def _run(self) -> None:
-        backoff = self.BACKOFF_INITIAL
+        backoff = ReconnectBackoff(self.BACKOFF_INITIAL, self.BACKOFF_MAX)
         while not self._closed:
             v3 = self._fallback.available()
             gen_stop = asyncio.Event()
             sent: list = []
             channel = platform_channel(self._host, self._port, self._token)
+            backoff.opened()
             try:
                 if v3:
                     response = await self._v3_call(channel)(self._items(gen_stop, self._to_v3, sent, v2=False))
@@ -244,7 +246,7 @@ class _IngestStream:
                     response = await self._v2_call(channel)(self._items(gen_stop, self._to_v2, sent, v2=True))
                     if response.has_errors:
                         logger.warning("%s v2 stream ended with error: %s", self._name, response.response_message)
-                backoff = self.BACKOFF_INITIAL
+                backoff.reset()
                 continue
             except Exception as exc:
                 if self._closed:
@@ -253,18 +255,18 @@ class _IngestStream:
                     self._fallback.mark_unavailable()
                     self._replay.extendleft(reversed(sent))
                     continue
+                delay = backoff.next_delay()
                 logger.warning(
-                    "%s stream error (%s: %s), reconnecting in %.1fs", self._name, type(exc).__name__, exc, backoff
+                    "%s stream error (%s: %s), reconnecting in %.1fs", self._name, type(exc).__name__, exc, delay
                 )
             finally:
                 gen_stop.set()
                 await channel.close()
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=backoff)
+                await asyncio.wait_for(self._stop.wait(), timeout=delay)
                 return
             except asyncio.TimeoutError:
                 pass
-            backoff = min(backoff * 2, self.BACKOFF_MAX)
 
     async def _next(self, gen_stop: asyncio.Event):
         if self._replay:

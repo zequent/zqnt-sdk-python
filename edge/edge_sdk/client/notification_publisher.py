@@ -31,6 +31,7 @@ import uuid
 
 from ..auth import default_edge_token, platform_channel
 from ..models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
+from ._reconnect import ReconnectBackoff
 from .edge_gateway import EdgeGatewayClient
 
 logger = logging.getLogger(__name__)
@@ -177,15 +178,18 @@ class NotificationPublisher:
     async def _run_stream(self) -> None:
         from zqnt_api.generated.zqnt import live_data_pb2_grpc
 
-        backoff = self._BACKOFF_INITIAL
+        backoff = ReconnectBackoff(self._BACKOFF_INITIAL, self._BACKOFF_MAX)
 
         while not self._closed:
             gen_stop = asyncio.Event()
             channel = None
+            delay: float | None = None
             try:
                 channel = platform_channel(self._host, self._port, self._token)
                 stub = live_data_pb2_grpc.LiveDataServiceStub(channel)
                 logger.info("Notification stream connecting to %s:%d (sn=%s)", self._host, self._port, self._sn)
+
+                backoff.opened()
 
                 response = await stub.ProduceNotification(self._stream_generator(gen_stop))
 
@@ -200,17 +204,19 @@ class NotificationPublisher:
                     )
                 else:
                     logger.debug("ProduceNotification stream ended cleanly (sn=%s)", self._sn)
-                    backoff = self._BACKOFF_INITIAL
+                    backoff.reset()
 
             except Exception as exc:
                 if self._closed:
                     return
+
+                delay = backoff.next_delay()
                 logger.warning(
                     "Notification stream error (sn=%s, %s: %s), reconnecting in %.1fs",
                     self._sn,
                     type(exc).__name__,
                     exc,
-                    backoff,
+                    delay,
                 )
             finally:
                 gen_stop.set()
@@ -221,12 +227,11 @@ class NotificationPublisher:
                 try:
                     await asyncio.wait_for(
                         self._stop_event.wait(),
-                        timeout=backoff,  # type: ignore[union-attr]
+                        timeout=delay if delay is not None else backoff.next_delay(),  # type: ignore[union-attr]
                     )
                     return
                 except asyncio.TimeoutError:
                     pass
-                backoff = min(backoff * 2, self._BACKOFF_MAX)
 
     async def _stream_generator(self, gen_stop: asyncio.Event):
         assert self._queue is not None
