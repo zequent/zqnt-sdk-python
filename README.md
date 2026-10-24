@@ -109,13 +109,19 @@ class MyDroneAdapter(EdgeAdapter):
         """Return capabilities supported by this asset."""
         return self._auto_capabilities(sn, AssetType.AIRCRAFT)
 
-    async def take_off(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
+    async def take_off(
+        self, ctx: RequestContext, coordinates: Coordinates
+    ) -> EdgeResponse:
         """Handle take-off command."""
         # Call your drone SDK here
-        await hardware.take_off(coordinates.latitude, coordinates.longitude, coordinates.altitude)
+        await hardware.take_off(
+            coordinates.latitude, coordinates.longitude, coordinates.altitude
+        )
         return EdgeResponse.ok(ctx.tid, ctx.sn, "Take-off initiated")
 
-    async def go_to(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
+    async def go_to(
+        self, ctx: RequestContext, coordinates: Coordinates
+    ) -> EdgeResponse:
         """Handle go-to command."""
         await hardware.fly_to(coordinates)
         return EdgeResponse.ok(ctx.tid, ctx.sn)
@@ -242,7 +248,13 @@ await publisher.publish_sub_asset_telemetry(
 Declare each command once; the registration is both what the platform discovers and what runs:
 
 ```python
-from edge_sdk import EdgeAdapter, AssetType, CustomCommandResponse, TelemetryValueType, schema
+from edge_sdk import (
+    EdgeAdapter,
+    AssetType,
+    CustomCommandResponse,
+    TelemetryValueType,
+    schema,
+)
 
 
 class MyDockAdapter(EdgeAdapter):
@@ -251,10 +263,14 @@ class MyDockAdapter(EdgeAdapter):
         self.register_command(
             "vendor.acme.spray",
             self._spray,
-            input_schema=schema({"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]),
+            input_schema=schema(
+                {"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]
+            ),
         )
         self.declare_standard_telemetry_field("dock.cover_state")
-        self.declare_telemetry_field("vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%")
+        self.declare_telemetry_field(
+            "vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%"
+        )
 
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.DOCK)
@@ -280,7 +296,11 @@ class MyDockAdapter(EdgeAdapter):
 - Params are validated against the command's input schema before the handler runs. Integral
   doubles become `int` where the schema says `integer`; invalid params come back as `REJECTED`
   with `command.invalid_params`. Omitted coordinates arrive as NaN: NaN is a number, but never
-  satisfies `required`.
+  satisfies `required`. v3 params are validated as sent; on v2 the SDK first converts text the
+  schema does not accept as text (`"13.405"` for a number, `"true"` for a boolean, `"pitch_down"`
+  for the enum value `PITCH_DOWN`), exact conversions only. Enum aliases (a DJI name such as
+  `SDR_ONLY` or `IRONBOW1` for a standard value) are not converted: a 2.x platform must send the
+  standard value.
 - A handler sees the platform's run id as `ctx.command_execution_id`.
 - Every capability carries its risk (`CommandSafety`). A standard id gets the rating of the
   platform's command catalog (`catalog_safety`, e.g. `flight.takeoff` MOVE, `flight.land` CRITICAL);
@@ -299,7 +319,10 @@ outcome later, as before:
 ```python
 await notifier.publish_command_execution_event(
     CommandExecutionEvent(
-        external_execution_id="vendor-42", status=CommandExecutionStatus.SUCCEEDED, sn="DOCK-1", output={"photos": 12}
+        external_execution_id="vendor-42",
+        status=CommandExecutionStatus.SUCCEEDED,
+        sn="DOCK-1",
+        output={"photos": 12},
     )
 )
 ```
@@ -313,14 +336,24 @@ not tried again for 10 minutes.
 #### v3 live data
 
 ```python
-from edge_sdk import Alert, AlertSeverity, DetectionBatch, TelemetryIngestPublisher, TelemetrySample
+from edge_sdk import (
+    Alert,
+    AlertSeverity,
+    DetectionBatch,
+    TelemetryIngestPublisher,
+    TelemetrySample,
+)
 
 ingest = TelemetryIngestPublisher(host="live-data", port=8003)
 await ingest.publish_sample(
-    TelemetrySample(sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"})
+    TelemetrySample(
+        sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"}
+    )
 )
 await ingest.publish_detections(DetectionBatch(sn="RADAR-1", detections=[...]))
-await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING))
+await ingest.publish_alert(
+    Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING)
+)
 ```
 
 Long-lived streams to `TelemetryIngestService`, opened on first use and reconnected with backoff.
@@ -358,7 +391,9 @@ async def some_operation(self, ctx: RequestContext) -> EdgeResponse:
         result = await hardware.do_something()
         return EdgeResponse.ok(ctx.tid, ctx.sn)
     except HardwareError as e:
-        return EdgeResponse.fail(ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR))
+        return EdgeResponse.fail(
+            ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR)
+        )
 ```
 
 #### Server Registration (with Redis)
@@ -457,9 +492,15 @@ Both directions of an adapter's gRPC traffic are authenticated (see `edge_sdk/au
   Issue one in the console (Edge Credentials, `POST /api/admin-console/edge-credentials`) or with
   `core/scripts/mint-edge-credential.py`. The platform refuses calls without it, except claim
   redemption (`ZQNT_CLAIM_CODE`).
-- `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) - the platform's service public key.
-  `EdgeServer` refuses every command that does not carry a token signed with it; without the key
-  it refuses everything.
+- `ZQNT_PLATFORM_KEYS_URL` - the platform's published signing keys, a JWK set
+  (`http://<admin-console>:8005/api/admin-console/auth/service-keys`). `EdgeServer` verifies every
+  command's token with the key its `kid` names. The set is fetched at start (retried until it
+  answers), refreshed every 5 minutes and, at most every 30 seconds, when a token names a key it
+  does not know yet, so the platform can rotate its keys without touching the adapter. A token
+  signed with a key the set does not list is refused.
+- `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) - the platform's service public key,
+  for tokens without `kid`. Optional with `ZQNT_PLATFORM_KEYS_URL`: without it, the key the set
+  lists without `kid` is used. Without either variable `EdgeServer` refuses everything.
 - `ZQNT_EDGE_AUTH_DISABLED=true` - accept unauthenticated commands. Local SITL/simulators only.
 
 ### API Reference
@@ -512,7 +553,8 @@ pytest tests/ --cov=edge_sdk --cov-report=html
 
 
 Python client SDK for Zequent 3.0. Every asset is commanded the same way, by command id, through
-`client.commands`; live telemetry, detections and alerts come from `client.telemetry`;
+`client.commands`; live telemetry, detections and alerts come from `client.telemetry`, the live video streams from
+`client.live_streams`, simulated Application runs from `client.simulations`;
 Applications, Skill executions and schedulers from `client.mission_autonomy` and
 `client.connector`.
 
@@ -554,7 +596,9 @@ from client_sdk import ZequentClient
 
 async def main():
     async with ZequentClient.from_env() as client:
-        await client.commands.execute_command("DRONE-1", "flight.takeoff", {"altitude": 40})
+        await client.commands.execute_command(
+            "DRONE-1", "flight.takeoff", {"altitude": 40}
+        )
 
         async for item in client.telemetry.watch_telemetry(["DRONE-1"]):
             print(item)
@@ -587,9 +631,15 @@ from client_sdk import ZequentClient
 from client_sdk.config import ServiceConfig
 
 async with ZequentClient(
-    connector_config=ServiceConfig("connector", host="connector.example.com", port=8010),
-    remote_control_config=ServiceConfig("remote-control", host="rc.example.com", port=8002),
-    mission_autonomy_config=ServiceConfig("mission-autonomy", host="ma.example.com", port=8004),
+    connector_config=ServiceConfig(
+        "connector", host="connector.example.com", port=8010
+    ),
+    remote_control_config=ServiceConfig(
+        "remote-control", host="rc.example.com", port=8002
+    ),
+    mission_autonomy_config=ServiceConfig(
+        "mission-autonomy", host="ma.example.com", port=8004
+    ),
     live_data_config=ServiceConfig("live-data", host="ld.example.com", port=8003),
 ) as client:
     ...
@@ -614,10 +664,14 @@ async with ZequentClient.from_env() as client:
     try:
         async with asyncio.timeout(300):
             result = await client.commands.execute_and_wait(
-                "DOCK-1", "navigation.go_to", {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60}
+                "DOCK-1",
+                "navigation.go_to",
+                {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60},
             )
     except CommandError as error:
-        print(error.category_name, error.code, error)  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
+        print(
+            error.category_name, error.code, error
+        )  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
     else:
         print(to_dict(result.result))
 
@@ -698,14 +752,67 @@ watch does not reconnect: watch again.
 async for batch in client.telemetry.watch_detections(["DRONE-1"]):
     print(batch.asset.sn, batch.stream_url, len(batch.detections))
 
-async for alert in client.telemetry.watch_alerts(min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING):
-    print(alert.asset.sn, telemetry_pb2.AlertSeverity.Name(alert.severity), alert.code, alert.message)
+async for alert in client.telemetry.watch_alerts(
+    min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING
+):
+    print(
+        alert.asset.sn,
+        telemetry_pb2.AlertSeverity.Name(alert.severity),
+        alert.code,
+        alert.message,
+    )
 ```
 
 `watch_detections(asset_sns=None, *, heartbeat_timeout=35s)` yields `DetectionBatch`es,
 `watch_alerts(asset_sns=None, *, min_severity=ALERT_SEVERITY_UNSPECIFIED, heartbeat_timeout=35s)`
 yields `Alert`s (stable `code` such as `dock.rain`, `message`, `details`) of at least
 `min_severity`. Heartbeats, refusals and a dropped stream behave as for `watch_telemetry`.
+
+#### Live video streams
+
+```python
+for stream in await client.live_streams.list_live_streams():
+    print(stream.asset.sn, stream.path, stream.since.ToDatetime(), stream.viewers)
+```
+
+`list_live_streams()` returns every `LiveStream` of the caller's organization that is live right
+now: the asset publishing it (for a docked aircraft, the aircraft), the media server's `path`,
+`since` when it is received and how many `viewers` read it. It raises `CommandError` with the gRPC
+`status` `PERMISSION_DENIED` when the organization's license does not include live streams and
+`UNAVAILABLE` when the platform has no current answer from the media server.
+
+#### Simulating an Application
+
+```python
+from zqnt_api.generated.zqnt.application_simulation.v3 import application_simulation_pb2 as sim
+
+request = sim.StartSimulationRequest(
+    application_id=application_id,
+    nodes=[
+        sim.NodeScenario(
+            command_id="flight.takeoff",
+            outcome=sim.NODE_OUTCOME_FAILURE,
+            error_code="flight.not_airborne",
+        )
+    ],
+    fleet=[sim.VirtualAsset(sn="DRONE-1", battery_percent=18)],
+)
+trace = await client.simulations.simulate(request, interval=1.0, timeout=120)
+for step in trace.steps:
+    print(step.node_id, sim.NodeStatus.Name(step.status), step.simulated_by)
+```
+
+`client.simulations` runs an Application on a virtual fleet through
+`zqnt.application_simulation.v3.SimulationService` on mission-autonomy: the platform's engine runs
+the graph, every command is answered from its contract and the request's `NodeScenario`s (success,
+failure, timeout, delay, fixed output, approval answer), and nothing reaches a real asset.
+`start_simulation(request)` returns the execution id and status (a request without
+`context.idempotency_key` gets a new one), `simulation_trace(execution_id)` the path the run took so
+far, `cancel_simulation(execution_id)` stops it. `wait_for_simulation(execution_id, *, interval=1.0,
+timeout=None)` polls the trace until `SUCCEEDED`, `FAILED`, `CANCELLED` or `TIMED_OUT` and returns
+it; when `timeout` elapses first it raises `CommandError` with category `TIMEOUT` and the run keeps
+going. `simulate(request, ...)` does both. Refusals raise `CommandError`: `INVALID_ARGUMENT` for an
+unusable scenario or fleet, `NOT_FOUND` for an Application or run of another organization.
 
 **Upgrading from 2.x:** the typed per-command methods (`client.remote_control`) and the 2.x live
 data client (`client.live_data`) are removed in 3.0. [MIGRATION.md](client/MIGRATION.md) maps every typed

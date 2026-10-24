@@ -29,6 +29,7 @@ import uuid
 
 from ..auth import default_edge_token, platform_channel
 from ..models.telemetry import AssetTelemetry, SubAssetTelemetry
+from ._reconnect import ReconnectBackoff
 
 logger = logging.getLogger(__name__)
 
@@ -144,16 +145,19 @@ class TelemetryPublisher:
         """
         from zqnt_api.generated.zqnt import live_data_pb2_grpc
 
-        backoff = self._BACKOFF_INITIAL
+        backoff = ReconnectBackoff(self._BACKOFF_INITIAL, self._BACKOFF_MAX)
 
         while not self._closed:
             # Each attempt gets its own stop signal so stale generators exit promptly.
             gen_stop = asyncio.Event()
             channel = None
+            delay: float | None = None
             try:
                 channel = platform_channel(self._host, self._port, self._token)
                 stub = live_data_pb2_grpc.LiveDataServiceStub(channel)
                 logger.info("Telemetry stream connecting to %s:%d (sn=%s)", self._host, self._port, self._sn)
+
+                backoff.opened()
 
                 response = await stub.ProduceTelemetry(self._stream_generator(gen_stop))
 
@@ -168,17 +172,19 @@ class TelemetryPublisher:
                     )
                 else:
                     logger.debug("ProduceTelemetry stream ended cleanly (sn=%s)", self._sn)
-                    backoff = self._BACKOFF_INITIAL  # reset only on clean completion
+                    backoff.reset()
 
             except Exception as exc:
                 if self._closed:
                     return
+
+                delay = backoff.next_delay()
                 logger.warning(
                     "Telemetry stream error (sn=%s, %s: %s), reconnecting in %.1fs",
                     self._sn,
                     type(exc).__name__,
                     exc,
-                    backoff,
+                    delay,
                 )
             finally:
                 gen_stop.set()
@@ -190,12 +196,11 @@ class TelemetryPublisher:
                 try:
                     await asyncio.wait_for(
                         self._stop_event.wait(),
-                        timeout=backoff,  # type: ignore[union-attr]
+                        timeout=delay if delay is not None else backoff.next_delay(),  # type: ignore[union-attr]
                     )
                     return  # stop_event was set → close() called
                 except asyncio.TimeoutError:
                     pass
-                backoff = min(backoff * 2, self._BACKOFF_MAX)
 
     async def _stream_generator(self, gen_stop: asyncio.Event):
         """

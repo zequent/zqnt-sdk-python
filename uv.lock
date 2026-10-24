@@ -300,7 +300,7 @@ requires-dist = [
     { name = "redis", extras = ["asyncio"], marker = "extra == 'dev'", specifier = ">=8.1.0" },
     { name = "redis", extras = ["asyncio"], marker = "extra == 'redis'", specifier = ">=8.1.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api?subdirectory=python&rev=390b5e2f0fa6faa16bf175ce63a3a0481879e9cb" },
+    { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api?subdirectory=python&rev=836cd676cd2f420234e5ba5dc9b01dd8873d4596" },
 ]
 provides-extras = ["redis", "dev"]
 
@@ -644,7 +644,7 @@ wheels = [
 [[package]]
 name = "zqnt-api"
 version = "3.0.0"
-source = { git = "https://github.com/zequent/zqnt-api?subdirectory=python&rev=390b5e2f0fa6faa16bf175ce63a3a0481879e9cb#390b5e2f0fa6faa16bf175ce63a3a0481879e9cb" }
+source = { git = "https://github.com/zequent/zqnt-api?subdirectory=python&rev=836cd676cd2f420234e5ba5dc9b01dd8873d4596#836cd676cd2f420234e5ba5dc9b01dd8873d4596" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
@@ -686,6 +686,6 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "python-dotenv", marker = "extra == 'dotenv'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
-    { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api?subdirectory=python&rev=390b5e2f0fa6faa16bf175ce63a3a0481879e9cb" },
+    { name = "zqnt-api", git = "https://github.com/zequent/zqnt-api?subdirectory=python&rev=836cd676cd2f420234e5ba5dc9b01dd8873d4596" },
 ]
 provides-extras = ["dotenv", "dev"]

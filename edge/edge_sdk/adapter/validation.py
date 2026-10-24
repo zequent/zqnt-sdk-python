@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -79,6 +80,63 @@ def validate_params(schema: dict | None, params: dict | None) -> ValidationResul
         logger.warning("Command schema is malformed; params passed on unchecked", exc_info=True)
         return ValidationResult(params, [])
     return ValidationResult(coerced if isinstance(coerced, dict) else params, errors)
+
+
+_DECIMAL = re.compile(r"[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?")
+
+
+def convert_text(schema: dict | None, params: dict | None) -> dict:
+    """
+    Text in *params* converted to what *schema* declares, for 2.x callers that send typed values as
+    text: a number or integer, ``true``/``false``, an enum value in another letter case.
+
+    Only exact conversions: ``"52.5200"`` becomes 52.52, ``"3.5"`` never becomes an integer and
+    ``"NaN"``, ``"1_000"`` or ``"warm"`` stay text, for validation to refuse.
+    """
+    params = dict(params or {})
+    if not schema:
+        return params
+    converted = _convert(schema, params)
+    return converted if isinstance(converted, dict) else params
+
+
+def _convert(schema: Any, value: Any) -> Any:
+    if not isinstance(schema, dict):
+        return value
+    if isinstance(value, dict):
+        properties = schema.get("properties", {})
+        additional = schema.get("additionalProperties")
+        return {
+            name: _convert(properties.get(name, additional if isinstance(additional, dict) else None), item)
+            for name, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_convert(schema.get("items"), item) for item in value]
+    if isinstance(value, str):
+        return _convert_text_value(schema, value)
+    return value
+
+
+def _convert_text_value(schema: dict, value: str) -> Any:
+    raw_type = schema.get("type")
+    types = raw_type if isinstance(raw_type, list) else [raw_type] if raw_type else []
+    enum = schema.get("enum")
+    if isinstance(enum, list) and value not in enum:
+        matches = [e for e in enum if isinstance(e, str) and e.casefold() == value.casefold()]
+        if len(matches) == 1:
+            return matches[0]
+    if not types or "string" in types:
+        return value
+    text = value.strip()
+    if ("integer" in types or "number" in types) and _DECIMAL.fullmatch(text):
+        number = float(text)
+        if "integer" in types and number.is_integer() and abs(number) < 2**53:
+            return int(number)
+        if "number" in types and math.isfinite(number):
+            return number
+    if "boolean" in types and text.lower() in ("true", "false"):
+        return text.lower() == "true"
+    return value
 
 
 def check_schema(schema: Any, path: str = "schema") -> list[str]:
