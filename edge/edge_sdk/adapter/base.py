@@ -73,7 +73,7 @@ from ..models.common import (
     TelemetryValueType,
 )
 from .commands import CATALOG, CommandHandler, RegisteredCommand, catalog_safety, spec_for
-from .validation import validate_params
+from .validation import convert_text, validate_params
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +168,13 @@ class EdgeAdapter(ABC):
             warnings.warn(
                 f"{cls.__name__} overrides typed command methods ({', '.join(typed)}); they are the v2 "
                 "compatibility layer -- declare the commands with register_command instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if "send_custom_command" in cls.__dict__:
+            warnings.warn(
+                f"{cls.__name__} overrides send_custom_command, which only ever receives registered commands; "
+                "free-form 2.x commands go to legacy_custom_command",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -388,26 +395,56 @@ class EdgeAdapter(ABC):
 
     async def execute_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
         """
-        Validate the params against the command's input schema, then run it.
+        Run a command this adapter has published (v3 ``ExecuteCommand``); any other id is refused.
 
-        Numbers are coerced here once (an integral double where the schema says integer becomes an
-        int); invalid params never reach the handler and come back as ``command.invalid_params``.
+        The params are validated against the command's input schema as they are: numbers are
+        coerced once (an integral double where the schema says integer becomes an int), anything
+        else that does not match comes back as ``command.invalid_params`` without reaching the
+        handler.
         """
-        schema = await self.input_schema(ctx.sn, request.command_type)
-        checked = validate_params(schema, request.params)
+        if not self.can_execute(request.command_type):
+            return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, request.command_type)
+        return await self._run_validated(ctx, request.command_type, request.params)
+
+    async def execute_v2_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
+        """
+        Run a 2.x ``SendCustomCommand``.
+
+        A published command runs as in :meth:`execute_command`, except that text is first converted
+        to what its schema declares (:func:`~edge_sdk.adapter.validation.convert_text`), since 2.x
+        callers send numbers, booleans and enum values as text. Any other id goes to
+        :meth:`legacy_custom_command`.
+        """
+        if not self.can_execute(request.command_type):
+            return await self.legacy_custom_command(ctx, request)
+        return await self._run_validated(ctx, request.command_type, request.params, text_converted=True)
+
+    async def _run_validated(
+        self, ctx: RequestContext, command_id: str, params: dict | None, *, text_converted: bool = False
+    ) -> CustomCommandResponse:
+        schema = await self.input_schema(ctx.sn, command_id)
+        if text_converted:
+            params = convert_text(schema, params)
+        checked = validate_params(schema, params)
         if not checked.valid:
-            return CustomCommandResponse.invalid_params(
-                ctx.tid, ctx.sn, request.command_type, f"{request.command_type}: {checked.message}"
-            )
-        return await self.send_custom_command(
-            ctx, CustomCommandRequest(command_type=request.command_type, params=checked.params)
-        )
+            return CustomCommandResponse.invalid_params(ctx.tid, ctx.sn, command_id, f"{command_id}: {checked.message}")
+        return await self.send_custom_command(ctx, CustomCommandRequest(command_type=command_id, params=checked.params))
+
+    async def legacy_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
+        """
+        A 2.x ``SendCustomCommand`` whose id this adapter has not published. Refused by default.
+
+        Override to keep accepting free-form commands from 2.x callers (a device protocol whose
+        requests are arbitrary strings, say). Never reached from v3: ``ExecuteCommand`` runs
+        published commands only.
+        """
+        return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, request.command_type)
 
     def can_execute(self, command_id: str) -> bool:
         """
-        Whether this adapter runs *command_id* through ``ExecuteCommand``/``send_custom_command``:
-        a registered handler, or a built-in id whose typed method is implemented. An adapter that
-        overrides ``send_custom_command`` itself may run more; the SDK cannot see that.
+        Whether *command_id* is published as runnable: a registered handler, or a built-in id whose
+        typed method is implemented. Only these run through ``ExecuteCommand`` and as published
+        commands through ``SendCustomCommand``.
         """
         registered = self._commands.get(command_id)
         if registered is not None and registered.dispatchable:
@@ -528,7 +565,11 @@ class EdgeAdapter(ABC):
         response = await builder(self, ctx, params)
         if response.success:
             return CustomCommandResponse.ok(
-                ctx.tid, ctx.sn, command_id, external_execution_id=response.external_execution_id
+                ctx.tid,
+                ctx.sn,
+                command_id,
+                message=response.message,
+                external_execution_id=response.external_execution_id,
             )
         return CustomCommandResponse.fail(
             ctx.tid,
@@ -556,7 +597,7 @@ class EdgeAdapter(ABC):
                 ctx.sn,
                 response.error or ErrorMessage(message=f"{command_id} failed", code=ErrorCode.ASSET_ERROR),
             )
-        return EdgeResponse.ok(ctx.tid, ctx.sn, external_execution_id=response.external_execution_id)
+        return EdgeResponse.ok(ctx.tid, ctx.sn, response.message, external_execution_id=response.external_execution_id)
 
     def _is_overridden(self, method_name: str) -> bool:
         """Return True if *method_name* has been overridden in a subclass."""
@@ -812,16 +853,12 @@ class EdgeAdapter(ABC):
         )
 
     async def send_custom_command(self, ctx: RequestContext, request: CustomCommandRequest) -> CustomCommandResponse:
-        """Run the command identified by ``request.command_type``.
+        """Run the published command identified by ``request.command_type``.
 
-        The default implementation dispatches to whatever :meth:`register_command` has been
-        given a handler for, so most adapters never override this method — they register their
-        commands and get advertisement and dispatch from the one declaration.
-
-        Overriding is still supported for an adapter that routes commands dynamically (a
-        protocol bridge forwarding an arbitrary id downstream, say). Call
-        ``await super().send_custom_command(ctx, request)`` first to let registered handlers win,
-        then fall back to your own routing.
+        Dispatches to whatever :meth:`register_command` has been given a handler for, then to the
+        typed method of a built-in id. The servers call it only for ids :meth:`can_execute`
+        accepts, with validated params; free-form 2.x commands go to
+        :meth:`legacy_custom_command` instead.
         """
         params = request.params or {}
         response = await self._dispatch_registered(ctx, request.command_type, params)

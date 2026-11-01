@@ -114,6 +114,7 @@ def proto_to_request_context(base) -> RequestContext:
         tid=base.tid,
         sn=base.sn,
         timestamp=_ts_to_dt(base.timestamp) or datetime.now(tz=timezone.utc),
+        command_execution_id=base.external_id or None,
     )
 
 
