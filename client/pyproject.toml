@@ -50,4 +50,4 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["client_sdk"]
 [tool.uv.sources]
-zqnt-api = { git = "https://github.com/zequent/zqnt-api", subdirectory = "python", rev = "836cd676cd2f420234e5ba5dc9b01dd8873d4596" }
+zqnt-api = { git = "https://github.com/zequent/zqnt-api", subdirectory = "python", tag = "v3.0.0" }
