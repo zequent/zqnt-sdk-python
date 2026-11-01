@@ -57,6 +57,22 @@ jobs:
       - name: Build
         run: uv build --package "$(sed -n 's/^name = "\(.*\)"/\1/p' ${{ matrix.package }}/pyproject.toml | head -1)" --out-dir dist
 
+  licences:
+    name: Licence gate
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Check dependency licences
+        run: scripts/licence-gate.sh --check
+
   secrets:
     name: Secret scan
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -79,7 +95,7 @@ jobs:
   preview-tag:
     name: Tag PR preview
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    needs: [test, secrets]
+    needs: [test, licences, secrets]
     runs-on: ubuntu-latest
     permissions:
       contents: write
