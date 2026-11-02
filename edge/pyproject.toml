@@ -41,6 +41,7 @@ ignore = ["E501"]  # line-too-long (handled by formatter)
 "edge_sdk/server/edge_server.py" = ["N802"]  # gRPC servicer methods must match PascalCase proto names
 "edge_sdk/server/edge_server_v3.py" = ["N802"]
 "tests/integration/test_v3_platform_calls.py" = ["N802"]  # fake platform servicers
+"tests/integration/test_edge_node_attach.py" = ["N802"]  # fake Edge Node servicers
 
 [build-system]
 requires = ["hatchling>=1.32.4"]

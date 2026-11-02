@@ -364,6 +364,59 @@ catalog (`dock.mode`, `wind.speed`, `drone.gear`, …; declare them with
 sample with a speed or an aircraft key becomes sub-asset (aircraft) telemetry, one with dock keys or
 only a battery asset telemetry. Alerts have no v2 counterpart and are dropped. The v2 `TelemetryPublisher` is unchanged.
 
+#### Attaching to a local Edge Node
+
+On a device that runs an Edge Node (`zqnt-edge-node`), the adapter talks to the node instead of the
+platform. The node queues live data while its link is down and runs the platform's commands on the
+adapter. Attaching takes configuration only, no code change:
+
+```bash
+ZQNT_EDGE_NODE_SOCKET=/run/zqnt-edge-node/node.sock    # the node's socket
+ZQNT_ADAPTER_SOCKET=/run/zqnt-adapter/dock.sock        # this adapter's socket
+```
+
+or in code:
+
+```python
+from edge_sdk import EdgeAdapterConfig, EdgeNodeConfig
+
+config = EdgeAdapterConfig(
+    edge_node=EdgeNodeConfig(
+        node_socket="/run/zqnt-edge-node/node.sock",
+        adapter_socket="/run/zqnt-adapter/dock.sock",
+    )
+)
+async with config.runtime() as runtime:
+    await runtime.serve(MyAdapter())
+```
+
+Set both sockets or neither. Attached, the adapter:
+
+- serves `EdgeAdapterService` on its own socket (mode `0660`: owner and group; `GRPC_HOST`/`GRPC_PORT`
+  are not used) and the node calls it there for every command;
+- sends live data (`runtime.ingest`), capability reports and command events (`runtime.gateway`,
+  `NotificationPublisher`) to the node socket, naming its own socket in the `zqnt-adapter-endpoint`
+  header (`unix:///run/zqnt-adapter/dock.sock`). The node serves v3 only, so there is no v2 fallback;
+- has no access to core: `runtime.connector`, `runtime.telemetry` and `runtime.mission_autonomy` are
+  `None`, nothing is written to Redis (`EDGE_ENDPOINT`/`REDIS_URL` are ignored), and asset-status and
+  mission events of `NotificationPublisher` are dropped;
+- **does not verify the platform's token** on commands from a Unix socket peer, because the node
+  does not sign them yet (zqnt-api#40). No TCP port is served, and a call over TCP is still verified. It logs a warning at start; the socket's permissions are the only access control,
+  so keep the socket directory to the node's and the adapter's users. Direct mode is unchanged.
+
+The node's queue tells the adapter how hard to push (`runtime.node_queue`):
+
+```python
+stats = await runtime.node_queue.get()
+rate = normal_rate * stats.throttle("LANE_TELEMETRY")   # 1 up to half full, down to 0.1 when full
+
+async for stats in runtime.node_queue.watch():          # at once, on change, at least every 10 s
+    ...
+```
+
+`QueueStats.connected` says whether the node has a link to the platform; each `LaneStats` carries the
+lane's items, bytes, quota, fill, dropped count and oldest item.
+
 ### Advanced Usage
 
 #### Custom Task Handling
@@ -483,6 +536,8 @@ The SDK respects the following environment variables:
 - `EDGE_TELEMETRY_PORT` - Port for telemetry (default: 50052)
 - `REMOTE_CONTROL_HOST` / `REMOTE_CONTROL_PORT` - remote-control (`EdgeGatewayService`: capability
   reports, v3 command events; port default 8002). Unset: no capability push, events over v2.
+- `ZQNT_EDGE_NODE_SOCKET` / `ZQNT_ADAPTER_SOCKET` - attach to a local Edge Node instead of the
+  platform (see [Attaching to a local Edge Node](#attaching-to-a-local-edge-node)).
 
 #### Authentication
 

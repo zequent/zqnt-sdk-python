@@ -22,6 +22,10 @@ silently dropped when the buffer is full::
 Command events go to the platform over v3 ``EdgeGatewayService.PublishCommandEvent`` when a
 gateway is configured (``gateway=`` or ``REMOTE_CONTROL_HOST``/``REMOTE_CONTROL_PORT``), under the
 platform's command_execution_id for the run. A core without v3 gets them over v2 as before.
+
+Attached to a local Edge Node (``node=`` or ``ZQNT_EDGE_NODE_SOCKET``/``ZQNT_ADAPTER_SOCKET``, see
+:mod:`edge_sdk.node`) command events go to the node only; asset-status and mission events have no
+node path and are dropped.
 """
 
 import asyncio
@@ -31,6 +35,7 @@ import uuid
 
 from ..auth import default_edge_token, platform_channel
 from ..models.notification import AssetStatusEvent, CommandExecutionEvent, MissionEvent
+from ..node import EdgeNodeConfig
 from ._reconnect import ReconnectBackoff
 from .edge_gateway import EdgeGatewayClient
 
@@ -65,11 +70,15 @@ class NotificationPublisher:
         queue_max_size: int = 1000,
         token: str | None = None,
         gateway: EdgeGatewayClient | None = None,
+        node: EdgeNodeConfig | None = None,
     ) -> None:
         self._host = host
         self._token = token if token is not None else default_edge_token()
-        self._owns_gateway = gateway is None and bool(os.getenv("REMOTE_CONTROL_HOST"))
-        if self._owns_gateway:
+        self._node = node if node is not None else EdgeNodeConfig.from_env()
+        self._owns_gateway = gateway is None and (self._node is not None or bool(os.getenv("REMOTE_CONTROL_HOST")))
+        if self._owns_gateway and self._node is not None:
+            gateway = EdgeGatewayClient.for_node(self._node)
+        elif self._owns_gateway:
             gateway = EdgeGatewayClient(
                 host=os.environ["REMOTE_CONTROL_HOST"],
                 port=int(os.getenv("REMOTE_CONTROL_PORT", "8002")),
@@ -97,6 +106,11 @@ class NotificationPublisher:
         self._closed = False
         self._stop_event = asyncio.Event()
         self._queue = asyncio.Queue(maxsize=self._queue_max_size)
+        if self._node is not None:
+            logger.info(
+                "NotificationPublisher attached to the Edge Node at %s (sn=%s)", self._node.node_socket, self._sn
+            )
+            return
         self._stream_task = asyncio.create_task(self._run_stream(), name="notification-producer")
         logger.info("NotificationPublisher started for %s:%d (sn=%s)", self._host, self._port, self._sn)
 
@@ -131,6 +145,9 @@ class NotificationPublisher:
         """Enqueue an asset-status event. Drops the event if the buffer is full."""
         if self._queue is None:
             raise RuntimeError("Not connected. Call connect() first.")
+        if self._node is not None:
+            logger.debug("Attached to an Edge Node: asset-status event dropped (sn=%s)", self._sn)
+            return
         req = self._build_asset_status_request(event)
         try:
             self._queue.put_nowait(req)
@@ -141,6 +158,9 @@ class NotificationPublisher:
         """Enqueue a mission event. Drops the event if the buffer is full."""
         if self._queue is None:
             raise RuntimeError("Not connected. Call connect() first.")
+        if self._node is not None:
+            logger.debug("Attached to an Edge Node: mission event dropped (sn=%s)", self._sn)
+            return
         req = self._build_mission_event_request(event)
         try:
             self._queue.put_nowait(req)
@@ -154,6 +174,17 @@ class NotificationPublisher:
         """
         if self._queue is None:
             raise RuntimeError("Not connected. Call connect() first.")
+        if self._node is not None and self._gateway is not None:
+            try:
+                await self._gateway.publish_command_event(event)
+            except Exception as exc:
+                logger.warning(
+                    "command event for %s not delivered to the Edge Node (%s: %s)",
+                    event.external_execution_id or event.command_execution_id,
+                    type(exc).__name__,
+                    exc,
+                )
+            return
         if self._gateway is not None:
             try:
                 if await self._gateway.publish_command_event(event):

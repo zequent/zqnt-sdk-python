@@ -281,10 +281,19 @@ def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channe
 
 
 class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
-    """Refuses every call into the adapter that does not carry a valid platform service token."""
+    """
+    Refuses every call into the adapter that does not carry a valid platform service token.
 
-    def __init__(self, config: EdgeAuthConfig, key_set: PlatformKeySet | None = None) -> None:
+    ``trust_unix_peers`` (an adapter attached to a local Edge Node, see :mod:`edge_sdk.node`) lets
+    calls from a Unix socket peer through unverified, because the node does not sign commands yet
+    (zqnt-api#40). Calls over TCP are verified as always.
+    """
+
+    def __init__(
+        self, config: EdgeAuthConfig, key_set: PlatformKeySet | None = None, *, trust_unix_peers: bool = False
+    ) -> None:
         self._disabled = config.disabled
+        self._trust_unix_peers = trust_unix_peers
         self._verifier: PlatformTokenVerifier | None = None
         self._misconfigured: str | None = None
         if self._disabled:
@@ -294,6 +303,8 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
             )
         elif not config.platform_public_key and not config.platform_keys_url and key_set is None:
             self._misconfigured = "neither ZQNT_PLATFORM_KEYS_URL nor ZQNT_PLATFORM_PUBLIC_KEY is configured"
+            if trust_unix_peers:
+                return
             logger.error(
                 "Neither ZQNT_PLATFORM_KEYS_URL nor ZQNT_PLATFORM_PUBLIC_KEY is set: every platform command will "
                 "be refused. Set ZQNT_PLATFORM_KEYS_URL to the platform's /api/admin-console/auth/service-keys "
@@ -339,6 +350,8 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
         if refusal is None or handler is None:
             return handler
         code, details = refusal
+        if self._trust_unix_peers:
+            return _unix_peers_only(handler, code, details)
 
         async def abort(_request, context):
             await context.abort(code, details)
@@ -354,3 +367,52 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
         if handler.response_streaming:
             return grpc.unary_stream_rpc_method_handler(abort, **kwargs)
         return grpc.unary_unary_rpc_method_handler(abort, **kwargs)
+
+
+def _is_unix_peer(context) -> bool:
+    return context.peer().startswith("unix:")
+
+
+def _unix_peers_only(handler, code: grpc.StatusCode, details: str):
+    """``handler`` for Unix socket peers; any other peer is refused with ``code``."""
+    kwargs = {
+        "request_deserializer": handler.request_deserializer,
+        "response_serializer": handler.response_serializer,
+    }
+    if handler.request_streaming and handler.response_streaming:
+        behavior = handler.stream_stream
+
+        async def stream_stream(request_iterator, context):
+            if not _is_unix_peer(context):
+                await context.abort(code, details)
+            async for response in behavior(request_iterator, context):
+                yield response
+
+        return grpc.stream_stream_rpc_method_handler(stream_stream, **kwargs)
+    if handler.response_streaming:
+        behavior = handler.unary_stream
+
+        async def unary_stream(request, context):
+            if not _is_unix_peer(context):
+                await context.abort(code, details)
+            async for response in behavior(request, context):
+                yield response
+
+        return grpc.unary_stream_rpc_method_handler(unary_stream, **kwargs)
+    if handler.request_streaming:
+        behavior = handler.stream_unary
+
+        async def stream_unary(request_iterator, context):
+            if not _is_unix_peer(context):
+                await context.abort(code, details)
+            return await behavior(request_iterator, context)
+
+        return grpc.stream_unary_rpc_method_handler(stream_unary, **kwargs)
+    behavior = handler.unary_unary
+
+    async def unary_unary(request, context):
+        if not _is_unix_peer(context):
+            await context.abort(code, details)
+        return await behavior(request, context)
+
+    return grpc.unary_unary_rpc_method_handler(unary_unary, **kwargs)
