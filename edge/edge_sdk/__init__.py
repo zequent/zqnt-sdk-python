@@ -128,6 +128,7 @@ from .models import (
 )
 from .models.common import CustomCommandResponse, DetectionBatch, Payload, TelemetryField, TelemetryValueType
 from .models.live import Alert, AlertSeverity, TelemetrySample
+from .node import EdgeNodeConfig, LaneStats, NodeQueueClient, QueueStats
 from .platform_keys import PlatformKeySet
 from .server.edge_server import EdgeServer, RegistrationConfig
 
@@ -147,6 +148,11 @@ __all__ = [
     "EdgeAdapter",
     "EdgeAdapterConfig",
     "EdgeAdapterRuntime",
+    # local Edge Node attach (edge_sdk.node)
+    "EdgeNodeConfig",
+    "NodeQueueClient",
+    "QueueStats",
+    "LaneStats",
     # authentication (edge_sdk.auth)
     "EdgeAuthConfig",
     "PlatformTokenVerifier",
