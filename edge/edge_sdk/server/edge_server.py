@@ -516,7 +516,8 @@ class EdgeServer:
                        and whenever they change (:meth:`EdgeAdapter.reported_asset_sns`).
         node:          Optional :class:`~edge_sdk.node.EdgeNodeConfig`: attach to a local Edge Node.
                        The server then listens on the adapter socket only (not on host/port), writes
-                       nothing to Redis and does not verify the platform's token (see :mod:`edge_sdk.node`).
+                       nothing to Redis and does not verify the platform's token for Unix socket peers
+                       (see :mod:`edge_sdk.node`).
 
     Example::
 
@@ -558,12 +559,11 @@ class EdgeServer:
         """Start the server and block until it is terminated."""
         if self._node is not None:
             warn_unverified_commands(self._node)
-            self._server = grpc.aio.server()
-        else:
-            # Only the platform may command the device: every call must carry its service token.
-            self._auth_interceptor = PlatformAuthServerInterceptor(self._auth)
-            self._auth_interceptor.start()
-            self._server = grpc.aio.server(interceptors=[self._auth_interceptor])
+        # Only the platform may command the device: every call must carry its service token, except
+        # from the local Edge Node over the adapter socket.
+        self._auth_interceptor = PlatformAuthServerInterceptor(self._auth, trust_unix_peers=self._node is not None)
+        self._auth_interceptor.start()
+        self._server = grpc.aio.server(interceptors=[self._auth_interceptor])
 
         # Register EdgeAdapterService: v2 (typed RPCs, frozen) and v3 (ExecuteCommand only) side by
         # side on one port, both served from the same adapter and its registered commands.

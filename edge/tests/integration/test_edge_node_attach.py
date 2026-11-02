@@ -193,6 +193,14 @@ async def test_an_adapter_attaches_to_the_node_by_configuration_only(node, socke
     endpoint = f"unix://{adapter_sock}"
     assert config.edge_node == EdgeNodeConfig(*sockets)
     dock = _Dock()
+    bound: list[str] = []
+    add_insecure_port = grpc.aio._server.Server.add_insecure_port
+
+    def record(server, address):
+        bound.append(address)
+        return add_insecure_port(server, address)
+
+    monkeypatch.setattr(grpc.aio._server.Server, "add_insecure_port", record)
 
     async with config.runtime() as runtime:
         assert runtime.connector is None and runtime.telemetry is None and runtime.mission_autonomy is None
@@ -202,6 +210,7 @@ async def test_an_adapter_attaches_to_the_node_by_configuration_only(node, socke
             assert node.capabilities[0].asset_sn == SN
             assert node.capability_endpoints == [endpoint]
             assert stat.S_IMODE(os.stat(adapter_sock).st_mode) == 0o660
+            assert len(bound) == 1 and bound[0].startswith("unix:"), bound
             assert "NOT verified" in caplog.text
             assert "Redis endpoint registration skipped" in caplog.text
 
@@ -277,6 +286,37 @@ async def test_direct_mode_still_verifies_the_platform_token(monkeypatch):
     finally:
         serving.cancel()
         await asyncio.gather(serving, return_exceptions=True)
+
+
+async def test_attached_only_a_unix_peer_skips_the_token_check(sockets):
+    from edge_sdk.auth import PlatformAuthServerInterceptor
+    from edge_sdk.server import edge_server_v3
+
+    _, adapter_sock = sockets
+    os.makedirs(os.path.dirname(adapter_sock))
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    interceptor = PlatformAuthServerInterceptor(EdgeAuthConfig(), trust_unix_peers=True)
+    server = grpc.aio.server(interceptors=[interceptor])
+    edge_server_v3.add_to_server(_Dock(), server)
+    server.add_insecure_port(f"unix:{adapter_sock}")
+    server.add_insecure_port(f"127.0.0.1:{port}")
+    await server.start()
+    request = edge_v3.ExecuteCommandRequest(
+        command=command_pb2.Command(command_id="dock.open_cover", asset=common_pb2.AssetRef(sn=SN)),
+        command_execution_id="capexec:e1:n1",
+    )
+    try:
+        async with grpc.aio.insecure_channel(f"127.0.0.1:{port}") as channel:
+            with pytest.raises(grpc.aio.AioRpcError) as refused:
+                await edge_v3_grpc.EdgeAdapterServiceStub(channel).ExecuteCommand(request)
+        assert refused.value.code() == grpc.StatusCode.UNAUTHENTICATED
+        async with grpc.aio.insecure_channel(f"unix:{adapter_sock}") as channel:
+            response = await edge_v3_grpc.EdgeAdapterServiceStub(channel).ExecuteCommand(request)
+        assert response.result.state == command_pb2.COMMAND_STATE_ACCEPTED
+    finally:
+        await server.stop(0)
 
 
 def test_an_attach_needs_both_sockets(monkeypatch):

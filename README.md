@@ -400,8 +400,8 @@ Set both sockets or neither. Attached, the adapter:
 - has no access to core: `runtime.connector`, `runtime.telemetry` and `runtime.mission_autonomy` are
   `None`, nothing is written to Redis (`EDGE_ENDPOINT`/`REDIS_URL` are ignored), and asset-status and
   mission events of `NotificationPublisher` are dropped;
-- **does not verify the platform's token** on commands, because the node does not sign them yet
-  (zqnt-api#40). It logs a warning at start; the socket's permissions are the only access control,
+- **does not verify the platform's token** on commands from a Unix socket peer, because the node
+  does not sign them yet (zqnt-api#40). No TCP port is served, and a call over TCP is still verified. It logs a warning at start; the socket's permissions are the only access control,
   so keep the socket directory to the node's and the adapter's users. Direct mode is unchanged.
 
 The node's queue tells the adapter how hard to push (`runtime.node_queue`):

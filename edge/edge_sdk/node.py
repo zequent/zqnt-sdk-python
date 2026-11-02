@@ -13,8 +13,9 @@ adapters. An attached adapter talks to the node only, over two Unix sockets:
   names this socket to the node in the ``zqnt-adapter-endpoint`` header of every call.
 
 Attached, the adapter has no access to core: it writes nothing to Redis, and it does not verify the
-platform's service token on incoming commands, because the node does not sign them yet
-(zqnt-api#40). The socket's permissions (owner and group, 0660) are the access control.
+platform's service token on commands from a Unix socket peer, because the node does not sign them
+yet (zqnt-api#40). The socket's permissions (owner and group, 0660) are the access control. No TCP
+port is served, and a call over TCP would still be verified.
 """
 
 from __future__ import annotations

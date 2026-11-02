@@ -38,7 +38,7 @@ Environment variables (all optional, sensible defaults provided):
                            Set both or neither. Attached, the adapter serves on its socket (0660)
                            instead of GRPC_HOST/GRPC_PORT, sends live data, capabilities and command
                            events to the node, writes nothing to Redis, and does not verify the
-                           platform's token on commands until the node signs them.
+                           platform's token on commands from the socket until the node signs them.
 
     Optional – automatic Redis service-discovery registration:
     EDGE_ENDPOINT       gRPC endpoint advertised to the platform
