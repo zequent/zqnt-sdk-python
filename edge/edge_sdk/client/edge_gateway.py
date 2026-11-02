@@ -13,7 +13,9 @@ import math
 import time
 import uuid
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import grpc
 from google.protobuf import struct_pb2, timestamp_pb2
@@ -21,6 +23,9 @@ from google.protobuf import struct_pb2, timestamp_pb2
 from ..auth import default_edge_token, platform_channel
 from ..models.common import Capabilities, CommandExecutionStatus
 from ..models.notification import CommandExecutionEvent
+
+if TYPE_CHECKING:
+    from ..node import EdgeNodeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +146,8 @@ class EdgeGatewayClient:
     ``publish_command_event`` returns False instead of sending when v3 is not served, so the caller
     keeps its v2 path (``NotificationPublisher`` does that on its own). ``report_capabilities`` falls
     back to v2 ``RemoteControlService.ReportAssetRuntime`` itself.
+
+    :meth:`for_node` sends both to a local Edge Node instead, which serves v3 only.
     """
 
     def __init__(
@@ -149,18 +156,26 @@ class EdgeGatewayClient:
         port: int = 8002,
         token: str | None = None,
         timeout: float = 5.0,
+        channel_factory: Callable[[], grpc.aio.Channel] | None = None,
     ) -> None:
         self._host = host
         self._port = port
         self._token = token if token is not None else default_edge_token()
         self._timeout = timeout
+        self._channel_factory = channel_factory or (lambda: platform_channel(self._host, self._port, self._token))
+        self._v2 = channel_factory is None
         self._channel: grpc.aio.Channel | None = None
         self._events_v3 = V3Fallback(f"{host}:{port}/EdgeGatewayService.PublishCommandEvent")
         self._capabilities_v3 = V3Fallback(f"{host}:{port}/EdgeGatewayService.ReportCapabilities")
 
+    @classmethod
+    def for_node(cls, node: "EdgeNodeConfig", timeout: float = 5.0) -> "EdgeGatewayClient":
+        """Command events and capability reports to the local Edge Node, naming this adapter's socket."""
+        return cls(host=node.node_target, port=0, token="", timeout=timeout, channel_factory=node.channel)
+
     def _open(self) -> grpc.aio.Channel:
         if self._channel is None:
-            self._channel = platform_channel(self._host, self._port, self._token)
+            self._channel = self._channel_factory()
         return self._channel
 
     async def close(self) -> None:
@@ -170,7 +185,7 @@ class EdgeGatewayClient:
 
     async def publish_command_event(self, event: CommandExecutionEvent) -> bool:
         """Send *event* over v3. False when v3 is not served (the caller uses v2); errors propagate."""
-        if not self._events_v3.available():
+        if self._v2 and not self._events_v3.available():
             return False
         from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
         from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
@@ -181,7 +196,7 @@ class EdgeGatewayClient:
                 edge_v3.PublishCommandEventRequest(event=command_event(event)), timeout=self._timeout
             )
         except grpc.aio.AioRpcError as exc:
-            if is_unimplemented(exc):
+            if self._v2 and is_unimplemented(exc):
                 self._events_v3.mark_unavailable()
                 return False
             raise
@@ -189,7 +204,7 @@ class EdgeGatewayClient:
 
     async def report_capabilities(self, caps: Capabilities) -> str:
         """Report *caps* (v3, else v2 ReportAssetRuntime). Returns the revision the platform stored."""
-        if self._capabilities_v3.available():
+        if not self._v2 or self._capabilities_v3.available():
             from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
             from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2_grpc as edge_v3_grpc
 
@@ -202,7 +217,7 @@ class EdgeGatewayClient:
                 )
                 return response.accepted_revision
             except grpc.aio.AioRpcError as exc:
-                if not is_unimplemented(exc):
+                if not self._v2 or not is_unimplemented(exc):
                     raise
                 self._capabilities_v3.mark_unavailable()
         return await self._report_asset_runtime(caps)

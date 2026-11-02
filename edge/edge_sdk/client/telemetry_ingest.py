@@ -26,7 +26,9 @@ import math
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime
+from typing import TYPE_CHECKING
 
+import grpc.aio
 from google.protobuf import struct_pb2, timestamp_pb2
 
 from ..auth import default_edge_token, platform_channel
@@ -34,6 +36,9 @@ from ..models.common import DetectionBatch
 from ..models.live import Alert, TelemetrySample
 from ._reconnect import ReconnectBackoff
 from .edge_gateway import V3Fallback, is_unimplemented
+
+if TYPE_CHECKING:
+    from ..node import EdgeNodeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -180,8 +185,10 @@ class _IngestStream:
         to_v3: Callable,
         v2_call: Callable | None,
         to_v2: Callable | None,
+        channel_factory: Callable[[], grpc.aio.Channel] | None = None,
     ) -> None:
         self._name = name
+        self._channel_factory = channel_factory or (lambda: platform_channel(self._host, self._port, self._token))
         self._host = host
         self._port = port
         self._token = token
@@ -231,7 +238,7 @@ class _IngestStream:
             v3 = self._fallback.available()
             gen_stop = asyncio.Event()
             sent: list = []
-            channel = platform_channel(self._host, self._port, self._token)
+            channel = self._channel_factory()
             backoff.opened()
             try:
                 if v3:
@@ -307,7 +314,10 @@ class _IngestStream:
 
 
 class TelemetryIngestPublisher:
-    """Publishes v3 telemetry samples, detection batches and alerts to live-data."""
+    """
+    Publishes v3 telemetry samples, detection batches and alerts to live-data, or with
+    :meth:`for_node` to a local Edge Node, which queues them while its link is down.
+    """
 
     def __init__(
         self,
@@ -315,8 +325,10 @@ class TelemetryIngestPublisher:
         port: int = 50052,
         token: str | None = None,
         queue_max_size: int = 1000,
+        channel_factory: Callable[[], grpc.aio.Channel] | None = None,
     ) -> None:
         token = token if token is not None else default_edge_token()
+        v2 = channel_factory is None
 
         def ingest(method: str):
             def call(channel):
@@ -340,18 +352,27 @@ class TelemetryIngestPublisher:
             *args,
             ingest("PublishTelemetry"),
             sample_to_v3,
-            live_data("ProduceTelemetry"),
-            sample_to_v2,
+            live_data("ProduceTelemetry") if v2 else None,
+            sample_to_v2 if v2 else None,
+            channel_factory,
         )
         self.detections = _IngestStream(
             "PublishDetections",
             *args,
             ingest("PublishDetections"),
             detections_to_v3,
-            live_data("ProduceDetection"),
-            detections_to_v2,
+            live_data("ProduceDetection") if v2 else None,
+            detections_to_v2 if v2 else None,
+            channel_factory,
         )
-        self.alerts = _IngestStream("PublishAlerts", *args, ingest("PublishAlerts"), alert_to_v3, None, None)
+        self.alerts = _IngestStream(
+            "PublishAlerts", *args, ingest("PublishAlerts"), alert_to_v3, None, None, channel_factory
+        )
+
+    @classmethod
+    def for_node(cls, node: "EdgeNodeConfig", queue_max_size: int = 1000) -> "TelemetryIngestPublisher":
+        """Live data to the local Edge Node (v3 only), naming this adapter's socket."""
+        return cls(host=node.node_target, port=0, token="", queue_max_size=queue_max_size, channel_factory=node.channel)
 
     async def publish_sample(self, sample: TelemetrySample) -> None:
         self.telemetry.put(sample)

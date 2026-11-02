@@ -47,6 +47,7 @@ from ..models.common import (
     proto_enum_lookup,
     proto_enum_name,
 )
+from ..node import EdgeNodeConfig, bind_adapter_socket, remove_adapter_socket, warn_unverified_commands
 from . import edge_server_v3
 from ._converters import (
     capabilities_to_proto,
@@ -513,6 +514,9 @@ class EdgeServer:
         gateway:       Optional :class:`~edge_sdk.client.edge_gateway.EdgeGatewayClient`
                        (remote-control). With it the adapter's capabilities are reported on start
                        and whenever they change (:meth:`EdgeAdapter.reported_asset_sns`).
+        node:          Optional :class:`~edge_sdk.node.EdgeNodeConfig`: attach to a local Edge Node.
+                       The server then listens on the adapter socket only (not on host/port), writes
+                       nothing to Redis and does not verify the platform's token (see :mod:`edge_sdk.node`).
 
     Example::
 
@@ -537,8 +541,10 @@ class EdgeServer:
         registration: RegistrationConfig | None = None,
         auth: EdgeAuthConfig | None = None,
         gateway: EdgeGatewayClient | None = None,
+        node: EdgeNodeConfig | None = None,
     ) -> None:
         self._adapter = adapter
+        self._node = node
         self._reporter = CapabilityReporter(adapter, gateway) if gateway is not None else None
         self._auth = auth if auth is not None else EdgeAuthConfig.from_env()
         self._port = port
@@ -550,10 +556,14 @@ class EdgeServer:
 
     async def serve(self) -> None:
         """Start the server and block until it is terminated."""
-        # Only the platform may command the device: every call must carry its service token.
-        self._auth_interceptor = PlatformAuthServerInterceptor(self._auth)
-        self._auth_interceptor.start()
-        self._server = grpc.aio.server(interceptors=[self._auth_interceptor])
+        if self._node is not None:
+            warn_unverified_commands(self._node)
+            self._server = grpc.aio.server()
+        else:
+            # Only the platform may command the device: every call must carry its service token.
+            self._auth_interceptor = PlatformAuthServerInterceptor(self._auth)
+            self._auth_interceptor.start()
+            self._server = grpc.aio.server(interceptors=[self._auth_interceptor])
 
         # Register EdgeAdapterService: v2 (typed RPCs, frozen) and v3 (ExecuteCommand only) side by
         # side on one port, both served from the same adapter and its registered commands.
@@ -576,12 +586,17 @@ class EdgeServer:
                 "Add grpcio-health-checking to your dependencies."
             )
 
-        listen_addr = f"{self._host}:{self._port}"
-        self._server.add_insecure_port(listen_addr)
+        if self._node is not None:
+            listen_addr = f"unix:{bind_adapter_socket(self._server, self._node)}"
+        else:
+            listen_addr = f"{self._host}:{self._port}"
+            self._server.add_insecure_port(listen_addr)
         await self._server.start()
         logger.info("EdgeServer listening on %s", listen_addr)
 
-        if self._registration:
+        if self._registration and self._node is not None:
+            logger.info("Attached to an Edge Node: Redis endpoint registration skipped")
+        elif self._registration:
             await self._register(online=True)
         if self._reporter is not None:
             await self._reporter.start()
@@ -589,12 +604,17 @@ class EdgeServer:
             await self._server.wait_for_termination()
         except (asyncio.CancelledError, KeyboardInterrupt):
             await self.stop()
+        finally:
+            if self._node is not None:
+                remove_adapter_socket(self._node)
 
     async def stop(self, grace: float = 5.0) -> None:
         """Gracefully stop the server."""
+        if self._node is not None:
+            remove_adapter_socket(self._node)
         if self._reporter is not None:
             await self._reporter.stop()
-        if self._registration:
+        if self._registration and self._node is None:
             await self._register(online=False)
 
         if self._health_servicer is not None:
