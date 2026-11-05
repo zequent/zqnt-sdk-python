@@ -5,6 +5,7 @@ from typing import Any
 import redis.asyncio as aioredis
 from zqnt_api.core import EdgeEndpointDTO
 
+from ..internal_tls import InternalTls
 from .keys import CacheKeys
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,9 @@ class CachingService:
         return cls(os.environ.get(url_env, default))
 
     async def connect(self) -> None:
-        self._client = aioredis.from_url(self._redis_url, decode_responses=True)
+        self._client = aioredis.from_url(
+            self._redis_url, decode_responses=True, **InternalTls.from_env().redis_kwargs(self._redis_url)
+        )
         logger.debug("CachingService connected to %s", self._redis_url)
 
     async def close(self) -> None:

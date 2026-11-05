@@ -6,6 +6,10 @@ localhost, connector 8010, remote-control 8002, live-data 8003, mission-autonomy
 deployment sets ``<SERVICE>_HOST``/``_PORT``, ``_USE_PLAINTEXT=false`` for TLS, and
 ``ZQNT_CLIENT_TOKEN`` from its secret store. There is no built-in development credential: the local
 platform refuses anonymous calls too.
+
+Inside an installation with internal TLS, ``ZQNT_INTERNAL_TLS=true`` dials every service over TLS
+verified against the installation's CA, ``ZQNT_INTERNAL_TLS_CA`` (default
+``/etc/zqnt/internal-tls/ca.crt``); a service's own ``_USE_PLAINTEXT`` still wins for that service.
 """
 
 from __future__ import annotations
@@ -19,6 +23,10 @@ from .service_config import LoadBalancerType, ServiceConfig
 if TYPE_CHECKING:
     from ..zequent_client import ZequentClient
 
+
+INTERNAL_TLS_ENV = "ZQNT_INTERNAL_TLS"
+INTERNAL_TLS_CA_ENV = "ZQNT_INTERNAL_TLS_CA"
+DEFAULT_INTERNAL_TLS_CA = "/etc/zqnt/internal-tls/ca.crt"
 
 _DEFAULT_PORTS = {
     "connector": 8010,
@@ -54,11 +62,15 @@ def _port(name: str, default: int) -> int:
 
 def _service(prefix: str, service_name: str) -> ServiceConfig:
     default_port = _DEFAULT_PORTS[service_name]
+    internal_tls = _bool(INTERNAL_TLS_ENV, False)
     return ServiceConfig(
         service_name=service_name,
         host=(os.environ.get(f"{prefix}_HOST") or "").strip() or "localhost",
         port=_port(f"{prefix}_PORT", default_port),
-        use_plaintext=_bool(f"{prefix}_USE_PLAINTEXT", True),
+        use_plaintext=_bool(f"{prefix}_USE_PLAINTEXT", not internal_tls),
+        tls_ca_file=((os.environ.get(INTERNAL_TLS_CA_ENV) or "").strip() or DEFAULT_INTERNAL_TLS_CA)
+        if internal_tls
+        else None,
         use_stork=_bool(f"{prefix}_USE_STORK", False),
         stork_service_name=os.environ.get(f"{prefix}_STORK_NAME", f"{service_name}-service"),
         load_balancer_type=LoadBalancerType(
