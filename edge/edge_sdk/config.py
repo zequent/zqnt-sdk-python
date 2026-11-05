@@ -54,6 +54,13 @@ Environment variables (all optional, sensible defaults provided):
     ZQNT_PLATFORM_PUBLIC_KEY  The platform's service public key, for tokens without a key id.
                               Optional with ZQNT_PLATFORM_KEYS_URL. Alias: SERVICE_AUTH_PUBLIC_KEY
     ZQNT_EDGE_AUTH_DISABLED   "true" accepts unauthenticated commands — local SITL/simulators only
+
+    Internal TLS (see edge_sdk.internal_tls) — an installation whose core services serve TLS from
+    their own CA:
+    ZQNT_INTERNAL_TLS         "true" dials the core services over TLS, the server verified against
+                              the CA and its host name (default: off, plaintext). The same CA verifies
+                              an https ZQNT_PLATFORM_KEYS_URL and a rediss:// REDIS_URL.
+    ZQNT_INTERNAL_TLS_CA      The CA certificate, PEM (default: /etc/zqnt/internal-tls/ca.crt)
 """
 
 from __future__ import annotations

@@ -26,6 +26,8 @@ from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from .internal_tls import InternalTls
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,8 @@ def parse_jwks(document: Any) -> dict[str | None, Ed25519PublicKey]:
 
 def _http_get_json(url: str, timeout: float) -> Any:
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - operator-configured URL
+    context = InternalTls.from_env().ssl_context() if url.lower().startswith("https://") else None
+    with urllib.request.urlopen(request, timeout=timeout, context=context) as response:  # noqa: S310 - operator-configured URL
         return json.loads(response.read())
 
 

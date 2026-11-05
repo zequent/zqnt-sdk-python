@@ -42,6 +42,7 @@ from typing import Any
 
 import grpc
 
+from .internal_tls import InternalTls
 from .platform_keys import PlatformKeySet
 
 logger = logging.getLogger(__name__)
@@ -262,17 +263,19 @@ def bearer_interceptors(token: str) -> list:
 def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channel:
     """
     A channel to a core service that carries ``token`` on every call. Without a token the calls go
-    out bare, and the platform refuses all but claim redemption — logged once per channel.
+    out bare, and the platform refuses all but claim redemption — logged once per channel. TLS with
+    the installation's CA when ``ZQNT_INTERNAL_TLS`` is on (see :mod:`edge_sdk.internal_tls`).
     """
     target = f"{host}:{port}"
+    tls = InternalTls.from_env()
     if not token:
         logger.warning(
             "No ZQNT_EDGE_TOKEN: calls to %s carry no credential and the platform will refuse them "
             "(issue one in the console under Edge Credentials)",
             target,
         )
-        return grpc.aio.insecure_channel(target)
-    return grpc.aio.insecure_channel(target, interceptors=bearer_interceptors(token))
+        return tls.aio_channel(target)
+    return tls.aio_channel(target, interceptors=bearer_interceptors(token))
 
 
 # ---------------------------------------------------------------------------

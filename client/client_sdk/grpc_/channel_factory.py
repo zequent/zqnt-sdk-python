@@ -53,6 +53,20 @@ def _channel_options(config: ServiceConfig) -> list[tuple[str, object]]:
     return options
 
 
+def _tls_credentials(config: ServiceConfig) -> grpc.ChannelCredentials:
+    """Server verification against ``tls_ca_file`` when set, else the system trust store."""
+    if not config.tls_ca_file:
+        return grpc.ssl_channel_credentials()
+    try:
+        with open(config.tls_ca_file, "rb") as f:
+            ca = f.read()
+    except OSError as exc:
+        raise FileNotFoundError(
+            f"the CA certificate {config.tls_ca_file} for service {config.service_name} cannot be read: {exc}"
+        ) from exc
+    return grpc.ssl_channel_credentials(root_certificates=ca)
+
+
 def create_channel(
     config: ServiceConfig,
     client_token: str | None = None,
@@ -66,6 +80,9 @@ def create_channel(
     ``interceptors`` are the host application's own, in the order given (the first one sees each
     call first). They run before the SDK's credential interceptor, so an ``authorization`` header
     they set wins over ``client_token``.
+
+    With ``use_plaintext`` off the server certificate is verified against ``tls_ca_file`` (an
+    installation's internal CA) or, without one, the system trust store.
     """
     if config.use_stork and config.stork_service_name:
         # Stork is Java-only. In Python a Kubernetes headless Service +
@@ -85,8 +102,7 @@ def create_channel(
     if config.use_plaintext:
         channel = grpc.aio.insecure_channel(target, options=options, interceptors=chain)
     else:
-        credentials = grpc.ssl_channel_credentials()
-        channel = grpc.aio.secure_channel(target, credentials, options=options, interceptors=chain)
+        channel = grpc.aio.secure_channel(target, _tls_credentials(config), options=options, interceptors=chain)
 
     logger.info("Channel created successfully for service: %s", config.service_name)
     return channel
