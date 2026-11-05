@@ -6,9 +6,9 @@ Status `review` marks file-level copyleft (ship unmodified, publish changes to i
 
 | Dependency | Licence | Status | Used by |
 |---|---|---|---|
-| `cffi` | MIT-0 | allow | edge |
+| `cffi` | MIT-0 | allow | client, edge |
 | `coverage` | Apache-2.0 | allow | client |
-| `cryptography` | Apache-2.0 OR BSD-3-Clause | allow | edge |
+| `cryptography` | Apache-2.0 OR BSD-3-Clause | allow | client, edge |
 | `fakeredis` | BSD-3-Clause | allow | edge |
 | `grpc-stubs` | MIT | allow | client |
 | `grpcio` | Apache-2.0 | allow | client, edge |
@@ -19,7 +19,7 @@ Status `review` marks file-level copyleft (ship unmodified, publish changes to i
 | `packaging` | Apache-2.0 OR BSD-2-Clause | allow | client, edge |
 | `pluggy` | MIT | allow | client, edge |
 | `protobuf` | BSD-3-Clause | allow | client, edge |
-| `pycparser` | BSD-3-Clause | allow | edge |
+| `pycparser` | BSD-3-Clause | allow | client, edge |
 | `pygments` | BSD-2-Clause | allow | client, edge |
 | `pytest` | MIT | allow | client, edge |
 | `pytest-asyncio` | Apache-2.0 | allow | client, edge |

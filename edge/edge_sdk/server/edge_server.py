@@ -36,6 +36,7 @@ from zqnt_api.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc
 from ..adapter.base import EdgeAdapter
 from ..auth import EdgeAuthConfig, PlatformAuthServerInterceptor
 from ..client.edge_gateway import EdgeGatewayClient
+from ..internal_tls import InternalTls
 from ..models.common import (
     AssetAirConditionerState,
     AssetType,
@@ -651,7 +652,8 @@ class EdgeServer:
 
         dto = EdgeEndpointDTO(endpoint=cfg.endpoint, online=online, asset_type=asset_type, asset_vendor=vendor)
         try:
-            async with aioredis.from_url(cfg.redis_url, decode_responses=True) as r:
+            redis_kwargs = InternalTls.from_env().redis_kwargs(cfg.redis_url)
+            async with aioredis.from_url(cfg.redis_url, decode_responses=True, **redis_kwargs) as r:
                 await r.set(EDGE_ENDPOINTS_KEY.format(vendor=vendor), dto.to_json())
         except Exception as exc:
             logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)

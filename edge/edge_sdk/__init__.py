@@ -46,6 +46,7 @@ from .client.mission_autonomy_client import MissionAutonomyClient
 from .client.telemetry_ingest import TelemetryIngestPublisher
 from .client.telemetry_publisher import TelemetryPublisher
 from .config import EdgeAdapterConfig, EdgeAdapterRuntime
+from .internal_tls import InternalTls
 from .models import (
     # task / mission
     AreaMappingTaskConfig,
@@ -159,6 +160,8 @@ __all__ = [
     "TokenVerificationError",
     "UnknownSigningKeyError",
     "PlatformKeySet",
+    # internal TLS to the platform (edge_sdk.internal_tls)
+    "InternalTls",
     "EdgeServer",
     "RegistrationConfig",
     "TelemetryPublisher",
