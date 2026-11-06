@@ -42,6 +42,9 @@ def _channel_options(config: ServiceConfig) -> list[tuple[str, object]]:
         ("grpc.keepalive_time_ms", 30_000),
         ("grpc.keepalive_timeout_ms", 30_000),
         ("grpc.keepalive_permit_without_calls", 1),
+        # gRPC core otherwise stops pinging after two pings without data, and a quiet watch stream
+        # is then closed by the server's 30-minute idle timeout (quarkus.http.idle-timeout).
+        ("grpc.http2.max_pings_without_data", 0),
         ("grpc.enable_retries", 1),
         (
             "grpc.service_config",

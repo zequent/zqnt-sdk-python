@@ -38,6 +38,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Mapping
 from typing import Any
 
 import grpc
@@ -260,11 +261,60 @@ def bearer_interceptors(token: str) -> list:
     ]
 
 
+#: How often an idle channel to the platform pings it (``ZQNT_GRPC_KEEPALIVE_TIME_MS`` overrides).
+#: The core serves gRPC on its Quarkus HTTP server, which closes a connection after 30 minutes
+#: without traffic (``quarkus.http.idle-timeout``). The telemetry and notification publishers hold
+#: one client stream each that can stay quiet for longer than that; without pings the server drops
+#: it every 30 minutes and whatever is sent in the reconnect gap is lost. Any frame resets that
+#: timer, an HTTP/2 PING included, so a ping a minute keeps the stream open. The Vert.x gRPC server
+#: has no grpc-java style ping policing (no ``too_many_pings`` GOAWAY), and the Java client SDK and
+#: the Go edge runtime already ping the same services every 20-30 s.
+KEEPALIVE_TIME_ENV = "ZQNT_GRPC_KEEPALIVE_TIME_MS"
+DEFAULT_KEEPALIVE_TIME_MS = 60_000
+#: How long a ping may go unanswered before the channel counts the connection as dead.
+KEEPALIVE_TIMEOUT_MS = 20_000
+#: Below this a ping interval is refused: servers with ping policing (gRPC Go/Java defaults)
+#: answer more frequent pings with GOAWAY.
+MIN_KEEPALIVE_TIME_MS = 10_000
+
+
+def platform_channel_options(env: Mapping[str, str] | None = None) -> list[tuple[str, Any]]:
+    """
+    gRPC options for a channel into the platform: keepalive pings, also while no call is open and
+    without data in between, so long-lived quiet streams outlive the server's idle timeout.
+    """
+    source = os.environ if env is None else env
+    keepalive_ms = DEFAULT_KEEPALIVE_TIME_MS
+    raw = (source.get(KEEPALIVE_TIME_ENV) or "").strip()
+    if raw:
+        try:
+            keepalive_ms = int(raw)
+        except ValueError:
+            keepalive_ms = -1
+        if keepalive_ms < MIN_KEEPALIVE_TIME_MS:
+            logger.warning(
+                "%s=%r is not a whole number of milliseconds >= %d; using %d",
+                KEEPALIVE_TIME_ENV,
+                raw,
+                MIN_KEEPALIVE_TIME_MS,
+                DEFAULT_KEEPALIVE_TIME_MS,
+            )
+            keepalive_ms = DEFAULT_KEEPALIVE_TIME_MS
+    return [
+        ("grpc.keepalive_time_ms", keepalive_ms),
+        ("grpc.keepalive_timeout_ms", KEEPALIVE_TIMEOUT_MS),
+        ("grpc.keepalive_permit_without_calls", 1),
+        # gRPC core otherwise stops pinging after two pings without data on a quiet stream.
+        ("grpc.http2.max_pings_without_data", 0),
+    ]
+
+
 def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channel:
     """
     A channel to a core service that carries ``token`` on every call. Without a token the calls go
     out bare, and the platform refuses all but claim redemption — logged once per channel. TLS with
     the installation's CA when ``ZQNT_INTERNAL_TLS`` is on (see :mod:`edge_sdk.internal_tls`).
+    Keepalive pings keep it open while idle (:func:`platform_channel_options`).
     """
     target = f"{host}:{port}"
     tls = InternalTls.from_env()
@@ -274,8 +324,8 @@ def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channe
             "(issue one in the console under Edge Credentials)",
             target,
         )
-        return tls.aio_channel(target)
-    return tls.aio_channel(target, interceptors=bearer_interceptors(token))
+        return tls.aio_channel(target, options=platform_channel_options())
+    return tls.aio_channel(target, options=platform_channel_options(), interceptors=bearer_interceptors(token))
 
 
 # ---------------------------------------------------------------------------
