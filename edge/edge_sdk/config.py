@@ -54,6 +54,8 @@ Environment variables (all optional, sensible defaults provided):
     ZQNT_PLATFORM_PUBLIC_KEY  The platform's service public key, for tokens without a key id.
                               Optional with ZQNT_PLATFORM_KEYS_URL. Alias: SERVICE_AUTH_PUBLIC_KEY
     ZQNT_EDGE_AUTH_DISABLED   "true" accepts unauthenticated commands — local SITL/simulators only
+    ZQNT_GRPC_KEEPALIVE_TIME_MS  Ping interval of idle channels to the platform (default 60000), so
+                              quiet telemetry/notification streams outlive the server's idle timeout
 
     Internal TLS (see edge_sdk.internal_tls) — an installation whose core services serve TLS from
     their own CA:
