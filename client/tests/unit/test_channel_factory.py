@@ -55,3 +55,12 @@ async def test_create_channel_with_stork_uses_dns_target() -> None:
         assert isinstance(channel, grpc.aio.Channel)
     finally:
         await channel.close()
+
+
+def test_channel_options_keep_quiet_streams_alive() -> None:
+    from client_sdk.grpc_.channel_factory import _channel_options
+
+    options = dict(_channel_options(ServiceConfig(service_name="live-data", host="localhost", port=8003)))
+    assert options["grpc.keepalive_time_ms"] < 30 * 60 * 1000
+    assert options["grpc.keepalive_permit_without_calls"] == 1
+    assert options["grpc.http2.max_pings_without_data"] == 0
