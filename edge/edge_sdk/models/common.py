@@ -661,6 +661,20 @@ class DetectionPosition:
 
 
 @dataclass
+class DetectionAttribute:
+    """
+    What a model read or recognised about an object beyond its class: ``plate`` = ``M AB 123``,
+    ``plate_country`` = ``DE``, ``uav_type`` = ``quadcopter``. Keys are lower snake case.
+    ``model`` names a second-stage model (name@version) when it is not the detection's own.
+    """
+
+    key: str
+    value: str
+    confidence: float = 0.0
+    model: str | None = None
+
+
+@dataclass
 class DetectionResult:
     object_id: str
     object_type: str
@@ -668,6 +682,9 @@ class DetectionResult:
     # Image-space box for camera detections; a radar has none.
     bounding_box: BoundingBox | None = None
     position: DetectionPosition | None = None
+    attributes: list[DetectionAttribute] = field(default_factory=list)
+    #: The model that produced the detection, as name@version (v3 only).
+    model: str | None = None
 
 
 @dataclass

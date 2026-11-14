@@ -21,6 +21,7 @@ from .common import (
     CommandSafety,
     CompletionMode,
     Coordinates,
+    DetectionAttribute,
     DetectionBatch,
     DetectionPosition,
     DetectionResponse,
@@ -125,6 +126,7 @@ __all__ = [
     "DetectionPosition",
     "DetectionResult",
     "DetectionResponse",
+    "DetectionAttribute",
     "DetectionBatch",
     # notification
     "AssetStatusEvent",

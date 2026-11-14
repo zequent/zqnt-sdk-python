@@ -129,6 +129,17 @@ def detection_to_v3(d):
             value = getattr(d.position, v2_name)
             if _given(value):
                 setattr(detection, v3_name, value)
+    for attribute in d.attributes:
+        detection.attributes.append(
+            edge_v3.DetectionAttribute(
+                key=attribute.key,
+                value=attribute.value,
+                confidence=attribute.confidence or 0.0,
+                model=attribute.model or "",
+            )
+        )
+    if d.model:
+        detection.model = d.model
     return detection
 
 
