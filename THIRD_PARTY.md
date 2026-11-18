@@ -16,11 +16,13 @@ Status `review` marks file-level copyleft (ship unmodified, publish changes to i
 | `grpcio-tools` | Apache-2.0 | allow | client |
 | `iniconfig` | MIT | allow | client, edge |
 | `mypy-protobuf` | Apache-2.0 | allow | client |
+| `nodeenv` | BSD-3-Clause | allow | client, edge |
 | `packaging` | Apache-2.0 OR BSD-2-Clause | allow | client, edge |
 | `pluggy` | MIT | allow | client, edge |
 | `protobuf` | BSD-3-Clause | allow | client, edge |
 | `pycparser` | BSD-3-Clause | allow | client, edge |
 | `pygments` | BSD-2-Clause | allow | client, edge |
+| `pyright` | MIT | allow | client, edge |
 | `pytest` | MIT | allow | client, edge |
 | `pytest-asyncio` | Apache-2.0 | allow | client, edge |
 | `pytest-cov` | MIT | allow | client |

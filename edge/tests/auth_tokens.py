@@ -67,7 +67,7 @@ class FakeJwksServer:
         server = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self):  # noqa: N802
+            def do_GET(self):
                 server.requests += 1
                 body = json.dumps({"keys": server.keys}).encode()
                 self.send_response(server.status)
@@ -76,7 +76,7 @@ class FakeJwksServer:
                 self.end_headers()
                 self.wfile.write(body)
 
-            def log_message(self, *args):
+            def log_message(self, format, *args):
                 pass
 
         self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

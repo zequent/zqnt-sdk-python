@@ -64,7 +64,7 @@ async def test_tls_with_the_installation_ca_carries_the_credential(tls_server, m
     try:
         assert await _call(channel) == f"Bearer {TOKEN}"
     finally:
-        await channel.close()
+        await channel.close(None)
 
 
 async def test_another_ca_is_refused(tls_server, tmp_path, monkeypatch):
@@ -78,7 +78,7 @@ async def test_another_ca_is_refused(tls_server, tmp_path, monkeypatch):
             await _call(channel)
         assert refused.value.code() == grpc.StatusCode.UNAVAILABLE
     finally:
-        await channel.close()
+        await channel.close(None)
 
 
 async def test_without_the_switch_the_channel_is_plaintext(tls_server, monkeypatch):
@@ -91,7 +91,7 @@ async def test_without_the_switch_the_channel_is_plaintext(tls_server, monkeypat
             await _call(channel)
         assert refused.value.code() == grpc.StatusCode.UNAVAILABLE
     finally:
-        await channel.close()
+        await channel.close(None)
 
 
 async def test_a_missing_ca_fails_before_dialling(monkeypatch, tmp_path):

@@ -20,6 +20,7 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 import grpc
+import grpc.aio
 
 from ..auth import explain
 from ..config.resilience import ResilienceConfig
@@ -81,7 +82,7 @@ class GrpcResilience:
                 return result
             except CircuitBreakerOpen:
                 raise
-            except BaseException as exc:  # noqa: BLE001 - we re-raise after policy
+            except BaseException as exc:
                 last_exc = exc
                 if attempt < max_attempts and _is_retryable(exc):
                     delay = self._config.retry_delay_millis * (attempt + 1) / 1000.0
@@ -107,7 +108,7 @@ class GrpcResilience:
                     raise explained from exc
                 raise
 
-        # Defensive – should be unreachable thanks to raise inside the loop.
+        # Defensive - should be unreachable thanks to raise inside the loop.
         assert last_exc is not None
         raise last_exc
 
@@ -169,10 +170,8 @@ def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, ValueError):
         # Validation errors — never retry.
         return False
-    if isinstance(exc, asyncio.CancelledError):
-        return False
     # Unknown exceptions: retry by default (matches Java behaviour).
-    return True
+    return not isinstance(exc, asyncio.CancelledError)
 
 
 def _short_exc(exc: BaseException) -> str:

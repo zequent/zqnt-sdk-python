@@ -70,7 +70,7 @@ def explain(error: BaseException) -> BaseException:
     explained = ZequentAuthError(
         code,
         error.initial_metadata(),
-        error.trailing_metadata(),
+        error.trailing_metadata(),  # pyright: ignore[reportArgumentType] - grpc-stubs types aio metadata as a tuple
         details=f"Zequent refused the call: {advice}{cause}",
         debug_error_string=error.debug_error_string(),
     )
@@ -111,7 +111,7 @@ class _BearerUnaryStream(grpc.aio.UnaryStreamClientInterceptor):
         self._token = token
 
     async def intercept_unary_stream(self, continuation, client_call_details, request):
-        return await continuation(_with_token(client_call_details, self._token), request)
+        return await continuation(_with_token(client_call_details, self._token), request)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 class _BearerStreamUnary(grpc.aio.StreamUnaryClientInterceptor):
@@ -127,14 +127,14 @@ class _BearerStreamStream(grpc.aio.StreamStreamClientInterceptor):
         self._token = token
 
     async def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
-        return await continuation(_with_token(client_call_details, self._token), request_iterator)
+        return await continuation(_with_token(client_call_details, self._token), request_iterator)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 def bearer_interceptors(token: str | None) -> list[grpc.aio.ClientInterceptor]:
     """Interceptors that send ``token`` on every kind of call; none without a token."""
     if not token:
         return []
-    return [_BearerUnaryUnary(token), _BearerUnaryStream(token), _BearerStreamUnary(token), _BearerStreamStream(token)]
+    return [_BearerUnaryUnary(token), _BearerUnaryStream(token), _BearerStreamUnary(token), _BearerStreamStream(token)]  # pyright: ignore[reportReturnType] - grpc-stubs leaves aio.ClientInterceptor a placeholder
 
 
 __all__ = ["ENV_VAR", "ZequentAuthError", "bearer_interceptors", "explain", "resolve_token"]

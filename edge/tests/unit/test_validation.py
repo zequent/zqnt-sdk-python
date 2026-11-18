@@ -3,6 +3,7 @@ Params are checked against the command's input schema once, in the SDK, before a
 """
 
 import math
+from typing import Any
 
 from google.protobuf import struct_pb2
 from zqnt_api.generated.zqnt import common_pb2 as common_v2
@@ -15,6 +16,22 @@ from edge_sdk.adapter.validation import check_schema, example_params, validate_p
 from edge_sdk.models.common import CustomCommandResponse, ErrorCode
 from edge_sdk.server.edge_server import _EdgeAdapterServicer
 from edge_sdk.server.edge_server_v3 import EdgeAdapterV3Servicer
+
+
+class _FakeContext:
+    """Stands in for grpc.aio.ServicerContext; these calls never abort."""
+
+    async def abort(self, code, details):
+        raise AssertionError(f"aborted: {code} {details}")
+
+
+def _context() -> Any:
+    return _FakeContext()
+
+
+def _v2(adapter: EdgeAdapter) -> _EdgeAdapterServicer:
+    return _EdgeAdapterServicer(adapter)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+
 
 SPRAY = schema(
     {
@@ -152,7 +169,7 @@ async def test_invalid_params_never_reach_the_handler_and_are_rejected():
     adapter = _Adapter()
 
     response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(
-        _execute("vendor.acme.spray", {"seconds": 120}), None
+        _execute("vendor.acme.spray", {"seconds": 120}), _context()
     )
 
     assert adapter.calls == []
@@ -165,7 +182,9 @@ async def test_invalid_params_never_reach_the_handler_and_are_rejected():
 async def test_the_handler_gets_coerced_params():
     adapter = _Adapter()
 
-    response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(_execute("vendor.acme.spray", {"seconds": 3}), None)
+    response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(
+        _execute("vendor.acme.spray", {"seconds": 3}), _context()
+    )
 
     assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
     assert adapter.calls == [{"seconds": 3}]
@@ -175,7 +194,9 @@ async def test_the_handler_gets_coerced_params():
 async def test_a_catalog_command_is_checked_against_the_catalog_schema():
     adapter = _Adapter()
 
-    response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(_execute("navigation.go_to", {"altitude": 40}), None)
+    response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(
+        _execute("navigation.go_to", {"altitude": 40}), _context()
+    )
 
     assert response.result.state == command_pb2.COMMAND_STATE_REJECTED
     assert "params.latitude is required" in response.result.error.message
@@ -189,7 +210,7 @@ async def test_v2_custom_commands_are_checked_too():
         base=common_v2.RequestBase(tid="t", sn="SN-1"), command_id="vendor.acme.spray", params=params
     )
 
-    response = await _EdgeAdapterServicer(adapter).SendCustomCommand(request, None)
+    response = await _v2(adapter).SendCustomCommand(request, _context())
 
     assert response.has_errors
     assert response.error.error_code == int(ErrorCode.CLIENT_ERROR)

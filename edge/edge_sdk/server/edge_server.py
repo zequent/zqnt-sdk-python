@@ -1,5 +1,5 @@
 """
-EdgeServer – wraps the generated EdgeAdapterService gRPC servicer and
+EdgeServer - wraps the generated EdgeAdapterService gRPC servicer and
 delegates every call to the user's EdgeAdapter implementation.
 
 Usage (minimal)::
@@ -25,7 +25,8 @@ Usage with automatic service discovery registration::
 import asyncio
 import dataclasses
 import logging
-from typing import Any
+from datetime import UTC
+from typing import Any, cast
 
 import grpc
 import grpc.aio
@@ -192,7 +193,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
             return common_pb2.AssetCapabilitiesResponse(
                 error=common_pb2.GlobalErrorMessage(
                     error_message=str(exc),
-                    error_code=int(ErrorCode.SDK_ERROR),
+                    error_code=cast(common_pb2.ErrorCode, int(ErrorCode.SDK_ERROR)),
                 )
             )
 
@@ -291,7 +292,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     # Detection  (server-streaming)
     # ------------------------------------------------------------------
 
-    async def GetDetections(self, request, context):
+    async def GetDetections(self, request, context: grpc.aio.ServicerContext):
         await self._assert_supported("get_detections", context)
         ctx = proto_to_request_context(request.base)
         stream_url = request.stream_url if request.HasField("stream_url") else None
@@ -307,7 +308,9 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
                             y=d.bounding_box.y,
                             width=d.bounding_box.width,
                             height=d.bounding_box.height,
-                        ),
+                        )
+                        if d.bounding_box is not None
+                        else None,
                     )
                     for d in detection.detections
                 ]
@@ -480,9 +483,9 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
 
 
 def _dummy_ctx() -> RequestContext:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return RequestContext(tid="", sn="", timestamp=datetime.now(tz=timezone.utc))
+    return RequestContext(tid="", sn="", timestamp=datetime.now(tz=UTC))
 
 
 # ---------------------------------------------------------------------------
@@ -568,7 +571,8 @@ class EdgeServer:
 
         # Register EdgeAdapterService: v2 (typed RPCs, frozen) and v3 (ExecuteCommand only) side by
         # side on one port, both served from the same adapter and its registered commands.
-        edge_pb2_grpc.add_EdgeAdapterServiceServicer_to_server(_EdgeAdapterServicer(self._adapter), self._server)
+        servicer = _EdgeAdapterServicer(self._adapter)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+        edge_pb2_grpc.add_EdgeAdapterServiceServicer_to_server(servicer, self._server)
         edge_server_v3.add_to_server(self._adapter, self._server)
 
         # Register standard gRPC health check (used by k8s probes)
@@ -583,7 +587,7 @@ class EdgeServer:
             logger.debug("gRPC health check service registered")
         except ImportError:
             logger.warning(
-                "grpcio-health-checking not installed – health check unavailable. "
+                "grpcio-health-checking not installed - health check unavailable. "
                 "Add grpcio-health-checking to your dependencies."
             )
 
@@ -637,7 +641,9 @@ class EdgeServer:
         Write (or update) the EdgeEndpointDTO in Redis under ``zqnt:edge-endpoints:{vendor}``,
         the key the platform's endpoint router reads (Java CacheKeys.EDGE_ENDPOINTS).
         """
-        cfg = self._registration  # type: ignore[union-attr]
+        cfg = self._registration
+        if cfg is None:
+            return
         vendor = proto_enum_name(cfg.asset_vendor)  # e.g. "ASSET_VENDOR_MAVLINK"
         asset_type = proto_enum_name(cfg.asset_type)  # e.g. "ASSET_TYPE_AIRCRAFT"
 
@@ -645,7 +651,7 @@ class EdgeServer:
             import redis.asyncio as aioredis
         except ImportError:
             logger.warning(
-                "redis package not installed – endpoint registration skipped. "
+                "redis package not installed - endpoint registration skipped. "
                 "Install with: pip install 'edge-python-sdk[redis]'"
             )
             return

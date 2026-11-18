@@ -50,6 +50,9 @@ jobs:
           uv run --frozen ruff check .
           uv run --frozen ruff format --check .
 
+      - name: Type check
+        run: uv run --frozen pyright ${{ matrix.package }}
+
       - name: Test
         working-directory: ${{ matrix.package }}
         run: uv run --frozen pytest -v

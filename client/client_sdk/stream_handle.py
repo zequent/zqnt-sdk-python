@@ -16,7 +16,7 @@ class StreamHandle:
     or use the handle as an ``async with`` context manager.
     """
 
-    __slots__ = ("_stopped", "_task", "_done")
+    __slots__ = ("_done", "_stopped", "_task")
 
     def __init__(self) -> None:
         self._stopped = False
@@ -45,7 +45,7 @@ class StreamHandle:
         """Block until the underlying task completes."""
         await self._done.wait()
 
-    async def __aenter__(self) -> "StreamHandle":
+    async def __aenter__(self) -> StreamHandle:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

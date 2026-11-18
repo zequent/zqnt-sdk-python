@@ -21,12 +21,13 @@ use.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import math
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard, cast
 
 import grpc.aio
 from google.protobuf import struct_pb2, timestamp_pb2
@@ -54,7 +55,7 @@ def _timestamp(value: datetime | None) -> timestamp_pb2.Timestamp:
     return ts
 
 
-def _given(value: float | None) -> bool:
+def _given(value: float | None) -> TypeGuard[float]:
     return value is not None and not (isinstance(value, float) and math.isnan(value))
 
 
@@ -168,7 +169,7 @@ def alert_to_v3(alert: Alert):
     proto = telemetry_pb2.Alert(
         asset=_asset_ref(alert.sn, alert.asset_id),
         occurred_at=_timestamp(alert.occurred_at),
-        severity=int(alert.severity),
+        severity=cast(telemetry_pb2.AlertSeverity, int(alert.severity)),
         code=alert.code,
         message=alert.message,
     )
@@ -229,19 +230,15 @@ class _IngestStream:
     async def close(self) -> None:
         self._closed = True
         self._stop.set()
-        try:
+        with contextlib.suppress(asyncio.QueueFull):
             self._queue.put_nowait(_SENTINEL)
-        except asyncio.QueueFull:
-            pass
         if self._task is not None:
             try:
                 await asyncio.wait_for(self._task, timeout=10.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._task
-                except asyncio.CancelledError:
-                    pass
 
     async def _run(self) -> None:
         backoff = ReconnectBackoff(self.BACKOFF_INITIAL, self.BACKOFF_MAX)
@@ -258,7 +255,7 @@ class _IngestStream:
                     self.rejected += response.rejected
                     if response.rejected:
                         logger.warning("%s: platform rejected %d item(s)", self._name, response.rejected)
-                elif self._v2_call is None:
+                elif self._v2_call is None or self._to_v2 is None:
                     await self._drop_while_v2(gen_stop)
                 else:
                     response = await self._v2_call(channel)(self._items(gen_stop, self._to_v2, sent, v2=True))
@@ -279,11 +276,11 @@ class _IngestStream:
                 )
             finally:
                 gen_stop.set()
-                await channel.close()
+                await channel.close(None)
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=delay)
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
     async def _next(self, gen_stop: asyncio.Event):
@@ -292,7 +289,7 @@ class _IngestStream:
         while not self._closed and not gen_stop.is_set():
             try:
                 return await asyncio.wait_for(self._queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return None
         return _SENTINEL
 
@@ -381,7 +378,7 @@ class TelemetryIngestPublisher:
         )
 
     @classmethod
-    def for_node(cls, node: "EdgeNodeConfig", queue_max_size: int = 1000) -> "TelemetryIngestPublisher":
+    def for_node(cls, node: EdgeNodeConfig, queue_max_size: int = 1000) -> TelemetryIngestPublisher:
         """Live data to the local Edge Node (v3 only), naming this adapter's socket."""
         return cls(host=node.node_target, port=0, token="", queue_max_size=queue_max_size, channel_factory=node.channel)
 
@@ -399,7 +396,7 @@ class TelemetryIngestPublisher:
         await self.detections.close()
         await self.alerts.close()
 
-    async def __aenter__(self) -> "TelemetryIngestPublisher":
+    async def __aenter__(self) -> TelemetryIngestPublisher:
         return self
 
     async def __aexit__(self, *_exc) -> None:

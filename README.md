@@ -109,19 +109,13 @@ class MyDroneAdapter(EdgeAdapter):
         """Return capabilities supported by this asset."""
         return self._auto_capabilities(sn, AssetType.AIRCRAFT)
 
-    async def take_off(
-        self, ctx: RequestContext, coordinates: Coordinates
-    ) -> EdgeResponse:
+    async def take_off(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Handle take-off command."""
         # Call your drone SDK here
-        await hardware.take_off(
-            coordinates.latitude, coordinates.longitude, coordinates.altitude
-        )
+        await hardware.take_off(coordinates.latitude, coordinates.longitude, coordinates.altitude)
         return EdgeResponse.ok(ctx.tid, ctx.sn, "Take-off initiated")
 
-    async def go_to(
-        self, ctx: RequestContext, coordinates: Coordinates
-    ) -> EdgeResponse:
+    async def go_to(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Handle go-to command."""
         await hardware.fly_to(coordinates)
         return EdgeResponse.ok(ctx.tid, ctx.sn)
@@ -263,14 +257,10 @@ class MyDockAdapter(EdgeAdapter):
         self.register_command(
             "vendor.acme.spray",
             self._spray,
-            input_schema=schema(
-                {"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]
-            ),
+            input_schema=schema({"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]),
         )
         self.declare_standard_telemetry_field("dock.cover_state")
-        self.declare_telemetry_field(
-            "vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%"
-        )
+        self.declare_telemetry_field("vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%")
 
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.DOCK)
@@ -346,14 +336,10 @@ from edge_sdk import (
 
 ingest = TelemetryIngestPublisher(host="live-data", port=8003)
 await ingest.publish_sample(
-    TelemetrySample(
-        sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"}
-    )
+    TelemetrySample(sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"})
 )
 await ingest.publish_detections(DetectionBatch(sn="RADAR-1", detections=[...]))
-await ingest.publish_alert(
-    Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING)
-)
+await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING))
 ```
 
 Long-lived streams to `TelemetryIngestService`, opened on first use and reconnected with backoff.
@@ -408,9 +394,9 @@ The node's queue tells the adapter how hard to push (`runtime.node_queue`):
 
 ```python
 stats = await runtime.node_queue.get()
-rate = normal_rate * stats.throttle("LANE_TELEMETRY")   # 1 up to half full, down to 0.1 when full
+rate = normal_rate * stats.throttle("LANE_TELEMETRY")  # 1 up to half full, down to 0.1 when full
 
-async for stats in runtime.node_queue.watch():          # at once, on change, at least every 10 s
+async for stats in runtime.node_queue.watch():  # at once, on change, at least every 10 s
     ...
 ```
 
@@ -444,9 +430,7 @@ async def some_operation(self, ctx: RequestContext) -> EdgeResponse:
         result = await hardware.do_something()
         return EdgeResponse.ok(ctx.tid, ctx.sn)
     except HardwareError as e:
-        return EdgeResponse.fail(
-            ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR)
-        )
+        return EdgeResponse.fail(ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR))
 ```
 
 #### Server Registration (with Redis)
@@ -651,9 +635,7 @@ from client_sdk import ZequentClient
 
 async def main():
     async with ZequentClient.from_env() as client:
-        await client.commands.execute_command(
-            "DRONE-1", "flight.takeoff", {"altitude": 40}
-        )
+        await client.commands.execute_command("DRONE-1", "flight.takeoff", {"altitude": 40})
 
         async for item in client.telemetry.watch_telemetry(["DRONE-1"]):
             print(item)
@@ -686,15 +668,9 @@ from client_sdk import ZequentClient
 from client_sdk.config import ServiceConfig
 
 async with ZequentClient(
-    connector_config=ServiceConfig(
-        "connector", host="connector.example.com", port=8010
-    ),
-    remote_control_config=ServiceConfig(
-        "remote-control", host="rc.example.com", port=8002
-    ),
-    mission_autonomy_config=ServiceConfig(
-        "mission-autonomy", host="ma.example.com", port=8004
-    ),
+    connector_config=ServiceConfig("connector", host="connector.example.com", port=8010),
+    remote_control_config=ServiceConfig("remote-control", host="rc.example.com", port=8002),
+    mission_autonomy_config=ServiceConfig("mission-autonomy", host="ma.example.com", port=8004),
     live_data_config=ServiceConfig("live-data", host="ld.example.com", port=8003),
 ) as client:
     ...
@@ -724,9 +700,7 @@ async with ZequentClient.from_env() as client:
                 {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60},
             )
     except CommandError as error:
-        print(
-            error.category_name, error.code, error
-        )  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
+        print(error.category_name, error.code, error)  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
     else:
         print(to_dict(result.result))
 
@@ -807,9 +781,7 @@ watch does not reconnect: watch again.
 async for batch in client.telemetry.watch_detections(["DRONE-1"]):
     print(batch.asset.sn, batch.stream_url, len(batch.detections))
 
-async for alert in client.telemetry.watch_alerts(
-    min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING
-):
+async for alert in client.telemetry.watch_alerts(min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING):
     print(
         alert.asset.sn,
         telemetry_pb2.AlertSeverity.Name(alert.severity),

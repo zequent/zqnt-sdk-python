@@ -7,6 +7,8 @@ is refused as REJECTED (never an aborted call); a long command is ACCEPTED with 
 under; capabilities come out of the same registry as v2's.
 """
 
+from typing import Any
+
 import pytest
 from google.protobuf import struct_pb2
 from zqnt_api.generated.zqnt.capability.v3 import command_pb2
@@ -28,11 +30,15 @@ from edge_sdk.models.common import (
 from edge_sdk.server.edge_server_v3 import NOT_SUPPORTED_CODE, EdgeAdapterV3Servicer
 
 
-class _Context:
-    """Stands in for grpc.aio.ServicerContext; v3 never aborts a command call."""
+class _FakeContext:
+    """Stands in for grpc.aio.ServicerContext; these calls never abort."""
 
     async def abort(self, code, details):
         raise AssertionError(f"aborted: {code} {details}")
+
+
+def _context() -> Any:
+    return _FakeContext()
 
 
 class _Adapter(EdgeAdapter):
@@ -83,7 +89,7 @@ def _execute(command_id: str, params: dict | None = None) -> edge_v3.ExecuteComm
 async def test_a_registered_handler_runs_and_returns_its_result():
     adapter = _Adapter()
     response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(
-        _execute("vendor.acme.spray", {"seconds": 3}), _Context()
+        _execute("vendor.acme.spray", {"seconds": 3}), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
@@ -95,7 +101,7 @@ async def test_a_registered_handler_runs_and_returns_its_result():
 async def test_a_built_in_id_reaches_the_typed_method_of_an_older_adapter():
     adapter = _Adapter()
     response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(
-        _execute("flight.takeoff", {"latitude": 52.5, "longitude": 13.4, "altitude": 40}), _Context()
+        _execute("flight.takeoff", {"latitude": 52.5, "longitude": 13.4, "altitude": 40}), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
@@ -104,7 +110,7 @@ async def test_a_built_in_id_reaches_the_typed_method_of_an_older_adapter():
 
 
 async def test_an_unknown_id_is_rejected_not_aborted():
-    response = await EdgeAdapterV3Servicer(_Adapter()).ExecuteCommand(_execute("vendor.nope.nothing"), _Context())
+    response = await EdgeAdapterV3Servicer(_Adapter()).ExecuteCommand(_execute("vendor.nope.nothing"), _context())
 
     assert response.result.state == command_pb2.COMMAND_STATE_REJECTED
     assert response.result.error.code == NOT_SUPPORTED_CODE
@@ -114,7 +120,7 @@ async def test_an_unknown_id_is_rejected_not_aborted():
 async def test_a_long_command_is_accepted_under_the_id_it_runs_as():
     mission = {"waypoints": [{"latitude": 47.5, "longitude": 9.7}]}
     response = await EdgeAdapterV3Servicer(_Adapter()).ExecuteCommand(
-        _execute("mission.waypoint.execute", mission), _Context()
+        _execute("mission.waypoint.execute", mission), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_ACCEPTED
@@ -122,7 +128,7 @@ async def test_a_long_command_is_accepted_under_the_id_it_runs_as():
 
 
 async def test_an_adapter_failure_is_failed_with_its_message():
-    response = await EdgeAdapterV3Servicer(_Adapter()).ExecuteCommand(_execute("vendor.acme.broken"), _Context())
+    response = await EdgeAdapterV3Servicer(_Adapter()).ExecuteCommand(_execute("vendor.acme.broken"), _context())
 
     assert response.result.state == command_pb2.COMMAND_STATE_FAILED
     assert response.result.error.category == common_pb2.ERROR_CATEGORY_ASSET
@@ -132,7 +138,7 @@ async def test_an_adapter_failure_is_failed_with_its_message():
 async def test_cancel_stops_through_stop_task():
     adapter = _Adapter()
     response = await EdgeAdapterV3Servicer(adapter).CancelCommand(
-        edge_v3.CancelCommandRequest(command_execution_id="dji-77", reason="operator"), _Context()
+        edge_v3.CancelCommandRequest(command_execution_id="dji-77", reason="operator"), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_CANCELLED
@@ -141,7 +147,7 @@ async def test_cancel_stops_through_stop_task():
 
 async def test_capabilities_come_from_the_same_registry_as_v2():
     response = await EdgeAdapterV3Servicer(_Adapter()).GetCapabilities(
-        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _context()
     )
     caps = {c.command_id: c for c in response.capabilities.capabilities}
 
@@ -168,7 +174,7 @@ class _DeclaringAdapter(_Adapter):
 
 async def test_a_declared_asynchronous_command_waits_even_when_its_handler_answered_success():
     response = await EdgeAdapterV3Servicer(_DeclaringAdapter()).ExecuteCommand(
-        _execute("flight.takeoff", {"latitude": 52.5, "longitude": 13.4, "altitude": 40}), _Context()
+        _execute("flight.takeoff", {"latitude": 52.5, "longitude": 13.4, "altitude": 40}), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_ACCEPTED
@@ -177,7 +183,7 @@ async def test_a_declared_asynchronous_command_waits_even_when_its_handler_answe
 
 async def test_a_declared_on_reply_command_is_done_on_its_reply():
     response = await EdgeAdapterV3Servicer(_DeclaringAdapter()).ExecuteCommand(
-        _execute("vendor.acme.spray", {"seconds": 1}), _Context()
+        _execute("vendor.acme.spray", {"seconds": 1}), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
@@ -185,7 +191,7 @@ async def test_a_declared_on_reply_command_is_done_on_its_reply():
 
 async def test_the_completion_mode_is_published_with_the_capability():
     response = await EdgeAdapterV3Servicer(_DeclaringAdapter()).GetCapabilities(
-        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _context()
     )
     caps = {c.command_id: c for c in response.capabilities.capabilities}
 
@@ -200,7 +206,7 @@ async def test_unreadable_capabilities_leave_the_command_to_its_response():
             raise RuntimeError("registry down")
 
     response = await EdgeAdapterV3Servicer(_Broken()).ExecuteCommand(
-        _execute("vendor.acme.spray", {"seconds": 1}), _Context()
+        _execute("vendor.acme.spray", {"seconds": 1}), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_SUCCEEDED
@@ -224,7 +230,7 @@ async def test_mounted_payloads_are_reported_and_a_change_is_announced():
     adapter.set_payloads("SN-1", [camera])
     adapter.set_payloads("SN-1", [camera])
     response = await EdgeAdapterV3Servicer(adapter).GetCapabilities(
-        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _context()
     )
     reported = response.capabilities.payloads[0]
 
@@ -241,7 +247,7 @@ async def test_mounted_payloads_are_reported_and_a_change_is_announced():
 
     adapter.set_payloads("SN-1", [Payload(ref="speaker-1", kind="speaker")])
     response = await EdgeAdapterV3Servicer(adapter).GetCapabilities(
-        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _context()
     )
     assert [p.ref for p in response.capabilities.payloads] == ["speaker-1"]
     assert not response.capabilities.payloads[0].HasField("slot_index")

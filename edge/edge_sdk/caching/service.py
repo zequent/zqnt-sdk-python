@@ -100,7 +100,9 @@ class CachingService:
     async def _get_client(self) -> aioredis.Redis:
         if self._client is None:
             await self.connect()
-        return self._client
+        client = self._client
+        assert client is not None
+        return client
 
     async def _safe_set(self, key: str, value: str, *, op: str) -> None:
         try:
@@ -112,7 +114,7 @@ class CachingService:
     async def _safe_get(self, key: str, *, op: str) -> str | None:
         try:
             client = await self._get_client()
-            return await client.get(key)
+            return await client.get(key)  # pyright: ignore[reportReturnType] - redis-py does not tie get() to decode_responses=True
         except Exception as exc:
             logger.error("Redis operation '%s' failed: %s", op, exc)
             return None

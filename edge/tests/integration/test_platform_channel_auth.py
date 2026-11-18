@@ -16,7 +16,7 @@ import grpc
 import grpc.aio
 import pytest
 import pytest_asyncio
-from zqnt_api.generated.zqnt import live_data_pb2_grpc, live_data_types_pb2  # type: ignore[import]
+from zqnt_api.generated.zqnt import live_data_pb2_grpc, live_data_types_pb2
 
 from edge_sdk.auth import platform_channel
 from edge_sdk.client.detection_publisher import DetectionPublisher
@@ -98,12 +98,12 @@ async def _requests():
 async def test_every_call_type_carries_the_edge_credential(echo_port):
     channel = platform_channel("localhost", echo_port, TOKEN)
     try:
-        unary_unary = await channel.unary_unary("/test.Echo/UnaryUnary")(b"x")
-        unary_stream = [r async for r in channel.unary_stream("/test.Echo/UnaryStream")(b"x")]
-        stream_unary = await channel.stream_unary("/test.Echo/StreamUnary")(_requests())
-        stream_stream = [r async for r in channel.stream_stream("/test.Echo/StreamStream")(_requests())]
+        unary_unary = await channel.unary_unary("/test.Echo/UnaryUnary")(b"x")  # pyright: ignore[reportCallIssue] - grpc-stubs requires the serializers grpc.aio makes optional
+        unary_stream = [r async for r in channel.unary_stream("/test.Echo/UnaryStream")(b"x")]  # pyright: ignore[reportCallIssue] - grpc-stubs requires the serializers grpc.aio makes optional
+        stream_unary = await channel.stream_unary("/test.Echo/StreamUnary")(_requests())  # pyright: ignore[reportCallIssue] - grpc-stubs requires the serializers grpc.aio makes optional
+        stream_stream = [r async for r in channel.stream_stream("/test.Echo/StreamStream")(_requests())]  # pyright: ignore[reportCallIssue] - grpc-stubs requires the serializers grpc.aio makes optional
     finally:
-        await channel.close()
+        await channel.close(None)
 
     assert {
         "unary_unary": unary_unary.decode(),
@@ -139,9 +139,9 @@ async def test_a_call_keeps_its_own_metadata_next_to_the_credential(echo_port):
     await server.start()
     channel = platform_channel("localhost", port, TOKEN)
     try:
-        await channel.stream_unary("/test.Echo/Any")(_requests(), metadata=(("x-trace", "abc"),))
+        await channel.stream_unary("/test.Echo/Any")(_requests(), metadata=(("x-trace", "abc"),))  # pyright: ignore[reportCallIssue] - grpc-stubs requires the serializers grpc.aio makes optional
     finally:
-        await channel.close()
+        await channel.close(None)
         await server.stop(grace=0)
 
     assert seen["authorization"] == BEARER
@@ -179,7 +179,7 @@ class _LiveData(live_data_pb2_grpc.LiveDataServiceServicer):
 @pytest_asyncio.fixture
 async def live_data():
     port = _free_port()
-    servicer = _LiveData()
+    servicer = _LiveData()  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
     server = grpc.aio.server()
     live_data_pb2_grpc.add_LiveDataServiceServicer_to_server(servicer, server)
     server.add_insecure_port(f"localhost:{port}")

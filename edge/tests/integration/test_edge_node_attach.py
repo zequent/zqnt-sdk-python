@@ -141,7 +141,8 @@ async def node(sockets):
     os.makedirs(os.path.dirname(node_sock))
     state = _Node()
     server = grpc.aio.server()
-    telemetry_pb2_grpc.add_TelemetryIngestServiceServicer_to_server(_Ingest(state), server)
+    ingest = _Ingest(state)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+    telemetry_pb2_grpc.add_TelemetryIngestServiceServicer_to_server(ingest, server)
     edge_v3_grpc.add_EdgeGatewayServiceServicer_to_server(_Gateway(state), server)
     server.add_generic_rpc_handlers((_queue_service(),))
     server.add_insecure_port(f"unix:{node_sock}")
@@ -194,16 +195,16 @@ async def test_an_adapter_attaches_to_the_node_by_configuration_only(node, socke
     assert config.edge_node == EdgeNodeConfig(*sockets)
     dock = _Dock()
     bound: list[str] = []
-    add_insecure_port = grpc.aio._server.Server.add_insecure_port
+    add_insecure_port = grpc.aio._server.Server.add_insecure_port  # pyright: ignore[reportAttributeAccessIssue] - private grpc module, absent from grpc-stubs
 
     def record(server, address):
         bound.append(address)
         return add_insecure_port(server, address)
 
-    monkeypatch.setattr(grpc.aio._server.Server, "add_insecure_port", record)
+    monkeypatch.setattr(grpc.aio._server.Server, "add_insecure_port", record)  # pyright: ignore[reportAttributeAccessIssue] - private grpc module, absent from grpc-stubs
 
     async with config.runtime() as runtime:
-        assert runtime.connector is None and runtime.telemetry is None and runtime.mission_autonomy is None
+        assert (runtime.connector, runtime.telemetry, runtime.mission_autonomy) == (None, None, None)
         serving = asyncio.create_task(runtime.serve(dock))
         try:
             await _until(lambda: node.capabilities)
@@ -246,6 +247,7 @@ async def test_an_adapter_attaches_to_the_node_by_configuration_only(node, socke
             assert event.command_id == "dock.open_cover"
             assert event.state == command_pb2.COMMAND_STATE_SUCCEEDED
 
+            assert runtime.node_queue is not None
             stats = await runtime.node_queue.get()
             assert not stats.connected
             assert stats.throttle("LANE_TELEMETRY") == 0.3

@@ -12,7 +12,7 @@ import json
 import types
 import typing
 from dataclasses import fields, is_dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from zqnt_api.proto_utils import parse_enum
@@ -86,7 +86,7 @@ from ..models.telemetry import (
 def _ts_to_dt(ts) -> datetime | None:
     if ts is None:
         return None
-    return datetime.fromtimestamp(ts.seconds + ts.nanos / 1e9, tz=timezone.utc)
+    return datetime.fromtimestamp(ts.seconds + ts.nanos / 1e9, tz=UTC)
 
 
 def _dt_to_ts(pb2_timestamp_module, dt: datetime | None):
@@ -113,7 +113,7 @@ def proto_to_request_context(base) -> RequestContext:
     return RequestContext(
         tid=base.tid,
         sn=base.sn,
-        timestamp=_ts_to_dt(base.timestamp) or datetime.now(tz=timezone.utc),
+        timestamp=_ts_to_dt(base.timestamp) or datetime.now(tz=UTC),
         command_execution_id=base.external_id or None,
     )
 
@@ -123,9 +123,7 @@ def proto_to_coordinates(c) -> Coordinates:
 
 
 def proto_to_return_to_home(r) -> ReturnToHomeRequest:
-    return ReturnToHomeRequest(
-        altitude=r.altitude if r.HasField("altitude") else None  # type: ignore[attr-defined]
-    )
+    return ReturnToHomeRequest(altitude=r.altitude if r.HasField("altitude") else None)
 
 
 def proto_to_manual_control_request(r) -> ManualControlRequest:
@@ -133,13 +131,13 @@ def proto_to_manual_control_request(r) -> ManualControlRequest:
         client_id=r.client_id,
         user_id=r.user_id,
         session_id=r.session_id,
-        reason=r.reason if r.HasField("reason") else None,  # type: ignore[attr-defined]
+        reason=r.reason if r.HasField("reason") else None,
     )
 
 
 def proto_to_manual_control_input(i) -> ManualControlInput:
     def _opt(msg, field):
-        return getattr(msg, field) if msg.HasField(field) else None  # type: ignore[attr-defined]
+        return getattr(msg, field) if msg.HasField(field) else None
 
     return ManualControlInput(
         roll=_opt(i, "roll"),
@@ -164,13 +162,13 @@ def proto_to_live_stream_stop(r) -> LiveStreamStopRequest:
 
 
 def proto_to_change_lens(r) -> ChangeCameraLensRequest:
-    return ChangeCameraLensRequest(lens=r.lens if r.HasField("lens") else None)  # type: ignore[attr-defined]
+    return ChangeCameraLensRequest(lens=r.lens if r.HasField("lens") else None)
 
 
 def proto_to_change_zoom(r) -> ChangeCameraZoomRequest:
     return ChangeCameraZoomRequest(
-        lens=r.lens if r.HasField("lens") else None,  # type: ignore[attr-defined]
-        zoom=r.zoom if r.HasField("zoom") else None,  # type: ignore[attr-defined]
+        lens=r.lens if r.HasField("lens") else None,
+        zoom=r.zoom if r.HasField("zoom") else None,
     )
 
 
@@ -216,7 +214,7 @@ def proto_to_asset(a) -> Asset:
 
 
 def _sub_asset_to_proto(sub: "SubAsset", common_pb2):
-    kwargs = dict(
+    kwargs: dict[str, typing.Any] = dict(
         id=sub.id,
         sn=sub.sn,
         name=sub.name,
@@ -245,7 +243,7 @@ def _sub_asset_to_proto(sub: "SubAsset", common_pb2):
 
 
 def asset_to_proto(asset: "Asset", common_pb2):
-    kwargs = dict(
+    kwargs: dict[str, typing.Any] = dict(
         id=asset.id,
         sn=asset.sn,
         name=asset.name,
@@ -277,7 +275,7 @@ def asset_to_proto(asset: "Asset", common_pb2):
 def _opt_field(msg, field):
     """Return proto optional scalar or None."""
     try:
-        return getattr(msg, field) if msg.HasField(field) else None  # type: ignore[attr-defined]
+        return getattr(msg, field) if msg.HasField(field) else None
     except ValueError:
         # HasField not supported for non-oneof / non-optional scalars
         return getattr(msg, field, None)
@@ -663,7 +661,7 @@ def proto_to_mission(m) -> Mission:
 
 def proto_to_asset_telemetry(t) -> AssetTelemetry:
     net = None
-    if t.HasField("network_information"):  # type: ignore[attr-defined]
+    if t.HasField("network_information"):
         ni = t.network_information
         net = AssetNetworkInfo(
             type=NetworkType(ni.type) if ni.HasField("type") else None,
@@ -671,14 +669,14 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
             quality=NetworkStateQuality(ni.quality) if ni.HasField("quality") else None,
         )
     ac = None
-    if t.HasField("air_conditioner"):  # type: ignore[attr-defined]
+    if t.HasField("air_conditioner"):
         a = t.air_conditioner
         ac = AssetAirConditioner(
             state=AssetAirConditionerState(a.state) if a.HasField("state") else None,
             switch_time=a.switch_time if a.HasField("switch_time") else None,
         )
     sub_info = None
-    if t.HasField("sub_asset_information"):  # type: ignore[attr-defined]
+    if t.HasField("sub_asset_information"):
         si = t.sub_asset_information
         sub_info = AssetSubAssetInfo(
             sn=si.sn if si.HasField("sn") else None,
@@ -687,7 +685,7 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
             online=si.online if si.HasField("online") else None,
         )
     pos = None
-    if t.HasField("position_state"):  # type: ignore[attr-defined]
+    if t.HasField("position_state"):
         ps = t.position_state
         pos = AssetPositionState(
             gps_number=ps.gps_number if ps.HasField("gps_number") else None,
@@ -732,7 +730,7 @@ def proto_to_asset_telemetry(t) -> AssetTelemetry:
 
 def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
     payload = None
-    if t.HasField("payload_telemetry"):  # type: ignore[attr-defined]
+    if t.HasField("payload_telemetry"):
         p = t.payload_telemetry
         cam = None
         if p.HasField("camera_data"):
@@ -768,7 +766,7 @@ def proto_to_sub_asset_telemetry(t) -> SubAssetTelemetry:
             sensor=sens,
         )
     batt = None
-    if t.HasField("battery_information"):  # type: ignore[attr-defined]
+    if t.HasField("battery_information"):
         bi = t.battery_information
         batt = SubAssetBatteryInfo(
             percentage=bi.percentage if bi.HasField("percentage") else None,
@@ -964,7 +962,7 @@ def proto_to_custom_command(r) -> CustomCommandRequest:
     from google.protobuf import json_format
 
     params = {}
-    if r.HasField("params"):  # type: ignore[attr-defined]
+    if r.HasField("params"):
         params = json_format.MessageToDict(r.params)
     # r.command_id: see the command_id/command_type note in custom_command_response_to_proto.
     return CustomCommandRequest(command_type=r.command_id, params=params)
