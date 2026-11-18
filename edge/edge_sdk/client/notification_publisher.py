@@ -1,5 +1,5 @@
 """
-NotificationPublisher – sends asset-status, mission, and command-execution notifications
+NotificationPublisher - sends asset-status, mission, and command-execution notifications
 to the ZQNT LiveDataService using the ``ProduceNotification`` client-streaming RPC.
 
 The publisher keeps a long-lived gRPC stream open and feeds it from an
@@ -29,6 +29,7 @@ node path and are dropped.
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import uuid
@@ -100,7 +101,7 @@ class NotificationPublisher:
 
     async def connect(self) -> None:
         """Open the channel and start the background streaming / reconnect task."""
-        import grpc.aio  # noqa: F401 – verify availability
+        import grpc.aio  # noqa: F401 - verify availability
         from zqnt_api.generated.zqnt import live_data_pb2_grpc  # noqa: F401
 
         self._closed = False
@@ -120,19 +121,15 @@ class NotificationPublisher:
         if self._stop_event:
             self._stop_event.set()
         if self._queue:
-            try:
+            with contextlib.suppress(asyncio.QueueFull):
                 self._queue.put_nowait(_SENTINEL)
-            except asyncio.QueueFull:
-                pass
         if self._stream_task:
             try:
                 await asyncio.wait_for(self._stream_task, timeout=10.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._stream_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._stream_task
-                except asyncio.CancelledError:
-                    pass
         if self._owns_gateway and self._gateway is not None:
             await self._gateway.close()
         logger.info("NotificationPublisher closed (sn=%s)", self._sn)
@@ -203,13 +200,15 @@ class NotificationPublisher:
             logger.debug("Notification queue full, dropping command-execution event (sn=%s)", self._sn)
 
     # ------------------------------------------------------------------
-    # Internal – reconnect loop
+    # Internal - reconnect loop
     # ------------------------------------------------------------------
 
     async def _run_stream(self) -> None:
         from zqnt_api.generated.zqnt import live_data_pb2_grpc
 
         backoff = ReconnectBackoff(self._BACKOFF_INITIAL, self._BACKOFF_MAX)
+        stop_event = self._stop_event
+        assert stop_event is not None
 
         while not self._closed:
             gen_stop = asyncio.Event()
@@ -252,16 +251,16 @@ class NotificationPublisher:
             finally:
                 gen_stop.set()
                 if channel:
-                    await channel.close()
+                    await channel.close(None)
 
             if not self._closed:
                 try:
                     await asyncio.wait_for(
-                        self._stop_event.wait(),
-                        timeout=delay if delay is not None else backoff.next_delay(),  # type: ignore[union-attr]
+                        stop_event.wait(),
+                        timeout=delay if delay is not None else backoff.next_delay(),
                     )
                     return
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
     async def _stream_generator(self, gen_stop: asyncio.Event):
@@ -269,15 +268,13 @@ class NotificationPublisher:
         while not self._closed and not gen_stop.is_set():
             try:
                 item = await asyncio.wait_for(self._queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except asyncio.CancelledError:
                 return
             if item is _SENTINEL:
-                try:
+                with contextlib.suppress(asyncio.QueueFull):
                     self._queue.put_nowait(_SENTINEL)
-                except asyncio.QueueFull:
-                    pass
                 return
             yield item
 

@@ -1,5 +1,5 @@
 """
-ZequentClient – top-level facade for all Zequent Framework services.
+ZequentClient - top-level facade for all Zequent Framework services.
 
 Mirrors the Java client SDK (``com.zqnt.sdk.client.ZequentClient``) so that
 ``.env`` files and configuration concepts are interchangeable between the
@@ -106,12 +106,12 @@ class ZequentClient:
         self._closed = False
 
         # Lazy sub-clients.
-        self._commands: "CommandsClient | None" = None
-        self._connector: "ConnectorClient | None" = None
-        self._mission_autonomy: "MissionAutonomyClient | None" = None
-        self._telemetry: "TelemetryClient | None" = None
-        self._live_streams: "LiveStreamsClient | None" = None
-        self._simulations: "SimulationsClient | None" = None
+        self._commands: CommandsClient | None = None
+        self._connector: ConnectorClient | None = None
+        self._mission_autonomy: MissionAutonomyClient | None = None
+        self._telemetry: TelemetryClient | None = None
+        self._live_streams: LiveStreamsClient | None = None
+        self._simulations: SimulationsClient | None = None
 
         logger.info("ZequentClient initialized with %d channels", len(self._channels))
 
@@ -120,7 +120,7 @@ class ZequentClient:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_env(cls, **overrides: Any) -> "ZequentClient":
+    def from_env(cls, **overrides: Any) -> ZequentClient:
         """Build a client from environment variables.
 
         Honours the same variable names as the Java and Go SDKs: ``<SERVICE>_HOST``, ``_PORT`` and
@@ -167,7 +167,7 @@ class ZequentClient:
     # ------------------------------------------------------------------
 
     @property
-    def commands(self) -> "CommandsClient":
+    def commands(self) -> CommandsClient:
         """Command any asset by id: ``list_capabilities(asset)`` and
         ``execute_command(asset, command_id, params)``, plus command events and cancel. The command
         API of Zequent 3.0."""
@@ -178,7 +178,7 @@ class ZequentClient:
         return self._commands
 
     @property
-    def telemetry(self) -> "TelemetryClient":
+    def telemetry(self) -> TelemetryClient:
         """Live data of Zequent 3.0: telemetry samples and source status (``watch_telemetry``),
         detections (``watch_detections``) and alerts (``watch_alerts``)."""
         if self._telemetry is None:
@@ -188,7 +188,7 @@ class ZequentClient:
         return self._telemetry
 
     @property
-    def live_streams(self) -> "LiveStreamsClient":
+    def live_streams(self) -> LiveStreamsClient:
         """The live video streams of the organization (``list_live_streams``), Zequent 3.0."""
         if self._live_streams is None:
             from .live_streams.client import LiveStreamsClient
@@ -197,7 +197,7 @@ class ZequentClient:
         return self._live_streams
 
     @property
-    def simulations(self) -> "SimulationsClient":
+    def simulations(self) -> SimulationsClient:
         """Simulated runs of an Application on a virtual fleet (``start_simulation``,
         ``simulation_trace``, ``cancel_simulation``, ``wait_for_simulation``), Zequent 3.0."""
         if self._simulations is None:
@@ -207,7 +207,7 @@ class ZequentClient:
         return self._simulations
 
     @property
-    def connector(self) -> "ConnectorClient":
+    def connector(self) -> ConnectorClient:
         if self._connector is None:
             from .connector.client import ConnectorClient
 
@@ -215,7 +215,7 @@ class ZequentClient:
         return self._connector
 
     @property
-    def mission_autonomy(self) -> "MissionAutonomyClient":
+    def mission_autonomy(self) -> MissionAutonomyClient:
         if self._mission_autonomy is None:
             from .mission_autonomy.client import MissionAutonomyClient
 
@@ -240,7 +240,7 @@ class ZequentClient:
         logger.info("Shutting down ZequentClient (%d channels)", len(self._channels))
         for channel in self._channels:
             try:
-                await channel.close()
+                await channel.close(None)
             except Exception:  # pragma: no cover - defensive
                 logger.exception("Error closing gRPC channel")
         logger.info("ZequentClient closed")

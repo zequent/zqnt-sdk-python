@@ -1,2 +1,31 @@
 [tool.uv.workspace]
 members = ["edge", "client"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["edge", "client"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"edge/edge_sdk/server/edge_server.py" = ["N802"]  # gRPC servicer methods must match PascalCase proto names
+"edge/edge_sdk/server/edge_server_v3.py" = ["N802"]
+"edge/tests/integration/test_v3_platform_calls.py" = ["N802"]  # fake platform servicers
+"edge/tests/integration/test_edge_node_attach.py" = ["N802"]  # fake Edge Node servicers
+"client/client_sdk/mission_autonomy/_converters.py" = ["N806"]  # local aliases for nested protobuf classes keep the proto names
+"client/client_sdk/grpc_/resilience.py" = ["N818"]  # CircuitBreakerOpen is a state name, not a generic error
+
+[tool.pyright]
+include = ["edge/edge_sdk", "edge/tests", "client/client_sdk", "client/tests", "client/main.py"]
+exclude = ["**/*_pb2.py", "**/*_pb2_grpc.py", "**/*_pb2.pyi", "**/*_pb2_grpc.pyi", "**/.venv", "**/__pycache__"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
+executionEnvironments = [
+    { root = "edge" },
+    { root = "client" },
+]

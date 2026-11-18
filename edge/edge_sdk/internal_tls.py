@@ -54,7 +54,7 @@ class InternalTls:
     ca_file: str = DEFAULT_CA_FILE
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> "InternalTls":
+    def from_env(cls, env: Mapping[str, str] | None = None) -> InternalTls:
         source = os.environ if env is None else env
         return cls(
             enabled=_is_true(source.get(ENABLED_ENV)),
@@ -62,7 +62,7 @@ class InternalTls:
         )
 
     @classmethod
-    def off(cls) -> "InternalTls":
+    def off(cls) -> InternalTls:
         return cls(enabled=False)
 
     def ca_bytes(self) -> bytes:

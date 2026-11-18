@@ -4,9 +4,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import grpc
+import grpc.aio
 import pytest
 from zqnt_api.generated.zqnt import common_pb2
 
@@ -18,7 +19,13 @@ from client_sdk.grpc_.resilience import GrpcResilience
 
 class _FakeAioRpcError(grpc.aio.AioRpcError):
     def __init__(self, code: grpc.StatusCode) -> None:
-        super().__init__(code, initial_metadata=None, trailing_metadata=None, details="boom")
+        super().__init__(
+            code,
+            initial_metadata=grpc.aio.Metadata(),
+            trailing_metadata=grpc.aio.Metadata(),
+            details="boom",
+            debug_error_string=None,
+        )
 
 
 class _FlakyStub:
@@ -43,7 +50,7 @@ class _FlakyStub:
 
 def _build_client(stub: Any, max_retries: int = 3) -> ConnectorClient:
     c = ConnectorClient.__new__(ConnectorClient)
-    c._channel = None
+    c._channel = cast(Any, None)
     c._resilience = ResilienceConfig(
         max_retry_attempts=max_retries,
         retry_delay_millis=1,

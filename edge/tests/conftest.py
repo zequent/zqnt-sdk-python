@@ -14,7 +14,7 @@ Design decisions:
 import asyncio
 import socket
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -84,7 +84,7 @@ class _RegistryOnlyAdapter(EdgeAdapter):
 
 
 class _CrashingAdapter(_TestAdapter):
-    """Adapter that deliberately raises exceptions – for error-handling tests."""
+    """Adapter that deliberately raises exceptions - for error-handling tests."""
 
     async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
         raise RuntimeError("hardware exploded")
@@ -107,12 +107,12 @@ def _free_port() -> int:
 # ---------------------------------------------------------------------------
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def test_adapter() -> _TestAdapter:
     return _TestAdapter()
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def crashing_adapter() -> _CrashingAdapter:
     return _CrashingAdapter()
 
@@ -146,7 +146,7 @@ async def crashing_server_port(crashing_adapter):
         await task
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def registry_adapter() -> _RegistryOnlyAdapter:
     return _RegistryOnlyAdapter()
 
@@ -165,7 +165,7 @@ async def registry_server_port(registry_adapter):
 
 
 def make_ctx(tid: str = "test-tid", sn: str = "TEST-001") -> RequestContext:
-    return RequestContext(tid=tid, sn=sn, timestamp=datetime.now(tz=timezone.utc))
+    return RequestContext(tid=tid, sn=sn, timestamp=datetime.now(tz=UTC))
 
 
 @pytest.fixture(autouse=True)

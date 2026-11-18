@@ -65,7 +65,7 @@ async def test_tls_with_the_ca_file_carries_the_client_token(tls_server):
     try:
         assert await _call(channel) == "Bearer client-token"
     finally:
-        await channel.close()
+        await channel.close(None)
 
 
 async def test_another_ca_is_refused(tls_server, tmp_path):
@@ -77,7 +77,7 @@ async def test_another_ca_is_refused(tls_server, tmp_path):
             await _call(channel)
         assert refused.value.code() == grpc.StatusCode.UNAVAILABLE
     finally:
-        await channel.close()
+        await channel.close(None)
 
 
 def test_a_missing_ca_file_fails_when_the_channel_is_built(tmp_path):

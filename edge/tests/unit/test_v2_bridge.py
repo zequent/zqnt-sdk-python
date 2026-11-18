@@ -4,6 +4,8 @@ the platform's execution id and with text converted to the published types. Free
 go to ``legacy_custom_command``, never reached from v3.
 """
 
+from typing import Any
+
 from google.protobuf import struct_pb2
 from zqnt_api.generated.zqnt import common_pb2 as common_v2
 from zqnt_api.generated.zqnt.capability.v3 import command_pb2
@@ -15,6 +17,22 @@ from edge_sdk.adapter.validation import convert_text
 from edge_sdk.models.common import CustomCommandResponse
 from edge_sdk.server.edge_server import _EdgeAdapterServicer
 from edge_sdk.server.edge_server_v3 import NOT_SUPPORTED_CODE, EdgeAdapterV3Servicer
+
+
+class _FakeContext:
+    """Stands in for grpc.aio.ServicerContext; these calls never abort."""
+
+    async def abort(self, code, details):
+        raise AssertionError(f"aborted: {code} {details}")
+
+
+def _context() -> Any:
+    return _FakeContext()
+
+
+def _v2(adapter: EdgeAdapter) -> _EdgeAdapterServicer:
+    return _EdgeAdapterServicer(adapter)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+
 
 EXECUTION_ID = "capexec:exec-1:node-1"
 
@@ -87,7 +105,7 @@ def _execute(command_id: str, params: dict | None = None) -> edge_v3.ExecuteComm
 async def test_v3_refuses_an_unpublished_id_even_when_the_adapter_takes_free_form_commands():
     adapter = _LegacyAdapter()
 
-    response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(_execute("mode_change"), None)
+    response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(_execute("mode_change"), _context())
 
     assert response.result.state == command_pb2.COMMAND_STATE_REJECTED
     assert response.result.error.code == NOT_SUPPORTED_CODE
@@ -97,7 +115,7 @@ async def test_v3_refuses_an_unpublished_id_even_when_the_adapter_takes_free_for
 async def test_v2_hands_an_unpublished_id_to_the_legacy_hook():
     adapter = _LegacyAdapter()
 
-    response = await _EdgeAdapterServicer(adapter).SendCustomCommand(_custom("Start Test"), None)
+    response = await _v2(adapter).SendCustomCommand(_custom("Start Test"), _context())
 
     assert not response.has_errors
     assert adapter.legacy == ["Start Test"]
@@ -106,7 +124,7 @@ async def test_v2_hands_an_unpublished_id_to_the_legacy_hook():
 async def test_the_legacy_hook_refuses_by_default():
     adapter = _Adapter()
 
-    response = await _EdgeAdapterServicer(adapter).SendCustomCommand(_custom("Start Test"), None)
+    response = await _v2(adapter).SendCustomCommand(_custom("Start Test"), _context())
 
     assert response.has_errors
     assert "not supported" in response.error.error_message
@@ -116,7 +134,7 @@ async def test_the_legacy_hook_refuses_by_default():
 async def test_a_published_id_never_reaches_the_legacy_hook():
     adapter = _LegacyAdapter()
 
-    await _EdgeAdapterServicer(adapter).SendCustomCommand(_custom("vendor.acme.spray", {"seconds": 3}), None)
+    await _v2(adapter).SendCustomCommand(_custom("vendor.acme.spray", {"seconds": 3}), _context())
 
     assert adapter.legacy == []
     assert adapter.calls == [(EXECUTION_ID, {"seconds": 3})]
@@ -125,7 +143,7 @@ async def test_a_published_id_never_reaches_the_legacy_hook():
 async def test_v2_custom_command_hands_the_execution_id_to_the_handler():
     adapter = _Adapter()
 
-    await _EdgeAdapterServicer(adapter).SendCustomCommand(_custom("vendor.acme.spray", {"seconds": 3}), None)
+    await _v2(adapter).SendCustomCommand(_custom("vendor.acme.spray", {"seconds": 3}), _context())
 
     assert adapter.calls[0][0] == EXECUTION_ID
 
@@ -136,7 +154,7 @@ async def test_v2_typed_call_hands_the_execution_id_to_the_handler():
         base=_base(), coordinate=common_v2.GeoCoordinate(latitude=52.5, longitude=13.4, altitude=30.0)
     )
 
-    response = await _EdgeAdapterServicer(adapter).TakeOff(request, None)
+    response = await _v2(adapter).TakeOff(request, _context())
 
     assert not response.has_errors
     assert adapter.calls[0][0] == EXECUTION_ID
@@ -148,7 +166,7 @@ async def test_a_v2_call_without_an_execution_id_has_none():
         base=_base(external_id=None), command_id="vendor.acme.spray", params=_struct({"seconds": 3})
     )
 
-    await _EdgeAdapterServicer(adapter).SendCustomCommand(request, None)
+    await _v2(adapter).SendCustomCommand(request, _context())
 
     assert adapter.calls[0][0] is None
 
@@ -157,7 +175,7 @@ async def test_v2_converts_text_to_the_published_types():
     adapter = _Adapter()
     text = {"seconds": "5", "pressure": " 52.5200 ", "dry_run": "TRUE", "nozzle": "wide", "label": "0123"}
 
-    response = await _EdgeAdapterServicer(adapter).SendCustomCommand(_custom("vendor.acme.spray", text), None)
+    response = await _v2(adapter).SendCustomCommand(_custom("vendor.acme.spray", text), _context())
 
     assert not response.has_errors
     params = adapter.calls[0][1]
@@ -169,7 +187,7 @@ async def test_v3_keeps_text_as_text():
     adapter = _Adapter()
 
     response = await EdgeAdapterV3Servicer(adapter).ExecuteCommand(
-        _execute("vendor.acme.spray", {"seconds": "5", "nozzle": "wide"}), None
+        _execute("vendor.acme.spray", {"seconds": "5", "nozzle": "wide"}), _context()
     )
 
     assert response.result.state == command_pb2.COMMAND_STATE_REJECTED
@@ -180,9 +198,7 @@ async def test_v3_keeps_text_as_text():
 async def test_v2_still_refuses_text_that_is_not_exactly_the_published_type():
     adapter = _Adapter()
 
-    response = await _EdgeAdapterServicer(adapter).SendCustomCommand(
-        _custom("vendor.acme.spray", {"seconds": "3.5"}), None
-    )
+    response = await _v2(adapter).SendCustomCommand(_custom("vendor.acme.spray", {"seconds": "3.5"}), _context())
 
     assert response.has_errors
     assert "params.seconds must be integer, got string" in response.error.error_message
@@ -190,9 +206,7 @@ async def test_v2_still_refuses_text_that_is_not_exactly_the_published_type():
 
 
 async def test_v2_typed_call_keeps_the_handler_message():
-    response = await _EdgeAdapterServicer(_Adapter()).StopTask(
-        common_v2.TaskCommandRequest(base=_base(), task_id="task-1"), None
-    )
+    response = await _v2(_Adapter()).StopTask(common_v2.TaskCommandRequest(base=_base(), task_id="task-1"), _context())
 
     assert not response.has_errors
     assert response.meta.response_message == "detection stopped"

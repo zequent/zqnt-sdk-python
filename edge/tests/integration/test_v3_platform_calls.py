@@ -141,8 +141,10 @@ async def _serve(v3: bool):
     if v3:
         edge_v3_grpc.add_EdgeGatewayServiceServicer_to_server(_Gateway(platform), server)
         telemetry_pb2_grpc.add_TelemetryIngestServiceServicer_to_server(_Ingest(platform), server)
-    live_data_pb2_grpc.add_LiveDataServiceServicer_to_server(_LiveDataV2(platform), server)
-    remote_control_pb2_grpc.add_RemoteControlServiceServicer_to_server(_RemoteControlV2(platform), server)
+    live_data = _LiveDataV2(platform)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+    live_data_pb2_grpc.add_LiveDataServiceServicer_to_server(live_data, server)
+    remote_control = _RemoteControlV2(platform)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+    remote_control_pb2_grpc.add_RemoteControlServiceServicer_to_server(remote_control, server)
     port = _free_port()
     server.add_insecure_port(f"localhost:{port}")
     await server.start()

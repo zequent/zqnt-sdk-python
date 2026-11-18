@@ -1,5 +1,5 @@
 """
-MissionAutonomyClient – thin wrapper around the MissionAutonomyService gRPC stub.
+MissionAutonomyClient - thin wrapper around the MissionAutonomyService gRPC stub.
 
 Mirrors :java:`com.zqnt.sdk.edge.missionautonomy.application.MissionAutonomyService` — the
 edge-side surface is deliberately tiny. Mission/Task CRUD was retired from MissionAutonomyService
@@ -21,10 +21,14 @@ All calls carry a per-call timeout (default 30 s) and retry automatically on tra
 import asyncio
 import logging
 import uuid
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from ..auth import default_edge_token, platform_channel
 from ..models.scheduler import SchedulerDTO
+
+if TYPE_CHECKING:
+    from zqnt_api.generated.zqnt.mission_autonomy_pb2_grpc import MissionAutonomyServiceAsyncStub
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +61,7 @@ class MissionAutonomyClient:
         self._call_timeout = call_timeout
         self._max_retries = max_retries
         self._channel = None
-        self._stub = None
+        self._stub: MissionAutonomyServiceAsyncStub | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -74,7 +78,7 @@ class MissionAutonomyClient:
     async def close(self) -> None:
         """Close the channel and release resources."""
         if self._channel:
-            await self._channel.close()
+            await self._channel.close(None)
             self._channel = None
             self._stub = None
             logger.info("MissionAutonomyClient closed")
@@ -92,7 +96,7 @@ class MissionAutonomyClient:
             "GetScheduler",
             tid,
             sn,
-            lambda: self._stub.GetScheduler(
+            lambda: self._ensure_connected().GetScheduler(
                 mission_autonomy_contracts_pb2.GetSchedulerRequest(base=self._base(tid, sn), scheduler_id=scheduler_id),
                 timeout=self._call_timeout,
             ),
@@ -105,9 +109,10 @@ class MissionAutonomyClient:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _ensure_connected(self) -> None:
+    def _ensure_connected(self) -> "MissionAutonomyServiceAsyncStub":
         if self._stub is None:
             raise RuntimeError("MissionAutonomyClient not connected. Call connect() first.")
+        return self._stub
 
     async def _call(self, operation: str, tid: str, sn: str, fn: Callable) -> Any:
         """Execute a gRPC call with retry on transient errors (UNAVAILABLE / DEADLINE_EXCEEDED)."""

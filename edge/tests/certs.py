@@ -16,7 +16,7 @@ def write_self_signed(directory: Path, name: str = "localhost") -> tuple[Path, P
     """Writes ``<directory>/<name>.crt`` and ``<name>.key`` (EC P-256, SAN localhost + 127.0.0.1)."""
     key = ec.generate_private_key(ec.SECP256R1())
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject)

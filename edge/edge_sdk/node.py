@@ -20,6 +20,7 @@ port is served, and a call over TCP would still be verified.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import logging
 import os
@@ -65,7 +66,7 @@ class EdgeNodeConfig:
         object.__setattr__(self, "adapter_socket", os.path.abspath(self.adapter_socket))
 
     @classmethod
-    def from_env(cls) -> "EdgeNodeConfig | None":
+    def from_env(cls) -> EdgeNodeConfig | None:
         """The attach from the environment; None when neither socket is set (direct mode)."""
         node = os.getenv(NODE_SOCKET_ENV) or ""
         adapter = os.getenv(ADAPTER_SOCKET_ENV) or ""
@@ -108,7 +109,7 @@ class _MetadataUnaryUnary(_Metadata, grpc.aio.UnaryUnaryClientInterceptor):
 
 class _MetadataUnaryStream(_Metadata, grpc.aio.UnaryStreamClientInterceptor):
     async def intercept_unary_stream(self, continuation, client_call_details, request):
-        return await continuation(self._details(client_call_details), request)
+        return await continuation(self._details(client_call_details), request)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 class _MetadataStreamUnary(_Metadata, grpc.aio.StreamUnaryClientInterceptor):
@@ -118,7 +119,7 @@ class _MetadataStreamUnary(_Metadata, grpc.aio.StreamUnaryClientInterceptor):
 
 class _MetadataStreamStream(_Metadata, grpc.aio.StreamStreamClientInterceptor):
     async def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
-        return await continuation(self._details(client_call_details), request_iterator)
+        return await continuation(self._details(client_call_details), request_iterator)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 def metadata_interceptors(pairs: Sequence[tuple[str, str]]) -> list:
@@ -153,10 +154,8 @@ def bind_adapter_socket(server: grpc.aio.Server, config: EdgeNodeConfig) -> str:
         os.chmod(bound, config.socket_mode)
         os.replace(bound, path)
     finally:
-        try:
+        with contextlib.suppress(OSError):
             os.rmdir(private)
-        except OSError:
-            pass
     return path
 
 
@@ -203,7 +202,7 @@ class QueueStats:
         return lane.throttle if lane is not None else 1.0
 
     @classmethod
-    def from_struct(cls, s: struct_pb2.Struct) -> "QueueStats":
+    def from_struct(cls, s: struct_pb2.Struct) -> QueueStats:
         fields = s.fields
         lanes = []
         for value in fields["lanes"].list_value.values if "lanes" in fields else ():
@@ -274,7 +273,7 @@ class NodeQueueClient:
 
     async def close(self) -> None:
         if self._channel is not None:
-            await self._channel.close()
+            await self._channel.close(None)
             self._channel = None
 
 

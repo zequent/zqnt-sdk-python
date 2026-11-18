@@ -18,11 +18,12 @@ from client_sdk.config.service_config import ServiceConfig
 
 class FakeLiveStreams(live_stream_pb2_grpc.LiveStreamServiceServicer):
     def __init__(self) -> None:
+        self.port = 0
         self.request: live_stream_pb2.ListLiveStreamsRequest | None = None
         self.refuse_with: tuple[grpc.StatusCode, str] | None = None
         self.streams: list[live_stream_pb2.LiveStream] = []
 
-    async def ListLiveStreams(self, request, context):  # noqa: N802
+    async def ListLiveStreams(self, request, context: grpc.aio.ServicerContext):  # noqa: N802
         self.request = request
         if self.refuse_with is not None:
             await context.abort(*self.refuse_with)
@@ -72,6 +73,7 @@ async def test_lists_the_live_streams_of_the_organization(client: LiveStreamsCli
     assert streams[0].path == "live/DOCK-1/drone"
     assert streams[0].since.ToDatetime(tzinfo=UTC) == since
     assert streams[0].viewers == 2
+    assert fake.request is not None
     assert fake.request.context.request_id
 
 

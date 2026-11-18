@@ -1,6 +1,7 @@
 """Platform <-> adapter authentication (edge_sdk.auth) — 2026-09-30 security review SAST-3."""
 
 import grpc
+import grpc.aio
 import pytest
 
 from edge_sdk.auth import (
@@ -56,20 +57,27 @@ class TestVerifier:
             PlatformTokenVerifier("not-a-key")
 
 
+def _refused(result: tuple[grpc.StatusCode, str] | None) -> tuple[grpc.StatusCode, str]:
+    assert result is not None
+    return result
+
+
 class TestServerInterceptor:
     async def test_no_token_is_refused(self):
-        code, _ = await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, ())
+        code, _ = _refused(await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, ()))
         assert code == grpc.StatusCode.UNAUTHENTICATED
 
     async def test_a_valid_token_passes(self):
         assert await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, _bearer(token(KEY))) is None
 
     async def test_a_forged_token_is_refused(self):
-        code, _ = await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, _bearer(token(OTHER_KEY)))
+        code, _ = _refused(
+            await _interceptor(platform_public_key=public_key_b64(KEY)).check(METHOD, _bearer(token(OTHER_KEY)))
+        )
         assert code == grpc.StatusCode.UNAUTHENTICATED
 
     async def test_without_a_public_key_everything_is_refused(self):
-        code, details = await _interceptor().check(METHOD, _bearer(token(KEY)))
+        code, details = _refused(await _interceptor().check(METHOD, _bearer(token(KEY))))
         assert code == grpc.StatusCode.UNAUTHENTICATED
         assert "ZQNT_PLATFORM_PUBLIC_KEY" in details
 
@@ -105,6 +113,6 @@ class TestClientInterceptor:
             return "ok"
 
         details = grpc.aio.ClientCallDetails("/zqnt.LiveDataService/ProduceTelemetry", None, None, None, None)
-        result = await _BearerUnaryUnary("edge-token").intercept_unary_unary(continuation, details, object())
+        result = await _BearerUnaryUnary("edge-token").intercept_unary_unary(continuation, details, object())  # pyright: ignore[reportArgumentType] - grpc-stubs types the continuation as returning a call
         assert result == "ok"
         assert ("authorization", "Bearer edge-token") in seen["metadata"]

@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 _LB_POLICY_MAP: dict[LoadBalancerType, str] = {
     LoadBalancerType.ROUND_ROBIN: "round_robin",
-    # gRPC core has no native "random" or "least_request" – fall back to
+    # gRPC core has no native "random" or "least_request" - fall back to
     # round_robin which is the closest stateless equivalent.
     LoadBalancerType.RANDOM: "round_robin",
     LoadBalancerType.LEAST_REQUESTS: "round_robin",

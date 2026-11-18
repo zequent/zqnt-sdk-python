@@ -12,7 +12,7 @@ import asyncio
 import grpc
 import grpc.aio
 import pytest
-from zqnt_api.generated.zqnt import (  # type: ignore[import]
+from zqnt_api.generated.zqnt import (
     connector_pb2,
     connector_pb2_grpc,
 )
@@ -27,7 +27,7 @@ from client_sdk.config.service_config import ServiceConfig
 
 class _Recorder:
     def __init__(self) -> None:
-        self.headers: list[list[str]] = []
+        self.headers: list[list[str | bytes]] = []
         self.refuse: tuple[grpc.StatusCode, str] | None = None
 
     async def check(self, context: grpc.aio.ServicerContext) -> None:
@@ -60,8 +60,10 @@ class _Telemetry(telemetry_pb2_grpc.TelemetryServiceServicer):
 async def server():
     recorder = _Recorder()
     srv = grpc.aio.server()
-    connector_pb2_grpc.add_ConnectorServiceServicer_to_server(_Connector(recorder), srv)
-    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(_Telemetry(recorder), srv)
+    connector = _Connector(recorder)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+    connector_pb2_grpc.add_ConnectorServiceServicer_to_server(connector, srv)
+    telemetry = _Telemetry(recorder)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(telemetry, srv)
     port = srv.add_insecure_port("127.0.0.1:0")
     await srv.start()
     yield recorder, port
@@ -93,7 +95,7 @@ class _ForwardingStream(grpc.aio.UnaryStreamClientInterceptor):
         self.token = token
 
     async def intercept_unary_stream(self, continuation, client_call_details, request):
-        return await continuation(_with_bearer(client_call_details, self.token()), request)
+        return await continuation(_with_bearer(client_call_details, self.token()), request)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 def _client(port: int, token: str | None, interceptors=()) -> ZequentClient:
@@ -158,7 +160,7 @@ async def test_a_refused_host_credential_is_still_explained(server, monkeypatch)
         with pytest.raises(ZequentAuthError) as refused:
             await client.connector.list_skill_contracts()
     assert refused.value.code() == grpc.StatusCode.UNAUTHENTICATED
-    assert "Invalid token" in refused.value.details()
+    assert "Invalid token" in (refused.value.details() or "")
 
 
 _SERVICE_VARS = [

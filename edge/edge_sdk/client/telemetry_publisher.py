@@ -1,5 +1,5 @@
 """
-TelemetryPublisher – sends asset / sub-asset telemetry to the ZQNT
+TelemetryPublisher - sends asset / sub-asset telemetry to the ZQNT
 LiveDataService using the ``ProduceTelemetry`` client-streaming RPC.
 
 The publisher keeps a long-lived gRPC stream open and feeds it from an
@@ -24,6 +24,7 @@ silently dropped when the buffer is full::
 """
 
 import asyncio
+import contextlib
 import logging
 import uuid
 
@@ -79,7 +80,7 @@ class TelemetryPublisher:
 
     async def connect(self) -> None:
         """Open the channel and start the background streaming / reconnect task."""
-        import grpc.aio  # noqa: F401 – verify availability
+        import grpc.aio  # noqa: F401 - verify availability
         from zqnt_api.generated.zqnt import live_data_pb2_grpc  # noqa: F401
 
         self._closed = False
@@ -95,19 +96,15 @@ class TelemetryPublisher:
             self._stop_event.set()
         if self._queue:
             # Wake up the generator so it can exit cleanly.
-            try:
+            with contextlib.suppress(asyncio.QueueFull):
                 self._queue.put_nowait(_SENTINEL)
-            except asyncio.QueueFull:
-                pass
         if self._stream_task:
             try:
                 await asyncio.wait_for(self._stream_task, timeout=10.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._stream_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._stream_task
-                except asyncio.CancelledError:
-                    pass
         logger.info("TelemetryPublisher closed (sn=%s)", self._sn)
 
     # ------------------------------------------------------------------
@@ -135,7 +132,7 @@ class TelemetryPublisher:
             logger.debug("Telemetry queue full, dropping sub-asset frame (sn=%s)", self._sn)
 
     # ------------------------------------------------------------------
-    # Internal – reconnect loop
+    # Internal - reconnect loop
     # ------------------------------------------------------------------
 
     async def _run_stream(self) -> None:
@@ -146,6 +143,8 @@ class TelemetryPublisher:
         from zqnt_api.generated.zqnt import live_data_pb2_grpc
 
         backoff = ReconnectBackoff(self._BACKOFF_INITIAL, self._BACKOFF_MAX)
+        stop_event = self._stop_event
+        assert stop_event is not None
 
         while not self._closed:
             # Each attempt gets its own stop signal so stale generators exit promptly.
@@ -189,17 +188,17 @@ class TelemetryPublisher:
             finally:
                 gen_stop.set()
                 if channel:
-                    await channel.close()
+                    await channel.close(None)
 
             if not self._closed:
                 # Wait for backoff duration; stop immediately if close() is called.
                 try:
                     await asyncio.wait_for(
-                        self._stop_event.wait(),
-                        timeout=delay if delay is not None else backoff.next_delay(),  # type: ignore[union-attr]
+                        stop_event.wait(),
+                        timeout=delay if delay is not None else backoff.next_delay(),
                     )
                     return  # stop_event was set → close() called
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
     async def _stream_generator(self, gen_stop: asyncio.Event):
@@ -213,16 +212,14 @@ class TelemetryPublisher:
         while not self._closed and not gen_stop.is_set():
             try:
                 item = await asyncio.wait_for(self._queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except asyncio.CancelledError:
                 return
             if item is _SENTINEL:
                 # Restore SENTINEL so close() can detect it too.
-                try:
+                with contextlib.suppress(asyncio.QueueFull):
                     self._queue.put_nowait(_SENTINEL)
-                except asyncio.QueueFull:
-                    pass
                 return
             yield item
 

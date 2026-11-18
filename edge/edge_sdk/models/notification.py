@@ -29,7 +29,7 @@ class MissionEvent:
     mission_id: str
     mission_type: MissionType
     status: MissionStatus
-    sn: str = ""  # asset serial number – required for multi-asset adapters
+    sn: str = ""  # asset serial number - required for multi-asset adapters
     message: str | None = None
 
 
@@ -39,9 +39,9 @@ class CommandExecutionEvent:
 
     external_execution_id: str
     status: CommandExecutionStatus
-    sn: str = ""  # asset serial number – required for multi-asset adapters
+    sn: str = ""  # asset serial number - required for multi-asset adapters
     command_id: str | None = None
-    progress: float | None = None  # 0.0 – 1.0, present when RUNNING
+    progress: float | None = None  # 0.0 - 1.0, present when RUNNING
     message: str | None = None
     # What the command produced, on SUCCEEDED. mission-autonomy completes a skill node that is
     # waiting on this execution with it as the node's output, so later nodes can map from it
