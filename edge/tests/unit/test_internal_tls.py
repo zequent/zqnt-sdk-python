@@ -3,6 +3,7 @@
 import ssl
 
 import grpc
+import grpc.aio
 import pytest
 
 from edge_sdk.internal_tls import DEFAULT_CA_FILE, InternalTls
@@ -57,7 +58,7 @@ class TestCredentials:
     async def test_off_is_a_plaintext_channel_without_touching_the_file(self, tmp_path):
         channel = InternalTls(enabled=False, ca_file=str(tmp_path / "nope.crt")).aio_channel("localhost:1")
         assert isinstance(channel, grpc.aio.Channel)
-        await channel.close()
+        await channel.close(None)
 
 
 class TestSslContext:
@@ -69,7 +70,7 @@ class TestSslContext:
         context = InternalTls(enabled=True, ca_file=str(cert)).ssl_context()
         assert isinstance(context, ssl.SSLContext)
         assert context.verify_mode == ssl.CERT_REQUIRED
-        subjects = [dict(x[0] for x in c["subject"]) for c in context.get_ca_certs()]
+        subjects = [dict(x[0] for x in c["subject"]) for c in context.get_ca_certs()]  # pyright: ignore[reportArgumentType, reportCallIssue] - typeshed types every certificate field as one union
         assert {"commonName": "localhost"} in subjects
 
     def test_on_with_a_missing_file_fails(self, tmp_path):

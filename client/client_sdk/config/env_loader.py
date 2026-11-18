@@ -15,7 +15,7 @@ verified against the installation's CA, ``ZQNT_INTERNAL_TLS_CA`` (default
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Type
+from typing import TYPE_CHECKING, Any
 
 from .resilience import ResilienceConfig
 from .service_config import LoadBalancerType, ServiceConfig
@@ -90,7 +90,7 @@ def _resilience() -> ResilienceConfig:
     )
 
 
-def load_from_env(cls: "Type[ZequentClient]", **overrides: Any) -> "ZequentClient":
+def load_from_env(cls: type[ZequentClient], **overrides: Any) -> ZequentClient:
     """``overrides`` win over the environment (``client_token``, ``interceptors``, one service's config)."""
     kwargs: dict[str, Any] = {
         "connector_config": _service("CONNECTOR_SERVICE", "connector"),

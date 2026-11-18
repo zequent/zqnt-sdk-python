@@ -8,6 +8,7 @@ are collected for a moment and sent once per asset. A failed report is retried l
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 
 from ..adapter.base import EdgeAdapter
@@ -42,10 +43,8 @@ class CapabilityReporter:
         self._started = False
         if self._task is not None:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def flush(self) -> None:

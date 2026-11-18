@@ -54,7 +54,7 @@ async def test_platform_channel_is_opened_with_the_keepalive_options(monkeypatch
         assert seen["options"]["grpc.keepalive_permit_without_calls"] == 1
         assert seen["options"]["grpc.http2.max_pings_without_data"] == 0
     finally:
-        await channel.close()
+        await channel.close(None)
 
 
 def _with_spy(spy):

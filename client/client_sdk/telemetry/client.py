@@ -11,6 +11,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Iterable
 from datetime import timedelta
+from typing import cast
 
 import grpc
 import grpc.aio
@@ -80,7 +81,9 @@ class TelemetryClient:
         :meth:`watch_telemetry`.
         """
         request = telemetry_pb2.WatchAlertsRequest(
-            context=_context(), assets=_assets(asset_sns), min_severity=min_severity
+            context=_context(),
+            assets=_assets(asset_sns),
+            min_severity=cast(telemetry_pb2.AlertSeverity, min_severity),
         )
         return _watch(self._stub.WatchAlerts, request, ("alert",), heartbeat_timeout)
 
@@ -99,7 +102,7 @@ async def _watch(rpc, request, items: tuple[str, ...], heartbeat_timeout: timede
                     category=common_pb2.ERROR_CATEGORY_SERVICE,
                     retryable=True,
                 ) from None
-            if response is grpc.aio.EOF:
+            if response is grpc.aio.EOF:  # pyright: ignore[reportAttributeAccessIssue] - grpc-stubs lacks aio.EOF
                 return
             item = response.WhichOneof("item")
             if item in items:

@@ -6,7 +6,7 @@ import enum
 from dataclasses import dataclass
 
 
-class LoadBalancerType(str, enum.Enum):
+class LoadBalancerType(enum.StrEnum):
     ROUND_ROBIN = "ROUND_ROBIN"
     RANDOM = "RANDOM"
     LEAST_REQUESTS = "LEAST_REQUESTS"

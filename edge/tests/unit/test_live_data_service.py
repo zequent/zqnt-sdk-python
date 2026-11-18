@@ -29,30 +29,35 @@ def _service() -> LiveDataService:
     return svc
 
 
+def _mock(method: object) -> AsyncMock:
+    assert isinstance(method, AsyncMock)
+    return method
+
+
 @pytest.mark.asyncio
 async def test_connect_opens_all_three_streams() -> None:
     svc = _service()
     await svc.connect()
-    svc.telemetry.connect.assert_awaited_once()
-    svc.detection.connect.assert_awaited_once()
-    svc.notification.connect.assert_awaited_once()
+    _mock(svc.telemetry.connect).assert_awaited_once()
+    _mock(svc.detection.connect).assert_awaited_once()
+    _mock(svc.notification.connect).assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_close_closes_all_three_streams() -> None:
     svc = _service()
     await svc.close()
-    svc.telemetry.close.assert_awaited_once()
-    svc.detection.close.assert_awaited_once()
-    svc.notification.close.assert_awaited_once()
+    _mock(svc.telemetry.close).assert_awaited_once()
+    _mock(svc.detection.close).assert_awaited_once()
+    _mock(svc.notification.close).assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_context_manager_connects_and_closes() -> None:
     svc = _service()
     async with svc:
-        svc.telemetry.connect.assert_awaited_once()
-    svc.telemetry.close.assert_awaited_once()
+        _mock(svc.telemetry.connect).assert_awaited_once()
+    _mock(svc.telemetry.close).assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -62,10 +67,10 @@ async def test_produce_telemetry_dispatches_by_type() -> None:
     sub_t = SubAssetTelemetry(id="DRONE-1")
 
     await svc.produce_telemetry(asset_t)
-    svc.telemetry.publish_asset_telemetry.assert_awaited_once_with(asset_t)
+    _mock(svc.telemetry.publish_asset_telemetry).assert_awaited_once_with(asset_t)
 
     await svc.produce_telemetry(sub_t)
-    svc.telemetry.publish_subasset_telemetry.assert_awaited_once_with(sub_t)
+    _mock(svc.telemetry.publish_subasset_telemetry).assert_awaited_once_with(sub_t)
 
 
 @pytest.mark.asyncio
@@ -74,15 +79,15 @@ async def test_produce_notification_dispatches_by_type() -> None:
 
     status = AssetStatusEvent(sn="DOCK-1", online=True)
     await svc.produce_notification(status)
-    svc.notification.publish_asset_status.assert_awaited_once_with(status)
+    _mock(svc.notification.publish_asset_status).assert_awaited_once_with(status)
 
     mission = MissionEvent(mission_id="m1", mission_type=MissionType.STANDARD, status=MissionStatus.ACTIVE)
     await svc.produce_notification(mission)
-    svc.notification.publish_mission_event.assert_awaited_once_with(mission)
+    _mock(svc.notification.publish_mission_event).assert_awaited_once_with(mission)
 
     cmd = CommandExecutionEvent(external_execution_id="exec-1", status=CommandExecutionStatus.SUCCEEDED)
     await svc.produce_notification(cmd)
-    svc.notification.publish_command_execution_event.assert_awaited_once_with(cmd)
+    _mock(svc.notification.publish_command_execution_event).assert_awaited_once_with(cmd)
 
 
 @pytest.mark.asyncio

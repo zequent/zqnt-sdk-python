@@ -32,7 +32,7 @@ Environment variables (all optional, sensible defaults provided):
     LOG_LEVEL           Python log level name (default: INFO)
     LOG_FORMAT          "json" or "text" (default: json)
 
-    Optional – attach to a local Edge Node instead of the platform (see edge_sdk.node):
+    Optional - attach to a local Edge Node instead of the platform (see edge_sdk.node):
     ZQNT_EDGE_NODE_SOCKET  The node's socket, e.g. /run/zqnt-edge-node/node.sock
     ZQNT_ADAPTER_SOCKET    This adapter's socket, e.g. /run/zqnt-adapter/dji.sock
                            Set both or neither. Attached, the adapter serves on its socket (0660)
@@ -40,7 +40,7 @@ Environment variables (all optional, sensible defaults provided):
                            events to the node, writes nothing to Redis, and does not verify the
                            platform's token on commands from the socket until the node signs them.
 
-    Optional – automatic Redis service-discovery registration:
+    Optional - automatic Redis service-discovery registration:
     EDGE_ENDPOINT       gRPC endpoint advertised to the platform
     ASSET_TYPE          AssetType proto name, e.g. ASSET_TYPE_AIRCRAFT
     ASSET_VENDOR        AssetVendor proto name, e.g. ASSET_VENDOR_MAVLINK
@@ -127,17 +127,17 @@ class EdgeAdapterRuntime:
 
     def __init__(
         self,
-        config: "EdgeAdapterConfig",
+        config: EdgeAdapterConfig,
     ) -> None:
         self._config = config
-        self.connector: "ConnectorClient" = None  # type: ignore[assignment]
-        self.telemetry: "TelemetryPublisher" = None  # type: ignore[assignment]
-        self.mission_autonomy: "MissionAutonomyClient" = None  # type: ignore[assignment]
-        self.ingest: "TelemetryIngestPublisher" = None  # type: ignore[assignment]
-        self.gateway: "EdgeGatewayClient | None" = None
-        self.node_queue: "NodeQueueClient | None" = None
+        self.connector: ConnectorClient = None  # type: ignore[assignment]
+        self.telemetry: TelemetryPublisher = None  # type: ignore[assignment]
+        self.mission_autonomy: MissionAutonomyClient = None  # type: ignore[assignment]
+        self.ingest: TelemetryIngestPublisher = None  # type: ignore[assignment]
+        self.gateway: EdgeGatewayClient | None = None
+        self.node_queue: NodeQueueClient | None = None
 
-    async def __aenter__(self) -> "EdgeAdapterRuntime":
+    async def __aenter__(self) -> EdgeAdapterRuntime:
         from .client.connector_client import ConnectorClient
         from .client.edge_gateway import EdgeGatewayClient
         from .client.mission_autonomy_client import MissionAutonomyClient
@@ -222,7 +222,7 @@ class EdgeAdapterRuntime:
             await self.mission_autonomy.close()
         logger.info("EdgeAdapterRuntime stopped")
 
-    async def serve(self, adapter: "EdgeAdapter") -> None:
+    async def serve(self, adapter: EdgeAdapter) -> None:
         """
         Create an :class:`~edge_sdk.EdgeServer`, wire in the optional
         :class:`~edge_sdk.RegistrationConfig`, and block until termination.
@@ -294,7 +294,7 @@ class EdgeAdapterConfig:
     edge_node: EdgeNodeConfig | None = None
 
     @classmethod
-    def from_env(cls) -> "EdgeAdapterConfig":
+    def from_env(cls) -> EdgeAdapterConfig:
         """Build from environment variables (recommended for Kubernetes deployments)."""
         return cls(
             grpc_host=os.getenv("GRPC_HOST", "0.0.0.0"),

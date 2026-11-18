@@ -15,9 +15,10 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import grpc
+import grpc.aio
 from google.protobuf import struct_pb2, timestamp_pb2
 
 from ..auth import default_edge_token, platform_channel
@@ -34,7 +35,7 @@ class V3Fallback:
     """Remembers per process that a core service does not serve its v3 API yet."""
 
     WINDOW_SECONDS = 600.0
-    _unavailable_until: dict[str, float] = {}
+    _unavailable_until: ClassVar[dict[str, float]] = {}
 
     def __init__(self, service: str, clock=time.monotonic) -> None:
         self._service = service
@@ -70,7 +71,7 @@ class CommandRuns:
     """
 
     MAX_ENTRIES = 10_000
-    _runs: OrderedDict[str, _Run] = OrderedDict()
+    _runs: ClassVar[OrderedDict[str, _Run]] = OrderedDict()
 
     @classmethod
     def remember(cls, external_execution_id: str, command_execution_id: str, command_id: str, sn: str) -> None:
@@ -113,7 +114,7 @@ def command_event(event: CommandExecutionEvent):
         command_execution_id=command_execution_id or event.external_execution_id,
         command_id=event.command_id or (run.command_id if run else ""),
         asset=common_pb2.AssetRef(sn=event.sn or (run.sn if run else "")),
-        state=_STATES.get(CommandExecutionStatus(int(event.status)), 0),
+        state=cast(command_pb2.CommandState, _STATES.get(CommandExecutionStatus(int(event.status)), 0)),
         message=event.message or "",
     )
     occurred_at = timestamp_pb2.Timestamp()
@@ -169,7 +170,7 @@ class EdgeGatewayClient:
         self._capabilities_v3 = V3Fallback(f"{host}:{port}/EdgeGatewayService.ReportCapabilities")
 
     @classmethod
-    def for_node(cls, node: "EdgeNodeConfig", timeout: float = 5.0) -> "EdgeGatewayClient":
+    def for_node(cls, node: EdgeNodeConfig, timeout: float = 5.0) -> EdgeGatewayClient:
         """Command events and capability reports to the local Edge Node, naming this adapter's socket."""
         return cls(host=node.node_target, port=0, token="", timeout=timeout, channel_factory=node.channel)
 
@@ -180,7 +181,7 @@ class EdgeGatewayClient:
 
     async def close(self) -> None:
         if self._channel is not None:
-            await self._channel.close()
+            await self._channel.close(None)
             self._channel = None
 
     async def publish_command_event(self, event: CommandExecutionEvent) -> bool:

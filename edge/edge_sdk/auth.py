@@ -42,6 +42,8 @@ from collections.abc import Mapping
 from typing import Any
 
 import grpc
+import grpc.aio
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from .internal_tls import InternalTls
 from .platform_keys import PlatformKeySet
@@ -67,13 +69,17 @@ def _b64url_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
-def _load_public_key(value: str):
+def _load_public_key(value: str) -> Ed25519PublicKey:
     from cryptography.hazmat.primitives.serialization import load_der_public_key, load_pem_public_key
 
     value = value.strip()
     if value.startswith("-----BEGIN"):
-        return load_pem_public_key(value.encode())
-    return load_der_public_key(base64.b64decode(value))
+        key = load_pem_public_key(value.encode())
+    else:
+        key = load_der_public_key(base64.b64decode(value))
+    if not isinstance(key, Ed25519PublicKey):
+        raise ValueError(f"expected an Ed25519 key, got {type(key).__name__}")
+    return key
 
 
 class UnknownSigningKeyError(TokenVerificationError):
@@ -88,11 +94,11 @@ class PlatformTokenVerifier:
     """Verifies the service token the platform puts on every call into this adapter."""
 
     def __init__(self, public_key: str | None = None, key_set: PlatformKeySet | None = None) -> None:
-        self._key = None
+        self._key: Ed25519PublicKey | None = None
         if public_key:
             try:
                 self._key = _load_public_key(public_key)
-            except Exception as exc:  # noqa: BLE001 - any parse failure is a configuration error
+            except Exception as exc:
                 raise ValueError(f"ZQNT_PLATFORM_PUBLIC_KEY is not a valid Ed25519 public key: {exc}") from exc
         self._key_set = key_set
 
@@ -120,7 +126,7 @@ class PlatformTokenVerifier:
             await asyncio.to_thread(self._key_set.refresh_if_due)
         return self._verify(token)
 
-    def _verification_key(self, kid: Any):
+    def _verification_key(self, kid: Any) -> Ed25519PublicKey:
         if kid is None:
             key = self._key or (self._key_set.key(None) if self._key_set is not None else None)
             if key is None:
@@ -145,7 +151,7 @@ class PlatformTokenVerifier:
             header = json.loads(_b64url_decode(parts[0]))
             payload = json.loads(_b64url_decode(parts[1]))
             signature = _b64url_decode(parts[2])
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise TokenVerificationError("token is not well-formed") from exc
         if not isinstance(header, dict) or not isinstance(payload, dict):
             raise TokenVerificationError("token is not well-formed")
@@ -193,7 +199,7 @@ class EdgeAuthConfig:
     disabled: bool = False
 
     @classmethod
-    def from_env(cls) -> "EdgeAuthConfig":
+    def from_env(cls) -> EdgeAuthConfig:
         return cls(
             edge_token=os.getenv("ZQNT_EDGE_TOKEN") or None,
             platform_public_key=os.getenv("ZQNT_PLATFORM_PUBLIC_KEY") or os.getenv("SERVICE_AUTH_PUBLIC_KEY") or None,
@@ -238,7 +244,7 @@ class _BearerUnaryUnary(_Bearer, grpc.aio.UnaryUnaryClientInterceptor):
 
 class _BearerUnaryStream(_Bearer, grpc.aio.UnaryStreamClientInterceptor):
     async def intercept_unary_stream(self, continuation, client_call_details, request):
-        return await continuation(self._details(client_call_details), request)
+        return await continuation(self._details(client_call_details), request)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 class _BearerStreamUnary(_Bearer, grpc.aio.StreamUnaryClientInterceptor):
@@ -248,7 +254,7 @@ class _BearerStreamUnary(_Bearer, grpc.aio.StreamUnaryClientInterceptor):
 
 class _BearerStreamStream(_Bearer, grpc.aio.StreamStreamClientInterceptor):
     async def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
-        return await continuation(self._details(client_call_details), request_iterator)
+        return await continuation(self._details(client_call_details), request_iterator)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 def bearer_interceptors(token: str) -> list:

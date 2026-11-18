@@ -7,12 +7,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
-from typing import Type, TypeVar
-
-_E = TypeVar("_E", bound=IntEnum)
 
 
-def proto_enum_lookup(enum_cls: Type[_E], name: str) -> _E:
+def proto_enum_lookup[E: IntEnum](enum_cls: type[E], name: str) -> E:
     """
     Resolve a proto-style full enum name to the Python IntEnum value.
 
@@ -275,7 +272,7 @@ class Coordinates:
 @dataclass
 class RequestContext:
     """
-    Extracted from gRPC RequestBase – identifies the incoming request.
+    Extracted from gRPC RequestBase - identifies the incoming request.
 
     Attributes:
         tid:       Transaction ID (unique per request).
@@ -303,7 +300,7 @@ class ErrorMessage:
 
 @dataclass
 class CommandProgress:
-    progress: float  # 0.0 – 100.0
+    progress: float  # 0.0 - 100.0
     state: str
     left_time_seconds: float
 
@@ -696,7 +693,7 @@ class DetectionResponse:
 class DetectionBatch:
     """Batch of detection results to publish via DetectionPublisher."""
 
-    sn: str = ""  # asset serial number – required for multi-asset adapters
+    sn: str = ""  # asset serial number - required for multi-asset adapters
     detections: list[DetectionResult] = field(default_factory=list)
     stream_url: str | None = None
     #: When the frame was analysed; v3 publishing uses now() when unset.

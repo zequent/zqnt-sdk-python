@@ -14,6 +14,8 @@ import asyncio
 import logging
 from typing import Any
 
+import grpc.aio
+
 logger = logging.getLogger(__name__)
 
 # Sentinel pushed onto the queue to signal end-of-stream to the request iterator.
@@ -30,18 +32,18 @@ class ConnectorBatchSession:
     manager, which completes automatically on clean exit.
     """
 
-    __slots__ = ("_rpc_name", "_stub", "_timeout", "_queue", "_call", "_completed", "_closed")
+    __slots__ = ("_call", "_closed", "_completed", "_queue", "_rpc_name", "_stub", "_timeout")
 
     def __init__(self, rpc_name: str, stub: Any, timeout: float) -> None:
         self._rpc_name = rpc_name
         self._stub = stub
         self._timeout = timeout
         self._queue: asyncio.Queue[Any] = asyncio.Queue()
-        self._call = None
+        self._call: grpc.aio.StreamUnaryCall[Any, Any] | None = None
         self._completed = False
         self._closed = False
 
-    async def __aenter__(self) -> "ConnectorBatchSession":
+    async def __aenter__(self) -> ConnectorBatchSession:
         self._open()
         return self
 
@@ -51,12 +53,13 @@ class ConnectorBatchSession:
         else:
             await self.close()
 
-    def _open(self) -> None:
-        if self._call is not None:
-            return
-        logger.info("%s session opened", self._rpc_name)
-        rpc = getattr(self._stub, self._rpc_name)
-        self._call = rpc(self._request_iterator(), timeout=self._timeout)
+    def _open(self) -> grpc.aio.StreamUnaryCall[Any, Any]:
+        call = self._call
+        if call is None:
+            logger.info("%s session opened", self._rpc_name)
+            rpc = getattr(self._stub, self._rpc_name)
+            call = self._call = rpc(self._request_iterator(), timeout=self._timeout)
+        return call
 
     async def _request_iterator(self):
         while True:
@@ -80,11 +83,11 @@ class ConnectorBatchSession:
         """Close the stream and await the server's final ``ConnectorResponse``."""
         if self._completed:
             raise RuntimeError(f"{self._rpc_name} session already completed")
-        self._open()
+        call = self._open()
         self._completed = True
         await self._queue.put(_CLOSE)
         try:
-            proto = await self._call
+            proto = await call
         finally:
             self._closed = True
         logger.info("%s session completed", self._rpc_name)

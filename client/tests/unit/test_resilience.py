@@ -6,6 +6,7 @@ import asyncio
 from typing import Any
 
 import grpc
+import grpc.aio
 import pytest
 
 from client_sdk.config.resilience import ResilienceConfig
@@ -14,7 +15,13 @@ from client_sdk.grpc_.resilience import CircuitBreakerOpen, GrpcResilience
 
 class _FakeAioRpcError(grpc.aio.AioRpcError):
     def __init__(self, code: grpc.StatusCode) -> None:
-        super().__init__(code, initial_metadata=None, trailing_metadata=None, details="boom")
+        super().__init__(
+            code,
+            initial_metadata=grpc.aio.Metadata(),
+            trailing_metadata=grpc.aio.Metadata(),
+            details="boom",
+            debug_error_string=None,
+        )
 
 
 def _fast_config(**overrides: Any) -> ResilienceConfig:

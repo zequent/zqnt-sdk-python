@@ -18,6 +18,7 @@ redis = [
     "redis[asyncio]>=8.1.0",
 ]
 dev = [
+    "pyright>=1.1.414",
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
     "fakeredis[aioredis]>=2.39.0",
@@ -28,20 +29,6 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-
-[tool.ruff]
-line-length = 120
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N"]
-ignore = ["E501"]  # line-too-long (handled by formatter)
-
-[tool.ruff.lint.per-file-ignores]
-"edge_sdk/server/edge_server.py" = ["N802"]  # gRPC servicer methods must match PascalCase proto names
-"edge_sdk/server/edge_server_v3.py" = ["N802"]
-"tests/integration/test_v3_platform_calls.py" = ["N802"]  # fake platform servicers
-"tests/integration/test_edge_node_attach.py" = ["N802"]  # fake Edge Node servicers
 
 [build-system]
 requires = ["hatchling>=1.32.4"]

@@ -1,5 +1,5 @@
 """
-ConnectorClient – thin wrapper around the ConnectorService gRPC stub.
+ConnectorClient - thin wrapper around the ConnectorService gRPC stub.
 
 Provides plain-Python methods so adapter code can query assets, missions,
 and tasks without touching protobuf directly::
@@ -24,11 +24,14 @@ backoff up to *max_retries* attempts.  Each request logs its transaction ID
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator
-from typing import Any, Callable
+from collections.abc import AsyncIterator, Callable
+from typing import TYPE_CHECKING, Any
 
 from ..auth import default_edge_token, platform_channel
 from ..models.asset import Asset
+
+if TYPE_CHECKING:
+    from zqnt_api.generated.zqnt.connector_pb2_grpc import ConnectorServiceAsyncStub
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +73,7 @@ class ConnectorClient:
         # The adapter's edge credential; core refuses calls without one (see edge_sdk.auth).
         self._token = token if token is not None else default_edge_token()
         self._channel = None
-        self._stub = None
+        self._stub: ConnectorServiceAsyncStub | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -87,7 +90,7 @@ class ConnectorClient:
     async def close(self) -> None:
         """Close the channel and release resources."""
         if self._channel:
-            await self._channel.close()
+            await self._channel.close(None)
             self._channel = None
             self._stub = None
             logger.info("ConnectorClient closed")
@@ -105,7 +108,7 @@ class ConnectorClient:
             "GetAssetBySn",
             tid,
             sn,
-            lambda: self._stub.GetAssetBySn(
+            lambda: self._ensure_connected().GetAssetBySn(
                 self._base(tid, sn),
                 timeout=self._call_timeout,
             ),
@@ -125,7 +128,7 @@ class ConnectorClient:
         from ..server._converters import proto_to_asset
 
         tid = str(uuid.uuid4())
-        stream = self._stub.AssetMonitoring(self._base(tid))
+        stream = self._ensure_connected().AssetMonitoring(self._base(tid))
         async for response in stream:
             if response.HasField("assets"):
                 yield [proto_to_asset(a) for a in response.assets.assets]
@@ -161,7 +164,7 @@ class ConnectorClient:
             "RedeemAssetClaim",
             tid,
             asset.sn,
-            lambda: self._stub.RedeemAssetClaim(
+            lambda: self._ensure_connected().RedeemAssetClaim(
                 connector_pb2.RedeemAssetClaimRequest(
                     base=self._base(tid, asset.sn),
                     code=code,
@@ -229,7 +232,7 @@ class ConnectorClient:
             "ObserveSkillContract",
             tid,
             "",
-            lambda: self._stub.ObserveSkillContract(
+            lambda: self._ensure_connected().ObserveSkillContract(
                 connector_pb2.UpsertSkillContractRequest(base=self._base(tid), contract=contract),
                 timeout=self._call_timeout,
             ),
@@ -256,7 +259,7 @@ class ConnectorClient:
             "ListSkillContracts",
             tid,
             "",
-            lambda: self._stub.ListSkillContracts(
+            lambda: self._ensure_connected().ListSkillContracts(
                 connector_pb2.ListSkillContractsRequest(**kwargs),
                 timeout=self._call_timeout,
             ),
@@ -275,7 +278,7 @@ class ConnectorClient:
             "SetSkillContractStatus",
             tid,
             "",
-            lambda: self._stub.SetSkillContractStatus(
+            lambda: self._ensure_connected().SetSkillContractStatus(
                 connector_pb2.SetSkillContractStatusRequest(base=self._base(tid), id=contract_id, status=status),
                 timeout=self._call_timeout,
             ),
@@ -294,7 +297,7 @@ class ConnectorClient:
             "SetSkillContractPermissions",
             tid,
             "",
-            lambda: self._stub.SetSkillContractPermissions(
+            lambda: self._ensure_connected().SetSkillContractPermissions(
                 connector_pb2.SetSkillContractPermissionsRequest(
                     base=self._base(tid), id=contract_id, required_permissions=list(required_permissions)
                 ),
@@ -310,9 +313,10 @@ class ConnectorClient:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _ensure_connected(self) -> None:
+    def _ensure_connected(self) -> "ConnectorServiceAsyncStub":
         if self._stub is None:
             raise RuntimeError("ConnectorClient not connected. Call connect() first.")
+        return self._stub
 
     async def _call(self, operation: str, tid: str, sn: str, fn: Callable) -> Any:
         """

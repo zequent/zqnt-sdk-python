@@ -39,8 +39,9 @@ import logging
 import time
 import warnings
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from datetime import UTC, datetime
+from typing import overload
 
 from ..models.asset import Asset
 from ..models.common import (
@@ -322,7 +323,7 @@ class EdgeAdapter(ABC):
 
     @property
     def _telemetry_fields(self) -> dict[str, TelemetryField]:
-        return self.__dict__.setdefault("_declared_telemetry_fields", {})
+        return vars(self).setdefault("_declared_telemetry_fields", {})
 
     def set_payloads(self, sn: str, payloads: list[Payload]) -> None:
         """
@@ -334,7 +335,7 @@ class EdgeAdapter(ABC):
             raise ValueError(f"a payload of {sn} has no ref")
         if len(set(refs)) != len(refs):
             raise ValueError(f"two payloads of {sn} share a ref")
-        mounted: dict[str, list[Payload]] = self.__dict__.setdefault("_mounted_payloads", {})
+        mounted: dict[str, list[Payload]] = vars(self).setdefault("_mounted_payloads", {})
         snapshot = list(payloads)
         if mounted.get(sn, []) == snapshot:
             return
@@ -346,7 +347,7 @@ class EdgeAdapter(ABC):
 
     def payloads(self, sn: str) -> list[Payload]:
         """What :meth:`set_payloads` last set for *sn*."""
-        return list(self.__dict__.get("_mounted_payloads", {}).get(sn, []))
+        return list(vars(self).get("_mounted_payloads", {}).get(sn, []))
 
     def reported_asset_sns(self) -> list[str]:
         """
@@ -358,12 +359,12 @@ class EdgeAdapter(ABC):
         return []
 
     def add_capability_listener(self, listener: CapabilityListener) -> None:
-        self.__dict__.setdefault("_capability_listeners", []).append(listener)
+        vars(self).setdefault("_capability_listeners", []).append(listener)
 
     def notify_capabilities_changed(self, sn: str | None = None) -> None:
         """Tell the SDK that what *sn* (None: every asset) can do changed, so it is reported again."""
-        self.__dict__["_capability_cache"] = {}
-        for listener in list(self.__dict__.get("_capability_listeners", [])):
+        vars(self)["_capability_cache"] = {}
+        for listener in list(vars(self).get("_capability_listeners", [])):
             try:
                 listener(sn)
             except Exception:
@@ -371,7 +372,7 @@ class EdgeAdapter(ABC):
 
     async def advertised_capabilities(self, sn: str) -> dict[str, Capability]:
         """The capabilities :meth:`get_capabilities` reports for *sn*, by id, briefly cached."""
-        cache: dict = self.__dict__.setdefault("_capability_cache", {})
+        cache: dict = vars(self).setdefault("_capability_cache", {})
         now = time.monotonic()
         cached = cache.get(sn)
         if cached is not None and cached[0] > now:
@@ -462,10 +463,10 @@ class EdgeAdapter(ABC):
     @property
     def _commands(self) -> dict[str, RegisteredCommand]:
         """Commands registered through :meth:`register_command`, keyed by command id."""
-        registry = self.__dict__.get("_registered_commands")
+        registry = vars(self).get("_registered_commands")
         if registry is None:
             registry = {}
-            self.__dict__["_registered_commands"] = registry
+            vars(self)["_registered_commands"] = registry
         return registry
 
     def registered_commands(self) -> dict[str, RegisteredCommand]:
@@ -532,7 +533,7 @@ class EdgeAdapter(ABC):
             asset_sn=sn,
             asset_type=asset_type,
             capabilities=list(derived.values()),
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.now(tz=UTC),
             telemetry_fields=list(self._telemetry_fields.values()),
             payloads=self.payloads(sn),
         )
@@ -706,7 +707,7 @@ class EdgeAdapter(ABC):
         return await self._delegate(ctx, "gimbal.tracking", {"enabled": enabled})
 
     # ------------------------------------------------------------------
-    # Detection  (server-streaming – optional)
+    # Detection  (server-streaming - optional)
     # ------------------------------------------------------------------
 
     async def get_detections(self, ctx: RequestContext, stream_url: str | None) -> AsyncIterator[DetectionResponse]:
@@ -875,6 +876,10 @@ class EdgeAdapter(ABC):
 # Python and Java SDKs (see edge-java-sdk's BuiltInCommandDispatch, which does this in Java).
 # The two streaming commands are absent on purpose: routing a frame per round trip would be a real
 # performance regression, so ManualControlInput/GetDetections stay typed-only.
+@overload
+def _num(params: dict, key: str, default: float) -> float: ...
+@overload
+def _num(params: dict, key: str, default: None = None) -> float | None: ...
 def _num(params: dict, key: str, default: float | None = None) -> float | None:
     value = params.get(key)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
