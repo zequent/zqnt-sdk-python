@@ -390,6 +390,18 @@ Set both sockets or neither. Attached, the adapter:
   does not sign them yet (zqnt-api#40). No TCP port is served, and a call over TCP is still verified. It logs a warning at start; the socket's permissions are the only access control,
   so keep the socket directory to the node's and the adapter's users. Direct mode is unchanged.
 
+The runtime's clients are typed `X | None`. Check for `None`, or use `runtime.require_connector()`,
+`require_telemetry()`, `require_mission_autonomy()` and `require_ingest()`, which return the client or
+raise a `RuntimeError` naming the missing one (for example "EdgeAdapterRuntime.connector is not
+available when the adapter runs on an Edge Node"):
+
+```python
+async with config.runtime() as runtime:
+    if runtime.connector is not None:
+        await runtime.connector.ensure_asset(...)
+    await runtime.require_ingest().publish_sample(sample)
+```
+
 The node's queue tells the adapter how hard to push (`runtime.node_queue`):
 
 ```python
