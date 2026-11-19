@@ -10,7 +10,7 @@ Typical usage::
     async def _serve() -> None:
         config = EdgeAdapterConfig.from_env()
         async with config.runtime() as runtime:
-            adapter = MyAdapter(connector=runtime.connector)
+            adapter = MyAdapter(connector=runtime.require_connector())
             await runtime.serve(adapter)
 
 Environment variables (all optional, sensible defaults provided):
@@ -114,15 +114,17 @@ class EdgeAdapterRuntime:
     Obtain an instance via ``async with EdgeAdapterConfig(...).runtime() as rt:``.
 
     Attributes:
-        connector:         Connected :class:`~edge_sdk.ConnectorClient`.
-        telemetry:         Running :class:`~edge_sdk.TelemetryPublisher` (v2).
+        connector:         Connected :class:`~edge_sdk.ConnectorClient`, None on an Edge Node.
+        telemetry:         Running :class:`~edge_sdk.TelemetryPublisher` (v2), None on an Edge Node.
         ingest:            :class:`~edge_sdk.TelemetryIngestPublisher` (v3 samples, detections, alerts).
-        mission_autonomy:  Connected :class:`~edge_sdk.MissionAutonomyClient`.
+        mission_autonomy:  Connected :class:`~edge_sdk.MissionAutonomyClient`, None on an Edge Node.
         gateway:           :class:`~edge_sdk.EdgeGatewayClient` when REMOTE_CONTROL_HOST is set, else None.
         node_queue:        :class:`~edge_sdk.node.NodeQueueClient` when attached to an Edge Node, else None.
 
     Attached to an Edge Node, ``ingest`` and ``gateway`` go to the node, and ``connector``,
-    ``telemetry`` and ``mission_autonomy`` are None: the adapter has no access to core.
+    ``telemetry`` and ``mission_autonomy`` are None: the adapter has no access to core. All clients
+    are None until the runtime is entered. The ``require_*`` methods return a client or raise a
+    :class:`RuntimeError` that says why it is missing.
     """
 
     def __init__(
@@ -130,12 +132,37 @@ class EdgeAdapterRuntime:
         config: EdgeAdapterConfig,
     ) -> None:
         self._config = config
-        self.connector: ConnectorClient = None  # type: ignore[assignment]
-        self.telemetry: TelemetryPublisher = None  # type: ignore[assignment]
-        self.mission_autonomy: MissionAutonomyClient = None  # type: ignore[assignment]
-        self.ingest: TelemetryIngestPublisher = None  # type: ignore[assignment]
+        self.connector: ConnectorClient | None = None
+        self.telemetry: TelemetryPublisher | None = None
+        self.mission_autonomy: MissionAutonomyClient | None = None
+        self.ingest: TelemetryIngestPublisher | None = None
         self.gateway: EdgeGatewayClient | None = None
         self.node_queue: NodeQueueClient | None = None
+
+    def require_connector(self) -> ConnectorClient:
+        """The :class:`~edge_sdk.ConnectorClient`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.connector, "connector")
+
+    def require_telemetry(self) -> TelemetryPublisher:
+        """The v2 :class:`~edge_sdk.TelemetryPublisher`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.telemetry, "telemetry")
+
+    def require_mission_autonomy(self) -> MissionAutonomyClient:
+        """The :class:`~edge_sdk.MissionAutonomyClient`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.mission_autonomy, "mission_autonomy")
+
+    def require_ingest(self) -> TelemetryIngestPublisher:
+        """The :class:`~edge_sdk.TelemetryIngestPublisher`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.ingest, "ingest")
+
+    def _require[T](self, client: T | None, name: str) -> T:
+        if client is not None:
+            return client
+        if self._config.edge_node is not None and name != "ingest":
+            raise RuntimeError(f"EdgeAdapterRuntime.{name} is not available when the adapter runs on an Edge Node")
+        raise RuntimeError(
+            f"EdgeAdapterRuntime.{name} is not set: enter the runtime first (async with config.runtime() as runtime)"
+        )
 
     async def __aenter__(self) -> EdgeAdapterRuntime:
         from .client.connector_client import ConnectorClient

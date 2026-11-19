@@ -205,6 +205,8 @@ async def test_an_adapter_attaches_to_the_node_by_configuration_only(node, socke
 
     async with config.runtime() as runtime:
         assert (runtime.connector, runtime.telemetry, runtime.mission_autonomy) == (None, None, None)
+        with pytest.raises(RuntimeError, match=r"connector is not available when the adapter runs on an Edge Node"):
+            runtime.require_connector()
         serving = asyncio.create_task(runtime.serve(dock))
         try:
             await _until(lambda: node.capabilities)
@@ -215,7 +217,7 @@ async def test_an_adapter_attaches_to_the_node_by_configuration_only(node, socke
             assert "NOT verified" in caplog.text
             assert "Redis endpoint registration skipped" in caplog.text
 
-            await runtime.ingest.publish_sample(
+            await runtime.require_ingest().publish_sample(
                 TelemetrySample(sn=SN, latitude=47.5, longitude=9.7, battery_percent=80)
             )
             await _until(lambda: node.samples)
