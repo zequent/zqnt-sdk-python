@@ -1,5 +1,7 @@
 """A command's risk reaches the platform: declared by the adapter, else the catalog's rating."""
 
+from typing import Any
+
 from zqnt_api.generated.zqnt.capability.v3 import capability_pb2
 from zqnt_api.generated.zqnt.common.v3 import common_pb2
 from zqnt_api.generated.zqnt.edge.v3 import edge_adapter_service_pb2 as edge_v3
@@ -9,9 +11,15 @@ from edge_sdk.adapter.commands import catalog_safety
 from edge_sdk.server.edge_server_v3 import EdgeAdapterV3Servicer
 
 
-class _Context:
+class _FakeContext:
+    """Stands in for grpc.aio.ServicerContext; these calls never abort."""
+
     async def abort(self, code, details):
         raise AssertionError(f"aborted: {code} {details}")
+
+
+def _context() -> Any:
+    return _FakeContext()
 
 
 async def _ok(ctx, params):
@@ -37,7 +45,7 @@ class _Adapter(EdgeAdapter):
 
 async def _advertised() -> dict[str, capability_pb2.Capability]:
     response = await EdgeAdapterV3Servicer(_Adapter()).GetCapabilities(
-        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _Context()
+        edge_v3.GetCapabilitiesRequest(asset=common_pb2.AssetRef(sn="SN-1")), _context()
     )
     return {c.command_id: c for c in response.capabilities.capabilities}
 
@@ -69,5 +77,7 @@ async def test_an_unknown_id_declares_nothing_and_an_unrated_catalog_id_counts_a
 
 
 def test_a_property_setter_matches_the_catalog_pattern():
-    assert catalog_safety("asset.property.night_lights_state.set").risk is CommandRisk.ADJUST
+    safety = catalog_safety("asset.property.night_lights_state.set")
+    assert safety is not None
+    assert safety.risk is CommandRisk.ADJUST
     assert catalog_safety("asset.property.set") is None

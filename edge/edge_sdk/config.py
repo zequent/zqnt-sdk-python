@@ -10,7 +10,7 @@ Typical usage::
     async def _serve() -> None:
         config = EdgeAdapterConfig.from_env()
         async with config.runtime() as runtime:
-            adapter = MyAdapter(connector=runtime.connector)
+            adapter = MyAdapter(connector=runtime.require_connector())
             await runtime.serve(adapter)
 
 Environment variables (all optional, sensible defaults provided):
@@ -32,7 +32,15 @@ Environment variables (all optional, sensible defaults provided):
     LOG_LEVEL           Python log level name (default: INFO)
     LOG_FORMAT          "json" or "text" (default: json)
 
-    Optional – automatic Redis service-discovery registration:
+    Optional - attach to a local Edge Node instead of the platform (see edge_sdk.node):
+    ZQNT_EDGE_NODE_SOCKET  The node's socket, e.g. /run/zqnt-edge-node/node.sock
+    ZQNT_ADAPTER_SOCKET    This adapter's socket, e.g. /run/zqnt-adapter/dji.sock
+                           Set both or neither. Attached, the adapter serves on its socket (0660)
+                           instead of GRPC_HOST/GRPC_PORT, sends live data, capabilities and command
+                           events to the node, writes nothing to Redis, and does not verify the
+                           platform's token on commands from the socket until the node signs them.
+
+    Optional - automatic Redis service-discovery registration:
     EDGE_ENDPOINT       gRPC endpoint advertised to the platform
     ASSET_TYPE          AssetType proto name, e.g. ASSET_TYPE_AIRCRAFT
     ASSET_VENDOR        AssetVendor proto name, e.g. ASSET_VENDOR_MAVLINK
@@ -46,6 +54,15 @@ Environment variables (all optional, sensible defaults provided):
     ZQNT_PLATFORM_PUBLIC_KEY  The platform's service public key, for tokens without a key id.
                               Optional with ZQNT_PLATFORM_KEYS_URL. Alias: SERVICE_AUTH_PUBLIC_KEY
     ZQNT_EDGE_AUTH_DISABLED   "true" accepts unauthenticated commands — local SITL/simulators only
+    ZQNT_GRPC_KEEPALIVE_TIME_MS  Ping interval of idle channels to the platform (default 60000), so
+                              quiet telemetry/notification streams outlive the server's idle timeout
+
+    Internal TLS (see edge_sdk.internal_tls) — an installation whose core services serve TLS from
+    their own CA:
+    ZQNT_INTERNAL_TLS         "true" dials the core services over TLS, the server verified against
+                              the CA and its host name (default: off, plaintext). The same CA verifies
+                              an https ZQNT_PLATFORM_KEYS_URL and a rediss:// REDIS_URL.
+    ZQNT_INTERNAL_TLS_CA      The CA certificate, PEM (default: /etc/zqnt/internal-tls/ca.crt)
 """
 
 from __future__ import annotations
@@ -57,6 +74,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from .auth import EdgeAuthConfig
+from .node import EdgeNodeConfig
 
 if TYPE_CHECKING:
     from .adapter.base import EdgeAdapter
@@ -65,6 +83,7 @@ if TYPE_CHECKING:
     from .client.mission_autonomy_client import MissionAutonomyClient
     from .client.telemetry_ingest import TelemetryIngestPublisher
     from .client.telemetry_publisher import TelemetryPublisher
+    from .node import NodeQueueClient
 
 logger = logging.getLogger(__name__)
 
@@ -95,25 +114,57 @@ class EdgeAdapterRuntime:
     Obtain an instance via ``async with EdgeAdapterConfig(...).runtime() as rt:``.
 
     Attributes:
-        connector:         Connected :class:`~edge_sdk.ConnectorClient`.
-        telemetry:         Running :class:`~edge_sdk.TelemetryPublisher` (v2).
+        connector:         Connected :class:`~edge_sdk.ConnectorClient`, None on an Edge Node.
+        telemetry:         Running :class:`~edge_sdk.TelemetryPublisher` (v2), None on an Edge Node.
         ingest:            :class:`~edge_sdk.TelemetryIngestPublisher` (v3 samples, detections, alerts).
-        mission_autonomy:  Connected :class:`~edge_sdk.MissionAutonomyClient`.
+        mission_autonomy:  Connected :class:`~edge_sdk.MissionAutonomyClient`, None on an Edge Node.
         gateway:           :class:`~edge_sdk.EdgeGatewayClient` when REMOTE_CONTROL_HOST is set, else None.
+        node_queue:        :class:`~edge_sdk.node.NodeQueueClient` when attached to an Edge Node, else None.
+
+    Attached to an Edge Node, ``ingest`` and ``gateway`` go to the node, and ``connector``,
+    ``telemetry`` and ``mission_autonomy`` are None: the adapter has no access to core. All clients
+    are None until the runtime is entered. The ``require_*`` methods return a client or raise a
+    :class:`RuntimeError` that says why it is missing.
     """
 
     def __init__(
         self,
-        config: "EdgeAdapterConfig",
+        config: EdgeAdapterConfig,
     ) -> None:
         self._config = config
-        self.connector: "ConnectorClient" = None  # type: ignore[assignment]
-        self.telemetry: "TelemetryPublisher" = None  # type: ignore[assignment]
-        self.mission_autonomy: "MissionAutonomyClient" = None  # type: ignore[assignment]
-        self.ingest: "TelemetryIngestPublisher" = None  # type: ignore[assignment]
-        self.gateway: "EdgeGatewayClient | None" = None
+        self.connector: ConnectorClient | None = None
+        self.telemetry: TelemetryPublisher | None = None
+        self.mission_autonomy: MissionAutonomyClient | None = None
+        self.ingest: TelemetryIngestPublisher | None = None
+        self.gateway: EdgeGatewayClient | None = None
+        self.node_queue: NodeQueueClient | None = None
 
-    async def __aenter__(self) -> "EdgeAdapterRuntime":
+    def require_connector(self) -> ConnectorClient:
+        """The :class:`~edge_sdk.ConnectorClient`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.connector, "connector")
+
+    def require_telemetry(self) -> TelemetryPublisher:
+        """The v2 :class:`~edge_sdk.TelemetryPublisher`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.telemetry, "telemetry")
+
+    def require_mission_autonomy(self) -> MissionAutonomyClient:
+        """The :class:`~edge_sdk.MissionAutonomyClient`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.mission_autonomy, "mission_autonomy")
+
+    def require_ingest(self) -> TelemetryIngestPublisher:
+        """The :class:`~edge_sdk.TelemetryIngestPublisher`; raises :class:`RuntimeError` when there is none."""
+        return self._require(self.ingest, "ingest")
+
+    def _require[T](self, client: T | None, name: str) -> T:
+        if client is not None:
+            return client
+        if self._config.edge_node is not None and name != "ingest":
+            raise RuntimeError(f"EdgeAdapterRuntime.{name} is not available when the adapter runs on an Edge Node")
+        raise RuntimeError(
+            f"EdgeAdapterRuntime.{name} is not set: enter the runtime first (async with config.runtime() as runtime)"
+        )
+
+    async def __aenter__(self) -> EdgeAdapterRuntime:
         from .client.connector_client import ConnectorClient
         from .client.edge_gateway import EdgeGatewayClient
         from .client.mission_autonomy_client import MissionAutonomyClient
@@ -121,6 +172,21 @@ class EdgeAdapterRuntime:
         from .client.telemetry_publisher import TelemetryPublisher
 
         _setup_logging(self._config.log_level, self._config.log_format)
+
+        node = self._config.edge_node
+        if node is not None:
+            from .node import NodeQueueClient
+
+            self.ingest = TelemetryIngestPublisher.for_node(node)
+            self.gateway = EdgeGatewayClient.for_node(node)
+            self.node_queue = NodeQueueClient(node)
+            logger.info(
+                "EdgeAdapterRuntime started, attached to the Edge Node [node=%s adapter=%s sn=%s]",
+                node.node_socket,
+                node.adapter_socket,
+                self._config.adapter_sn,
+            )
+            return self
 
         self.connector = ConnectorClient(
             host=self._config.connector_host,
@@ -175,13 +241,15 @@ class EdgeAdapterRuntime:
             await self.ingest.close()
         if self.gateway is not None:
             await self.gateway.close()
+        if self.node_queue is not None:
+            await self.node_queue.close()
         if self.connector is not None:
             await self.connector.close()
         if self.mission_autonomy is not None:
             await self.mission_autonomy.close()
         logger.info("EdgeAdapterRuntime stopped")
 
-    async def serve(self, adapter: "EdgeAdapter") -> None:
+    async def serve(self, adapter: EdgeAdapter) -> None:
         """
         Create an :class:`~edge_sdk.EdgeServer`, wire in the optional
         :class:`~edge_sdk.RegistrationConfig`, and block until termination.
@@ -209,6 +277,7 @@ class EdgeAdapterRuntime:
             registration=registration,
             auth=cfg.auth,
             gateway=self.gateway,
+            node=cfg.edge_node,
         )
         await server.serve()
 
@@ -248,9 +317,11 @@ class EdgeAdapterConfig:
     claim_code: str | None = None
     # Both directions of the adapter's gRPC traffic are authenticated — see edge_sdk.auth.
     auth: EdgeAuthConfig = dataclasses.field(default_factory=EdgeAuthConfig.from_env)
+    # Attach to a local Edge Node instead of the platform; None is direct mode.
+    edge_node: EdgeNodeConfig | None = None
 
     @classmethod
-    def from_env(cls) -> "EdgeAdapterConfig":
+    def from_env(cls) -> EdgeAdapterConfig:
         """Build from environment variables (recommended for Kubernetes deployments)."""
         return cls(
             grpc_host=os.getenv("GRPC_HOST", "0.0.0.0"),
@@ -272,6 +343,7 @@ class EdgeAdapterConfig:
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"),
             claim_code=os.getenv("ZQNT_CLAIM_CODE") or None,
             auth=EdgeAuthConfig.from_env(),
+            edge_node=EdgeNodeConfig.from_env(),
         )
 
     def runtime(self) -> EdgeAdapterRuntime:

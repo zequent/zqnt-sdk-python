@@ -1,7 +1,7 @@
 import math
 
 from edge_sdk.client.telemetry_ingest import detection_to_v3
-from edge_sdk.models.common import DetectionPosition, DetectionResult
+from edge_sdk.models.common import DetectionAttribute, DetectionPosition, DetectionResult
 
 
 def test_radar_geometry_reaches_the_v3_detection():
@@ -45,3 +45,32 @@ def test_geometry_without_coordinates_is_kept_and_unset_fields_stay_unset():
     assert detection.range_meters == 900.0
     assert not detection.HasField("bearing_degrees")
     assert not detection.HasField("speed")
+
+
+def test_attributes_and_model_reach_the_v3_detection():
+    detection = detection_to_v3(
+        DetectionResult(
+            object_id="obj-1",
+            object_type="licence_plate",
+            confidence=0.9,
+            model="plates@1.0.0",
+            attributes=[
+                DetectionAttribute(key="plate", value="M AB 123", confidence=0.93, model="plate-ocr@2.1.0"),
+                DetectionAttribute(key="plate_country", value="DE", confidence=0.81),
+            ],
+        )
+    )
+
+    assert detection.model == "plates@1.0.0"
+    assert [(a.key, a.value, a.model) for a in detection.attributes] == [
+        ("plate", "M AB 123", "plate-ocr@2.1.0"),
+        ("plate_country", "DE", ""),
+    ]
+    assert abs(detection.attributes[0].confidence - 0.93) < 1e-6
+
+
+def test_a_detection_without_attributes_has_none():
+    detection = detection_to_v3(DetectionResult(object_id="obj-2", object_type="car", confidence=0.5))
+
+    assert len(detection.attributes) == 0
+    assert detection.model == ""

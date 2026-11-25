@@ -19,7 +19,13 @@ from client_sdk.config.service_config import ServiceConfig
 
 class FakeTelemetryV3(telemetry_pb2_grpc.TelemetryServiceServicer):
     def __init__(self) -> None:
-        self.request: telemetry_pb2.WatchTelemetryRequest | None = None
+        self.port = 0
+        self.request: (
+            telemetry_pb2.WatchTelemetryRequest
+            | telemetry_pb2.WatchDetectionsRequest
+            | telemetry_pb2.WatchAlertsRequest
+            | None
+        ) = None
         self.refuse_with: tuple[grpc.StatusCode, str] | None = None
         self.responses: list = []
         self.cancelled = asyncio.Event()
@@ -36,11 +42,11 @@ class FakeTelemetryV3(telemetry_pb2_grpc.TelemetryServiceServicer):
         async for response in self._serve(request, context):
             yield response
 
-    async def _serve(self, request, context):
+    async def _serve(self, request, context: grpc.aio.ServicerContext):
         self.request = request
         if self.refuse_with is not None:
             await context.abort(*self.refuse_with)
-        context.add_done_callback(lambda _ctx: self.cancelled.set())
+        context.add_done_callback(lambda _ctx: self.cancelled.set())  # pyright: ignore[reportArgumentType] - grpc-stubs types the callback as a class
         for response in self.responses:
             yield response
         await asyncio.Event().wait()
@@ -92,6 +98,7 @@ async def test_yields_source_status_and_samples_and_skips_heartbeats(client: Tel
             if len(items) == 2:
                 break
 
+    assert isinstance(fake.request, telemetry_pb2.WatchTelemetryRequest)
     assert [a.sn for a in fake.request.assets] == ["DOCK-1", "DRONE-1"]
     assert fake.request.min_interval.nanos == 500_000_000
     assert fake.request.context.request_id
@@ -112,6 +119,7 @@ async def test_no_asset_watches_the_whole_organization(client: TelemetryClient, 
         async for _ in client.watch_telemetry():
             break
 
+    assert isinstance(fake.request, telemetry_pb2.WatchTelemetryRequest)
     assert len(fake.request.assets) == 0
     assert not fake.request.HasField("min_interval")
 
@@ -151,10 +159,12 @@ async def test_watches_detection_batches_and_skips_heartbeats(client: TelemetryC
         ),
     ]
 
+    batch = None
     async with asyncio.timeout(5):
-        async for batch in client.watch_detections(["DRONE-1"]):
+        async for batch in client.watch_detections(["DRONE-1"]):  # noqa: B007 - read after the loop
             break
 
+    assert isinstance(fake.request, telemetry_pb2.WatchDetectionsRequest)
     assert [a.sn for a in fake.request.assets] == ["DRONE-1"]
     assert isinstance(batch, telemetry_pb2.DetectionBatch)
     assert batch.stream_url == "rtsp://s"
@@ -171,13 +181,16 @@ async def test_watches_alerts_from_a_minimum_severity(client: TelemetryClient, f
         ),
     ]
 
+    alert = None
     async with asyncio.timeout(5):
-        async for alert in client.watch_alerts(min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING):
+        async for alert in client.watch_alerts(min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING):  # noqa: B007 - read after the loop
             break
 
+    assert isinstance(fake.request, telemetry_pb2.WatchAlertsRequest)
     assert len(fake.request.assets) == 0
     assert fake.request.min_severity == telemetry_pb2.ALERT_SEVERITY_WARNING
     assert fake.request.context.request_id
+    assert alert is not None
     assert alert.code == "dock.rain"
 
 

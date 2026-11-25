@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from zqnt_api.generated.zqnt import (
@@ -32,7 +32,7 @@ class _FakeStub:
         self.calls: dict[str, Any] = {}
 
     def _make(self, name: str):
-        async def _rpc(request, timeout=None):  # noqa: ANN001
+        async def _rpc(request, timeout=None):
             self.calls[name] = (request, timeout)
             return self._response
 
@@ -44,7 +44,7 @@ class _FakeStub:
 
 def _client(stub: Any) -> ConnectorClient:
     c = ConnectorClient.__new__(ConnectorClient)
-    c._channel = None
+    c._channel = cast(Any, None)
     c._resilience = ResilienceConfig()
     from client_sdk.grpc_.resilience import GrpcResilience
 
@@ -187,6 +187,7 @@ async def test_create_scheduler_via_connector() -> None:
         SchedulerDTO(name="daily", cron_expression="* * * * *", command_id="dock.open_cover")
     )
     assert resp.success is True
+    assert resp.scheduler is not None
     assert resp.scheduler.id == "s1"
 
 

@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import fakeredis.aioredis as fakeredis
 import pytest
 from zqnt_api.core import EdgeEndpointDTO
@@ -96,7 +98,7 @@ async def test_deregistering_an_unknown_endpoint_writes_nothing(cache):
 
 async def test_redis_failures_are_swallowed():
     service = CachingService("redis://unused:6379")
-    service._client = _BrokenRedis()
+    service._client = cast(Any, _BrokenRedis())
 
     await service.set("k", "v")
     await service.setex("k", 1, "v")

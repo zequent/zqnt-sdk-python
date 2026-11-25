@@ -26,6 +26,8 @@ from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from .internal_tls import InternalTls
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,8 @@ def parse_jwks(document: Any) -> dict[str | None, Ed25519PublicKey]:
 
 def _http_get_json(url: str, timeout: float) -> Any:
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - operator-configured URL
+    context = InternalTls.from_env().ssl_context() if url.lower().startswith("https://") else None
+    with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
         return json.loads(response.read())
 
 
@@ -131,7 +134,7 @@ class PlatformKeySet:
         self._last_attempt = self._clock()
         try:
             keys = parse_jwks(self._fetch(self._url, self._timeout))
-        except Exception as exc:  # noqa: BLE001 - any failure keeps the cached keys
+        except Exception as exc:
             logger.warning("Could not read the platform's signing keys from %s: %s", self._url, exc)
             return False
         if set(keys) != set(self._keys):

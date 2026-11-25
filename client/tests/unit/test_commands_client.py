@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
 from datetime import timedelta
+from typing import Any
 
 import grpc
 import grpc.aio
@@ -20,7 +22,7 @@ from client_sdk.config.resilience import ResilienceConfig
 from client_sdk.config.service_config import ServiceConfig
 
 
-def _event(execution_id: str, state: int, **result) -> command_pb2.CommandEvent:
+def _event(execution_id: str, state: command_pb2.CommandState, **result) -> command_pb2.CommandEvent:
     event = command_pb2.CommandEvent(
         command_execution_id=execution_id,
         command_id="navigation.go_to",
@@ -35,7 +37,8 @@ def _event(execution_id: str, state: int, **result) -> command_pb2.CommandEvent:
 
 class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
     def __init__(self) -> None:
-        self.requests: dict[str, object] = {}
+        self.port = 0
+        self.requests: dict[str, Any] = {}
         self.metadata: dict[str, str] = {}
         self.refuse_with: tuple[grpc.StatusCode, str] | None = None
         self.answer_with: command_pb2.CommandResult | None = None
@@ -91,7 +94,7 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
             )
         )
 
-    async def WatchCommandEvents(self, request, context):  # noqa: N802
+    async def WatchCommandEvents(self, request, context: grpc.aio.ServicerContext):  # noqa: N802
         self.requests["WatchCommandEvents"] = request
         self.received.append("WatchCommandEvents")
         await self._refused(context)
@@ -105,13 +108,13 @@ class FakeRemoteControlV3(control_pb2_grpc.RemoteControlServiceServicer):
             return
         events: asyncio.Queue = asyncio.Queue()
         self.asset_watches.append(events)
-        context.add_done_callback(lambda _ctx: self.asset_watch_cancelled.set())
+        context.add_done_callback(lambda _ctx: self.asset_watch_cancelled.set())  # pyright: ignore[reportArgumentType] - grpc-stubs types the callback as a class
         self.asset_watch_open.set()
         yield control_pb2.WatchCommandEventsResponse(event=_event("exec-2", command_pb2.COMMAND_STATE_RUNNING))
         while True:
             yield control_pb2.WatchCommandEventsResponse(event=await events.get())
 
-    async def StreamManualControl(self, request_iterator, context):  # noqa: N802
+    async def StreamManualControl(self, request_iterator, context: grpc.aio.ServicerContext):  # noqa: N802
         sn = None
         async for request in request_iterator:
             if sn is None:
@@ -220,6 +223,7 @@ async def test_a_rejected_command_raises_its_category_and_code(client: CommandsC
     assert raised.value.code == "command.invalid_params"
     assert str(raised.value) == "altitude must be a number"
     assert raised.value.status is None
+    assert raised.value.result is not None
     assert raised.value.result.state == command_pb2.COMMAND_STATE_REJECTED
 
 
@@ -279,6 +283,7 @@ async def test_watches_one_run_until_its_terminal_event(client: CommandsClient, 
 async def test_watches_an_asset_until_the_loop_is_left(client: CommandsClient, fake: FakeRemoteControlV3):
     events = client.watch_asset("DRONE-1")
     first = await anext(events)
+    assert isinstance(events, AsyncGenerator)
     await events.aclose()
 
     assert fake.requests["WatchCommandEvents"].asset.sn == "DRONE-1"
@@ -332,6 +337,7 @@ async def test_execute_and_wait_raises_the_final_result_of_a_failed_run(
         async with asyncio.timeout(5):
             await client.execute_and_wait("DRONE-1", "navigation.go_to")
 
+    assert raised.value.result is not None
     assert raised.value.result.state == command_pb2.COMMAND_STATE_FAILED
     assert raised.value.result.command_execution_id == "exec-1"
     assert raised.value.category == common_pb2.ERROR_CATEGORY_ASSET
@@ -352,6 +358,7 @@ async def test_execute_and_wait_raises_a_rejection_without_waiting(client: Comma
             await client.execute_and_wait("DRONE-1", "flight.takeoff")
 
     assert raised.value.category == common_pb2.ERROR_CATEGORY_INVALID_ARGUMENT
+    assert raised.value.result is not None
     assert raised.value.result.state == command_pb2.COMMAND_STATE_REJECTED
 
 
@@ -455,8 +462,9 @@ async def test_manual_control_needs_an_asset_and_closes_once(client: CommandsCli
 
 
 async def test_leaving_the_block_with_an_exception_aborts_the_stream(client: CommandsClient, fake: FakeRemoteControlV3):
+    stick = client.stream_manual_control("DRONE-1")
     with pytest.raises(KeyError):
-        async with client.stream_manual_control("DRONE-1") as stick:
+        async with stick:
             await stick.send(throttle=0.5)
             raise KeyError("operator let go")
 

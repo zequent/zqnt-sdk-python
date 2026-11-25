@@ -33,7 +33,7 @@ def test_dto_serialises_to_java_compatible_json():
     # Field names must match Java Jackson serialisation
     assert data["endpoint"] == "grpc://adapter:50051"
     assert data["online"] is True
-    assert data["assetType"] == "SENSOR"  # camelCase – Java convention
+    assert data["assetType"] == "SENSOR"  # camelCase - Java convention
     assert data["assetVendor"] == "ROS"
 
 

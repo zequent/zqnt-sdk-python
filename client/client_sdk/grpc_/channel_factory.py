@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 _LB_POLICY_MAP: dict[LoadBalancerType, str] = {
     LoadBalancerType.ROUND_ROBIN: "round_robin",
-    # gRPC core has no native "random" or "least_request" – fall back to
+    # gRPC core has no native "random" or "least_request" - fall back to
     # round_robin which is the closest stateless equivalent.
     LoadBalancerType.RANDOM: "round_robin",
     LoadBalancerType.LEAST_REQUESTS: "round_robin",
@@ -42,6 +42,9 @@ def _channel_options(config: ServiceConfig) -> list[tuple[str, object]]:
         ("grpc.keepalive_time_ms", 30_000),
         ("grpc.keepalive_timeout_ms", 30_000),
         ("grpc.keepalive_permit_without_calls", 1),
+        # gRPC core otherwise stops pinging after two pings without data, and a quiet watch stream
+        # is then closed by the server's 30-minute idle timeout (quarkus.http.idle-timeout).
+        ("grpc.http2.max_pings_without_data", 0),
         ("grpc.enable_retries", 1),
         (
             "grpc.service_config",
@@ -51,6 +54,20 @@ def _channel_options(config: ServiceConfig) -> list[tuple[str, object]]:
     if config.max_inbound_message_size > 0:
         options.append(("grpc.max_receive_message_length", config.max_inbound_message_size))
     return options
+
+
+def _tls_credentials(config: ServiceConfig) -> grpc.ChannelCredentials:
+    """Server verification against ``tls_ca_file`` when set, else the system trust store."""
+    if not config.tls_ca_file:
+        return grpc.ssl_channel_credentials()
+    try:
+        with open(config.tls_ca_file, "rb") as f:
+            ca = f.read()
+    except OSError as exc:
+        raise FileNotFoundError(
+            f"the CA certificate {config.tls_ca_file} for service {config.service_name} cannot be read: {exc}"
+        ) from exc
+    return grpc.ssl_channel_credentials(root_certificates=ca)
 
 
 def create_channel(
@@ -66,6 +83,9 @@ def create_channel(
     ``interceptors`` are the host application's own, in the order given (the first one sees each
     call first). They run before the SDK's credential interceptor, so an ``authorization`` header
     they set wins over ``client_token``.
+
+    With ``use_plaintext`` off the server certificate is verified against ``tls_ca_file`` (an
+    installation's internal CA) or, without one, the system trust store.
     """
     if config.use_stork and config.stork_service_name:
         # Stork is Java-only. In Python a Kubernetes headless Service +
@@ -85,8 +105,7 @@ def create_channel(
     if config.use_plaintext:
         channel = grpc.aio.insecure_channel(target, options=options, interceptors=chain)
     else:
-        credentials = grpc.ssl_channel_credentials()
-        channel = grpc.aio.secure_channel(target, credentials, options=options, interceptors=chain)
+        channel = grpc.aio.secure_channel(target, _tls_credentials(config), options=options, interceptors=chain)
 
     logger.info("Channel created successfully for service: %s", config.service_name)
     return channel

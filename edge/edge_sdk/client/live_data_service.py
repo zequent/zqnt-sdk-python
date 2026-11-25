@@ -1,5 +1,5 @@
 """
-LiveDataService – unified facade over telemetry, detection, and notification publishing.
+LiveDataService - unified facade over telemetry, detection, and notification publishing.
 
 Mirrors :java:`com.zqnt.sdk.edge.livedata.application.LiveDataService`'s single-interface
 ergonomics: one object, one ``connect()``/``close()`` lifecycle, instead of managing

@@ -200,7 +200,9 @@ class TestFetching:
 class TestConfig:
     def test_the_url_comes_from_the_environment(self, monkeypatch):
         monkeypatch.setenv("ZQNT_PLATFORM_KEYS_URL", "http://admin-console:8005/api/admin-console/auth/service-keys")
-        assert EdgeAuthConfig.from_env().platform_keys_url.endswith("/service-keys")
+        url = EdgeAuthConfig.from_env().platform_keys_url
+        assert url is not None
+        assert url.endswith("/service-keys")
 
     async def test_a_url_alone_is_enough(self, jwks):
         jwks.keys = [jwk(V1, "service-token:v1")]
@@ -210,8 +212,10 @@ class TestConfig:
         interceptor.close()
 
     async def test_neither_url_nor_key_refuses_everything(self):
-        code, details = await PlatformAuthServerInterceptor(EdgeAuthConfig()).check(
+        refusal = await PlatformAuthServerInterceptor(EdgeAuthConfig()).check(
             METHOD, (("authorization", f"Bearer {token(V1)}"),)
         )
+        assert refusal is not None
+        code, details = refusal
         assert code == grpc.StatusCode.UNAUTHENTICATED
         assert "ZQNT_PLATFORM_KEYS_URL" in details and "ZQNT_PLATFORM_PUBLIC_KEY" in details

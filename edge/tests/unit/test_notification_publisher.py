@@ -1,5 +1,5 @@
 """
-Unit tests for NotificationPublisher – no live gRPC connection required.
+Unit tests for NotificationPublisher - no live gRPC connection required.
 
 Primarily regression coverage for the proto builders against the current ``events.proto``
 schema (``ProduceNotificationRequest.event`` is a ``NotificationEvent`` wrapper, not flat
@@ -8,8 +8,10 @@ in favor of ``command_execution``, and ``operation`` was renamed ``mission``).
 """
 
 import asyncio
+from datetime import UTC
 
 import pytest
+from google.protobuf.struct_pb2 import Struct
 from zqnt_api.generated.zqnt import events_pb2
 
 from edge_sdk.client.notification_publisher import NotificationPublisher
@@ -47,6 +49,7 @@ async def test_publish_asset_status_before_connect_raises():
 async def test_publish_asset_status_enqueues_frame():
     pub = _FakePublisher()
     await pub.publish_asset_status(AssetStatusEvent(sn="DOCK001", online=True))
+    assert pub._queue is not None
     assert pub._queue.qsize() == 1
 
 
@@ -55,6 +58,7 @@ async def test_queue_full_drops_event_silently():
     pub = _FakePublisher(queue_max_size=1)
     await pub.publish_asset_status(AssetStatusEvent(sn="DOCK001", online=True))
     await pub.publish_asset_status(AssetStatusEvent(sn="DOCK001", online=False))  # dropped, not raised
+    assert pub._queue is not None
     assert pub._queue.qsize() == 1
 
 
@@ -132,7 +136,9 @@ def test_build_command_execution_event_carries_output():
     assert out["found"] is True
     assert out["object_type"] == "person"
     assert out["latitude"] == 52.5
-    assert out["position"]["lat"] == 1.0
+    position = out["position"]
+    assert isinstance(position, Struct)
+    assert position["lat"] == 1.0
 
 
 def test_build_command_execution_event_without_output_leaves_it_unset():
@@ -190,9 +196,9 @@ def test_command_execution_event_always_carries_occurred_at():
 
 
 def test_command_execution_event_preserves_an_explicit_occurred_at():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    observed = datetime(2026, 9, 16, 12, 30, 45, tzinfo=timezone.utc)
+    observed = datetime(2026, 9, 16, 12, 30, 45, tzinfo=UTC)
     pub = NotificationPublisher(host="localhost", sn="DRONE-1")
     req = pub._build_command_execution_event_request(
         CommandExecutionEvent(
@@ -203,4 +209,4 @@ def test_command_execution_event_preserves_an_explicit_occurred_at():
         )
     )
 
-    assert req.event.command_execution.occurred_at.ToDatetime(tzinfo=timezone.utc) == observed
+    assert req.event.command_execution.occurred_at.ToDatetime(tzinfo=UTC) == observed

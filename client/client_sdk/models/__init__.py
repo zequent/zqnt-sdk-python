@@ -1,6 +1,6 @@
 """Hand-written dataclasses exposed to SDK consumers.
 
-Generated proto types are kept internal – converters in this package
+Generated proto types are kept internal - converters in this package
 translate proto <-> dataclass so the public API never leaks protobuf.
 """
 
@@ -20,7 +20,6 @@ from .mission_autonomy import (
     SchedulerResponse,
     TaskDTO,
     TaskResponse,
-    WaypointDTO,
 )
 from .task_config import (
     AreaMappingTaskConfig,
@@ -31,32 +30,33 @@ from .task_config import (
     PoiTaskConfig,
     TaskConfig,
     TrackTaskConfig,
+    WaypointDTO,
     WaypointTaskConfig,
 )
 
 __all__ = [
-    "ErrorInfo",
-    "ProgressInfo",
-    "ErrorCode",
-    "MissionStatus",
-    "MissionType",
-    "SchedulerType",
-    "TaskStatus",
-    "TaskType",
-    "MissionDTO",
-    "MissionResponse",
-    "SchedulerDTO",
-    "SchedulerResponse",
-    "TaskDTO",
-    "TaskResponse",
-    "WaypointDTO",
-    "TaskConfig",
     "AreaMappingTaskConfig",
     "AreaVertex",
-    "DetectionParameter",
     "DetectTaskConfig",
+    "DetectionParameter",
+    "ErrorCode",
+    "ErrorInfo",
     "FollowTaskConfig",
+    "MissionDTO",
+    "MissionResponse",
+    "MissionStatus",
+    "MissionType",
     "PoiTaskConfig",
+    "ProgressInfo",
+    "SchedulerDTO",
+    "SchedulerResponse",
+    "SchedulerType",
+    "TaskConfig",
+    "TaskDTO",
+    "TaskResponse",
+    "TaskStatus",
+    "TaskType",
     "TrackTaskConfig",
+    "WaypointDTO",
     "WaypointTaskConfig",
 ]

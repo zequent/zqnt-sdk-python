@@ -7,12 +7,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
-from typing import Type, TypeVar
-
-_E = TypeVar("_E", bound=IntEnum)
 
 
-def proto_enum_lookup(enum_cls: Type[_E], name: str) -> _E:
+def proto_enum_lookup[E: IntEnum](enum_cls: type[E], name: str) -> E:
     """
     Resolve a proto-style full enum name to the Python IntEnum value.
 
@@ -275,7 +272,7 @@ class Coordinates:
 @dataclass
 class RequestContext:
     """
-    Extracted from gRPC RequestBase – identifies the incoming request.
+    Extracted from gRPC RequestBase - identifies the incoming request.
 
     Attributes:
         tid:       Transaction ID (unique per request).
@@ -303,7 +300,7 @@ class ErrorMessage:
 
 @dataclass
 class CommandProgress:
-    progress: float  # 0.0 – 100.0
+    progress: float  # 0.0 - 100.0
     state: str
     left_time_seconds: float
 
@@ -661,6 +658,20 @@ class DetectionPosition:
 
 
 @dataclass
+class DetectionAttribute:
+    """
+    What a model read or recognised about an object beyond its class: ``plate`` = ``M AB 123``,
+    ``plate_country`` = ``DE``, ``uav_type`` = ``quadcopter``. Keys are lower snake case.
+    ``model`` names a second-stage model (name@version) when it is not the detection's own.
+    """
+
+    key: str
+    value: str
+    confidence: float = 0.0
+    model: str | None = None
+
+
+@dataclass
 class DetectionResult:
     object_id: str
     object_type: str
@@ -668,6 +679,9 @@ class DetectionResult:
     # Image-space box for camera detections; a radar has none.
     bounding_box: BoundingBox | None = None
     position: DetectionPosition | None = None
+    attributes: list[DetectionAttribute] = field(default_factory=list)
+    #: The model that produced the detection, as name@version (v3 only).
+    model: str | None = None
 
 
 @dataclass
@@ -679,7 +693,7 @@ class DetectionResponse:
 class DetectionBatch:
     """Batch of detection results to publish via DetectionPublisher."""
 
-    sn: str = ""  # asset serial number – required for multi-asset adapters
+    sn: str = ""  # asset serial number - required for multi-asset adapters
     detections: list[DetectionResult] = field(default_factory=list)
     stream_url: str | None = None
     #: When the frame was analysed; v3 publishing uses now() when unset.

@@ -109,19 +109,13 @@ class MyDroneAdapter(EdgeAdapter):
         """Return capabilities supported by this asset."""
         return self._auto_capabilities(sn, AssetType.AIRCRAFT)
 
-    async def take_off(
-        self, ctx: RequestContext, coordinates: Coordinates
-    ) -> EdgeResponse:
+    async def take_off(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Handle take-off command."""
         # Call your drone SDK here
-        await hardware.take_off(
-            coordinates.latitude, coordinates.longitude, coordinates.altitude
-        )
+        await hardware.take_off(coordinates.latitude, coordinates.longitude, coordinates.altitude)
         return EdgeResponse.ok(ctx.tid, ctx.sn, "Take-off initiated")
 
-    async def go_to(
-        self, ctx: RequestContext, coordinates: Coordinates
-    ) -> EdgeResponse:
+    async def go_to(self, ctx: RequestContext, coordinates: Coordinates) -> EdgeResponse:
         """Handle go-to command."""
         await hardware.fly_to(coordinates)
         return EdgeResponse.ok(ctx.tid, ctx.sn)
@@ -263,14 +257,10 @@ class MyDockAdapter(EdgeAdapter):
         self.register_command(
             "vendor.acme.spray",
             self._spray,
-            input_schema=schema(
-                {"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]
-            ),
+            input_schema=schema({"seconds": {"type": "integer", "minimum": 1}}, ["seconds"]),
         )
         self.declare_standard_telemetry_field("dock.cover_state")
-        self.declare_telemetry_field(
-            "vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%"
-        )
+        self.declare_telemetry_field("vendor.acme.tank_level", TelemetryValueType.NUMBER, unit="%")
 
     async def get_capabilities(self, sn, asset_id):
         return self._auto_capabilities(sn, AssetType.DOCK)
@@ -346,14 +336,10 @@ from edge_sdk import (
 
 ingest = TelemetryIngestPublisher(host="live-data", port=8003)
 await ingest.publish_sample(
-    TelemetrySample(
-        sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"}
-    )
+    TelemetrySample(sn="DOCK-1", latitude=47.5, longitude=9.7, details={"dock.cover_state": "OPEN"})
 )
 await ingest.publish_detections(DetectionBatch(sn="RADAR-1", detections=[...]))
-await ingest.publish_alert(
-    Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING)
-)
+await ingest.publish_alert(Alert(sn="DOCK-1", code="dock.rain", severity=AlertSeverity.WARNING))
 ```
 
 Long-lived streams to `TelemetryIngestService`, opened on first use and reconnected with backoff.
@@ -363,6 +349,71 @@ catalog (`dock.mode`, `wind.speed`, `drone.gear`, …; declare them with
 `declare_standard_telemetry_field`) land in their v2 fields, **other `details` keys are dropped**. A
 sample with a speed or an aircraft key becomes sub-asset (aircraft) telemetry, one with dock keys or
 only a battery asset telemetry. Alerts have no v2 counterpart and are dropped. The v2 `TelemetryPublisher` is unchanged.
+
+#### Attaching to a local Edge Node
+
+On a device that runs an Edge Node (`zqnt-edge-node`), the adapter talks to the node instead of the
+platform. The node queues live data while its link is down and runs the platform's commands on the
+adapter. Attaching takes configuration only, no code change:
+
+```bash
+ZQNT_EDGE_NODE_SOCKET=/run/zqnt-edge-node/node.sock    # the node's socket
+ZQNT_ADAPTER_SOCKET=/run/zqnt-adapter/dock.sock        # this adapter's socket
+```
+
+or in code:
+
+```python
+from edge_sdk import EdgeAdapterConfig, EdgeNodeConfig
+
+config = EdgeAdapterConfig(
+    edge_node=EdgeNodeConfig(
+        node_socket="/run/zqnt-edge-node/node.sock",
+        adapter_socket="/run/zqnt-adapter/dock.sock",
+    )
+)
+async with config.runtime() as runtime:
+    await runtime.serve(MyAdapter())
+```
+
+Set both sockets or neither. Attached, the adapter:
+
+- serves `EdgeAdapterService` on its own socket (mode `0660`: owner and group; `GRPC_HOST`/`GRPC_PORT`
+  are not used) and the node calls it there for every command;
+- sends live data (`runtime.ingest`), capability reports and command events (`runtime.gateway`,
+  `NotificationPublisher`) to the node socket, naming its own socket in the `zqnt-adapter-endpoint`
+  header (`unix:///run/zqnt-adapter/dock.sock`). The node serves v3 only, so there is no v2 fallback;
+- has no access to core: `runtime.connector`, `runtime.telemetry` and `runtime.mission_autonomy` are
+  `None`, nothing is written to Redis (`EDGE_ENDPOINT`/`REDIS_URL` are ignored), and asset-status and
+  mission events of `NotificationPublisher` are dropped;
+- **does not verify the platform's token** on commands from a Unix socket peer, because the node
+  does not sign them yet (zqnt-api#40). No TCP port is served, and a call over TCP is still verified. It logs a warning at start; the socket's permissions are the only access control,
+  so keep the socket directory to the node's and the adapter's users. Direct mode is unchanged.
+
+The runtime's clients are typed `X | None`. Check for `None`, or use `runtime.require_connector()`,
+`require_telemetry()`, `require_mission_autonomy()` and `require_ingest()`, which return the client or
+raise a `RuntimeError` naming the missing one (for example "EdgeAdapterRuntime.connector is not
+available when the adapter runs on an Edge Node"):
+
+```python
+async with config.runtime() as runtime:
+    if runtime.connector is not None:
+        await runtime.connector.ensure_asset(...)
+    await runtime.require_ingest().publish_sample(sample)
+```
+
+The node's queue tells the adapter how hard to push (`runtime.node_queue`):
+
+```python
+stats = await runtime.node_queue.get()
+rate = normal_rate * stats.throttle("LANE_TELEMETRY")  # 1 up to half full, down to 0.1 when full
+
+async for stats in runtime.node_queue.watch():  # at once, on change, at least every 10 s
+    ...
+```
+
+`QueueStats.connected` says whether the node has a link to the platform; each `LaneStats` carries the
+lane's items, bytes, quota, fill, dropped count and oldest item.
 
 ### Advanced Usage
 
@@ -391,9 +442,7 @@ async def some_operation(self, ctx: RequestContext) -> EdgeResponse:
         result = await hardware.do_something()
         return EdgeResponse.ok(ctx.tid, ctx.sn)
     except HardwareError as e:
-        return EdgeResponse.fail(
-            ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR)
-        )
+        return EdgeResponse.fail(ctx.tid, ctx.sn, ErrorMessage(str(e), ErrorCode.HARDWARE_ERROR))
 ```
 
 #### Server Registration (with Redis)
@@ -483,6 +532,8 @@ The SDK respects the following environment variables:
 - `EDGE_TELEMETRY_PORT` - Port for telemetry (default: 50052)
 - `REMOTE_CONTROL_HOST` / `REMOTE_CONTROL_PORT` - remote-control (`EdgeGatewayService`: capability
   reports, v3 command events; port default 8002). Unset: no capability push, events over v2.
+- `ZQNT_EDGE_NODE_SOCKET` / `ZQNT_ADAPTER_SOCKET` - attach to a local Edge Node instead of the
+  platform (see [Attaching to a local Edge Node](#attaching-to-a-local-edge-node)).
 
 #### Authentication
 
@@ -596,9 +647,7 @@ from client_sdk import ZequentClient
 
 async def main():
     async with ZequentClient.from_env() as client:
-        await client.commands.execute_command(
-            "DRONE-1", "flight.takeoff", {"altitude": 40}
-        )
+        await client.commands.execute_command("DRONE-1", "flight.takeoff", {"altitude": 40})
 
         async for item in client.telemetry.watch_telemetry(["DRONE-1"]):
             print(item)
@@ -631,15 +680,9 @@ from client_sdk import ZequentClient
 from client_sdk.config import ServiceConfig
 
 async with ZequentClient(
-    connector_config=ServiceConfig(
-        "connector", host="connector.example.com", port=8010
-    ),
-    remote_control_config=ServiceConfig(
-        "remote-control", host="rc.example.com", port=8002
-    ),
-    mission_autonomy_config=ServiceConfig(
-        "mission-autonomy", host="ma.example.com", port=8004
-    ),
+    connector_config=ServiceConfig("connector", host="connector.example.com", port=8010),
+    remote_control_config=ServiceConfig("remote-control", host="rc.example.com", port=8002),
+    mission_autonomy_config=ServiceConfig("mission-autonomy", host="ma.example.com", port=8004),
     live_data_config=ServiceConfig("live-data", host="ld.example.com", port=8003),
 ) as client:
     ...
@@ -669,9 +712,7 @@ async with ZequentClient.from_env() as client:
                 {"latitude": 47.7760, "longitude": 9.2671, "altitude": 60},
             )
     except CommandError as error:
-        print(
-            error.category_name, error.code, error
-        )  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
+        print(error.category_name, error.code, error)  # e.g. ERROR_CATEGORY_INVALID_ARGUMENT command.invalid_params
     else:
         print(to_dict(result.result))
 
@@ -752,9 +793,7 @@ watch does not reconnect: watch again.
 async for batch in client.telemetry.watch_detections(["DRONE-1"]):
     print(batch.asset.sn, batch.stream_url, len(batch.detections))
 
-async for alert in client.telemetry.watch_alerts(
-    min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING
-):
+async for alert in client.telemetry.watch_alerts(min_severity=telemetry_pb2.ALERT_SEVERITY_WARNING):
     print(
         alert.asset.sn,
         telemetry_pb2.AlertSeverity.Name(alert.severity),
@@ -956,3 +995,16 @@ the 2.x typed calls to commands: [client/MIGRATION.md](client/MIGRATION.md).
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE); see [NOTICE](NOTICE).
+
+### Dependency licences
+
+CI fails when a dependency's licence is not allowed by [licences/policy.yaml](licences/policy.yaml)
+(the same policy in every Zequent SDK; human-readable in the docs under `edge/licence-policy`).
+Every dependency, including test-only ones, is listed in [THIRD_PARTY.md](THIRD_PARTY.md).
+After changing a dependency or `uv.lock`, run `scripts/licence-gate.sh` (needs `uv`) and commit `THIRD_PARTY.md`.
+A dependency the policy rejects but that was reviewed goes into
+[licences/exceptions.yaml](licences/exceptions.yaml) with reason, reviewer and date.
+
+Code generated from a `.proto` file carries the licence of that file: never generate code from
+GPL-licensed protos (for example the Meshtastic protobufs) into this repository; such a protocol is
+spoken by a separate process.

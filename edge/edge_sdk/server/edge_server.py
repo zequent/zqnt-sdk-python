@@ -1,5 +1,5 @@
 """
-EdgeServer – wraps the generated EdgeAdapterService gRPC servicer and
+EdgeServer - wraps the generated EdgeAdapterService gRPC servicer and
 delegates every call to the user's EdgeAdapter implementation.
 
 Usage (minimal)::
@@ -25,7 +25,8 @@ Usage with automatic service discovery registration::
 import asyncio
 import dataclasses
 import logging
-from typing import Any
+from datetime import UTC
+from typing import Any, cast
 
 import grpc
 import grpc.aio
@@ -36,6 +37,7 @@ from zqnt_api.generated.zqnt import common_pb2, edge_pb2, edge_pb2_grpc
 from ..adapter.base import EdgeAdapter
 from ..auth import EdgeAuthConfig, PlatformAuthServerInterceptor
 from ..client.edge_gateway import EdgeGatewayClient
+from ..internal_tls import InternalTls
 from ..models.common import (
     AssetAirConditionerState,
     AssetType,
@@ -47,6 +49,7 @@ from ..models.common import (
     proto_enum_lookup,
     proto_enum_name,
 )
+from ..node import EdgeNodeConfig, bind_adapter_socket, remove_adapter_socket, warn_unverified_commands
 from . import edge_server_v3
 from ._converters import (
     capabilities_to_proto,
@@ -190,7 +193,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
             return common_pb2.AssetCapabilitiesResponse(
                 error=common_pb2.GlobalErrorMessage(
                     error_message=str(exc),
-                    error_code=int(ErrorCode.SDK_ERROR),
+                    error_code=cast(common_pb2.ErrorCode, int(ErrorCode.SDK_ERROR)),
                 )
             )
 
@@ -289,7 +292,7 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
     # Detection  (server-streaming)
     # ------------------------------------------------------------------
 
-    async def GetDetections(self, request, context):
+    async def GetDetections(self, request, context: grpc.aio.ServicerContext):
         await self._assert_supported("get_detections", context)
         ctx = proto_to_request_context(request.base)
         stream_url = request.stream_url if request.HasField("stream_url") else None
@@ -305,7 +308,9 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
                             y=d.bounding_box.y,
                             width=d.bounding_box.width,
                             height=d.bounding_box.height,
-                        ),
+                        )
+                        if d.bounding_box is not None
+                        else None,
                     )
                     for d in detection.detections
                 ]
@@ -478,9 +483,9 @@ class _EdgeAdapterServicer(edge_pb2_grpc.EdgeAdapterServiceServicer):
 
 
 def _dummy_ctx() -> RequestContext:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return RequestContext(tid="", sn="", timestamp=datetime.now(tz=timezone.utc))
+    return RequestContext(tid="", sn="", timestamp=datetime.now(tz=UTC))
 
 
 # ---------------------------------------------------------------------------
@@ -513,6 +518,10 @@ class EdgeServer:
         gateway:       Optional :class:`~edge_sdk.client.edge_gateway.EdgeGatewayClient`
                        (remote-control). With it the adapter's capabilities are reported on start
                        and whenever they change (:meth:`EdgeAdapter.reported_asset_sns`).
+        node:          Optional :class:`~edge_sdk.node.EdgeNodeConfig`: attach to a local Edge Node.
+                       The server then listens on the adapter socket only (not on host/port), writes
+                       nothing to Redis and does not verify the platform's token for Unix socket peers
+                       (see :mod:`edge_sdk.node`).
 
     Example::
 
@@ -537,8 +546,10 @@ class EdgeServer:
         registration: RegistrationConfig | None = None,
         auth: EdgeAuthConfig | None = None,
         gateway: EdgeGatewayClient | None = None,
+        node: EdgeNodeConfig | None = None,
     ) -> None:
         self._adapter = adapter
+        self._node = node
         self._reporter = CapabilityReporter(adapter, gateway) if gateway is not None else None
         self._auth = auth if auth is not None else EdgeAuthConfig.from_env()
         self._port = port
@@ -550,14 +561,18 @@ class EdgeServer:
 
     async def serve(self) -> None:
         """Start the server and block until it is terminated."""
-        # Only the platform may command the device: every call must carry its service token.
-        self._auth_interceptor = PlatformAuthServerInterceptor(self._auth)
+        if self._node is not None:
+            warn_unverified_commands(self._node)
+        # Only the platform may command the device: every call must carry its service token, except
+        # from the local Edge Node over the adapter socket.
+        self._auth_interceptor = PlatformAuthServerInterceptor(self._auth, trust_unix_peers=self._node is not None)
         self._auth_interceptor.start()
         self._server = grpc.aio.server(interceptors=[self._auth_interceptor])
 
         # Register EdgeAdapterService: v2 (typed RPCs, frozen) and v3 (ExecuteCommand only) side by
         # side on one port, both served from the same adapter and its registered commands.
-        edge_pb2_grpc.add_EdgeAdapterServiceServicer_to_server(_EdgeAdapterServicer(self._adapter), self._server)
+        servicer = _EdgeAdapterServicer(self._adapter)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+        edge_pb2_grpc.add_EdgeAdapterServiceServicer_to_server(servicer, self._server)
         edge_server_v3.add_to_server(self._adapter, self._server)
 
         # Register standard gRPC health check (used by k8s probes)
@@ -572,16 +587,21 @@ class EdgeServer:
             logger.debug("gRPC health check service registered")
         except ImportError:
             logger.warning(
-                "grpcio-health-checking not installed – health check unavailable. "
+                "grpcio-health-checking not installed - health check unavailable. "
                 "Add grpcio-health-checking to your dependencies."
             )
 
-        listen_addr = f"{self._host}:{self._port}"
-        self._server.add_insecure_port(listen_addr)
+        if self._node is not None:
+            listen_addr = f"unix:{bind_adapter_socket(self._server, self._node)}"
+        else:
+            listen_addr = f"{self._host}:{self._port}"
+            self._server.add_insecure_port(listen_addr)
         await self._server.start()
         logger.info("EdgeServer listening on %s", listen_addr)
 
-        if self._registration:
+        if self._registration and self._node is not None:
+            logger.info("Attached to an Edge Node: Redis endpoint registration skipped")
+        elif self._registration:
             await self._register(online=True)
         if self._reporter is not None:
             await self._reporter.start()
@@ -589,12 +609,17 @@ class EdgeServer:
             await self._server.wait_for_termination()
         except (asyncio.CancelledError, KeyboardInterrupt):
             await self.stop()
+        finally:
+            if self._node is not None:
+                remove_adapter_socket(self._node)
 
     async def stop(self, grace: float = 5.0) -> None:
         """Gracefully stop the server."""
+        if self._node is not None:
+            remove_adapter_socket(self._node)
         if self._reporter is not None:
             await self._reporter.stop()
-        if self._registration:
+        if self._registration and self._node is None:
             await self._register(online=False)
 
         if self._health_servicer is not None:
@@ -616,7 +641,9 @@ class EdgeServer:
         Write (or update) the EdgeEndpointDTO in Redis under ``zqnt:edge-endpoints:{vendor}``,
         the key the platform's endpoint router reads (Java CacheKeys.EDGE_ENDPOINTS).
         """
-        cfg = self._registration  # type: ignore[union-attr]
+        cfg = self._registration
+        if cfg is None:
+            return
         vendor = proto_enum_name(cfg.asset_vendor)  # e.g. "ASSET_VENDOR_MAVLINK"
         asset_type = proto_enum_name(cfg.asset_type)  # e.g. "ASSET_TYPE_AIRCRAFT"
 
@@ -624,14 +651,15 @@ class EdgeServer:
             import redis.asyncio as aioredis
         except ImportError:
             logger.warning(
-                "redis package not installed – endpoint registration skipped. "
+                "redis package not installed - endpoint registration skipped. "
                 "Install with: pip install 'edge-python-sdk[redis]'"
             )
             return
 
         dto = EdgeEndpointDTO(endpoint=cfg.endpoint, online=online, asset_type=asset_type, asset_vendor=vendor)
         try:
-            async with aioredis.from_url(cfg.redis_url, decode_responses=True) as r:
+            redis_kwargs = InternalTls.from_env().redis_kwargs(cfg.redis_url)
+            async with aioredis.from_url(cfg.redis_url, decode_responses=True, **redis_kwargs) as r:
                 await r.set(EDGE_ENDPOINTS_KEY.format(vendor=vendor), dto.to_json())
         except Exception as exc:
             logger.error("Edge endpoint registration failed (online=%s): %s", online, exc)

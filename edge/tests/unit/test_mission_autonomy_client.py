@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from zqnt_api.generated.zqnt import mission_autonomy_contracts_pb2 as mac
@@ -18,7 +18,7 @@ def _client(stub: Any) -> MissionAutonomyClient:
     c._port = 50054
     c._call_timeout = 5.0
     c._max_retries = 3
-    c._channel = object()
+    c._channel = cast(Any, object())
     c._stub = stub
     return c
 
@@ -29,7 +29,7 @@ class _FakeStub:
         self.calls: dict[str, Any] = {}
 
     def _make(self, name: str):
-        async def _rpc(request, timeout=None):  # noqa: ANN001
+        async def _rpc(request, timeout=None):
             self.calls[name] = request
             return self._response
 
