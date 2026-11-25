@@ -10,7 +10,7 @@ import asyncio
 import grpc
 import grpc.aio
 import pytest
-from zqnt_api.generated.zqnt import (  # type: ignore[import]
+from zqnt_api.generated.zqnt import (
     connector_pb2,
     connector_pb2_grpc,
 )
@@ -59,8 +59,10 @@ class _Telemetry(telemetry_pb2_grpc.TelemetryServiceServicer):
 async def server():
     recorder = _Recorder()
     srv = grpc.aio.server()
-    connector_pb2_grpc.add_ConnectorServiceServicer_to_server(_Connector(recorder), srv)
-    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(_Telemetry(recorder), srv)
+    connector = _Connector(recorder)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+    connector_pb2_grpc.add_ConnectorServiceServicer_to_server(connector, srv)
+    telemetry = _Telemetry(recorder)  # pyright: ignore[reportAbstractUsage] - generated stubs mark every RPC abstract, the runtime base implements them
+    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(telemetry, srv)
     port = srv.add_insecure_port("127.0.0.1:0")
     await srv.start()
     yield recorder, port
@@ -122,8 +124,8 @@ async def test_without_any_credential_nothing_is_sent_and_the_refusal_names_the_
     assert recorder.headers == [None]
     assert isinstance(refused.value, ZequentAuthError)
     assert refused.value.code() == grpc.StatusCode.UNAUTHENTICATED
-    assert ENV_VAR in refused.value.details()
-    assert "Authentication required" in refused.value.details(), "the platform's own reason is kept"
+    assert ENV_VAR in (refused.value.details() or "")
+    assert "Authentication required" in (refused.value.details() or ""), "the platform's own reason is kept"
 
 
 async def test_a_call_outside_the_credentials_scope_says_so_and_is_not_retried(server, monkeypatch) -> None:
@@ -137,7 +139,7 @@ async def test_a_call_outside_the_credentials_scope_says_so_and_is_not_retried(s
         with pytest.raises(ZequentAuthError) as refused:
             await client.connector.list_skill_contracts()
     assert refused.value.code() == grpc.StatusCode.PERMISSION_DENIED
-    assert "own organization" in refused.value.details()
+    assert "own organization" in (refused.value.details() or "")
     assert len(recorder.headers) == 1
 
 

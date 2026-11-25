@@ -8,12 +8,12 @@ from .telemetry_ingest import TelemetryIngestPublisher
 from .telemetry_publisher import TelemetryPublisher
 
 __all__ = [
-    "TelemetryPublisher",
-    "NotificationPublisher",
-    "DetectionPublisher",
     "ConnectorClient",
-    "MissionAutonomyClient",
-    "LiveDataService",
+    "DetectionPublisher",
     "EdgeGatewayClient",
+    "LiveDataService",
+    "MissionAutonomyClient",
+    "NotificationPublisher",
     "TelemetryIngestPublisher",
+    "TelemetryPublisher",
 ]

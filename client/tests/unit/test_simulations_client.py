@@ -19,7 +19,7 @@ from client_sdk.config.resilience import ResilienceConfig
 from client_sdk.config.service_config import ServiceConfig
 
 
-def _trace(execution_id: str, status: int) -> sim_pb2.SimulationTrace:
+def _trace(execution_id: str, status: sim_pb2.SimulationStatus) -> sim_pb2.SimulationTrace:
     output = struct_pb2.Struct()
     output.update({"battery_percent": 18})
     return sim_pb2.SimulationTrace(
@@ -49,18 +49,19 @@ def _trace(execution_id: str, status: int) -> sim_pb2.SimulationTrace:
 
 class FakeSimulations(sim_pb2_grpc.SimulationServiceServicer):
     def __init__(self) -> None:
+        self.port = 0
         self.start: sim_pb2.StartSimulationRequest | None = None
         self.trace_request: sim_pb2.GetSimulationTraceRequest | None = None
         self.cancel: sim_pb2.CancelSimulationRequest | None = None
         self.refuse_with: tuple[grpc.StatusCode, str] | None = None
-        self.statuses: list[int] = []
+        self.statuses: list[sim_pb2.SimulationStatus] = []
         self.trace_calls = 0
 
     async def StartSimulation(self, request, context):  # noqa: N802
         self.start = request
         return sim_pb2.StartSimulationResponse(execution_id="exec-1", status=sim_pb2.SIMULATION_STATUS_RUNNING)
 
-    async def GetSimulationTrace(self, request, context):  # noqa: N802
+    async def GetSimulationTrace(self, request, context: grpc.aio.ServicerContext):  # noqa: N802
         self.trace_request = request
         self.trace_calls += 1
         if self.refuse_with is not None:
@@ -121,6 +122,7 @@ async def test_start_generates_an_idempotency_key_when_the_caller_gives_none(
 
     assert started.execution_id == "exec-1"
     assert started.status == sim_pb2.SIMULATION_STATUS_RUNNING
+    assert fake.start is not None
     assert fake.start.context.idempotency_key
     assert fake.start.context.request_id
     assert list(fake.start.nodes) == list(request.nodes)
@@ -135,6 +137,7 @@ async def test_start_keeps_the_callers_idempotency_key(client: SimulationsClient
         )
     )
 
+    assert fake.start is not None
     assert fake.start.context.idempotency_key == "retry-me"
 
 
@@ -152,6 +155,7 @@ async def test_trace_is_the_one_the_platform_answers(client: SimulationsClient, 
 
     trace = await client.simulation_trace("exec-1")
 
+    assert fake.trace_request is not None
     assert fake.trace_request.execution_id == "exec-1"
     assert trace == _trace("exec-1", sim_pb2.SIMULATION_STATUS_FAILED)
     assert trace.steps[0].next[0].edge_type == sim_pb2.EDGE_TYPE_FAILURE
@@ -160,6 +164,7 @@ async def test_trace_is_the_one_the_platform_answers(client: SimulationsClient, 
 async def test_cancel_returns_the_status(client: SimulationsClient, fake: FakeSimulations):
     status = await client.cancel_simulation("exec-1")
 
+    assert fake.cancel is not None
     assert fake.cancel.execution_id == "exec-1"
     assert status == sim_pb2.SIMULATION_STATUS_CANCELLING
 
@@ -200,5 +205,6 @@ async def test_simulate_starts_and_waits_for_the_trace(client: SimulationsClient
 
     trace = await client.simulate(sim_pb2.StartSimulationRequest(application_id="app-1"), interval=0.01, timeout=5)
 
+    assert fake.trace_request is not None
     assert fake.trace_request.execution_id == "exec-1"
     assert trace.status == sim_pb2.SIMULATION_STATUS_SUCCEEDED

@@ -8,7 +8,7 @@ fields are permanently reserved on the wire).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from zqnt_api.generated.zqnt import common_pb2, connector_pb2
@@ -26,7 +26,7 @@ def _client(stub: Any, claim_code: str | None = None) -> ConnectorClient:
     c._call_timeout = 5.0
     c._max_retries = 3
     c._claim_code = claim_code
-    c._channel = object()
+    c._channel = cast(Any, object())
     c._stub = stub
     return c
 
@@ -37,7 +37,7 @@ class _FakeStub:
         self.calls: dict[str, Any] = {}
 
     def _make(self, name: str):
-        async def _rpc(request, timeout=None):  # noqa: ANN001
+        async def _rpc(request, timeout=None):
             self.calls[name] = request
             return self._responses[name]
 

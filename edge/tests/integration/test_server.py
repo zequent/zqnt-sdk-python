@@ -2,14 +2,14 @@
 Integration tests for EdgeServer.
 
 A real gRPC server is started in-process on a random port.
-No gRPC mocks – this validates the full stack: proto serialisation,
+No gRPC mocks - this validates the full stack: proto serialisation,
 servicer routing, status codes, and exception handling.
 """
 
 import grpc
 import grpc.aio
 import pytest
-from zqnt_api.generated.zqnt import common_pb2, edge_pb2_grpc  # type: ignore[import]
+from zqnt_api.generated.zqnt import common_pb2, edge_pb2_grpc
 
 # ---------------------------------------------------------------------------
 # Helpers

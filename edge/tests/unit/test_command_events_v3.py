@@ -3,7 +3,7 @@ A command event reaches the platform under the platform's command_execution_id a
 occurred_at -- the platform refuses one without it.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from google.protobuf import struct_pb2
 from zqnt_api.generated.zqnt.capability.v3 import command_pb2
@@ -40,7 +40,7 @@ def test_occurred_at_is_set_when_the_adapter_gave_none():
 
 
 def test_the_adapters_time_and_fields_are_kept():
-    at = datetime(2026, 10, 9, 12, 0, tzinfo=timezone.utc)
+    at = datetime(2026, 10, 9, 12, 0, tzinfo=UTC)
     event = command_event(
         CommandExecutionEvent(
             external_execution_id="x",
@@ -57,7 +57,7 @@ def test_the_adapters_time_and_fields_are_kept():
 
     assert event.command_execution_id == "capexec:e1:n1"
     assert event.state == command_pb2.COMMAND_STATE_RUNNING
-    assert event.occurred_at.ToDatetime(tzinfo=timezone.utc) == at
+    assert event.occurred_at.ToDatetime(tzinfo=UTC) == at
     assert event.progress == 0.5
     assert event.message == "halfway"
     assert event.result["photos"] == 3
@@ -121,9 +121,9 @@ def test_runs_are_bounded():
         CommandRuns.remember(f"v-{i}", f"c-{i}", "x", "SN")
 
     assert CommandRuns.lookup("v-0") is None
-    assert CommandRuns.lookup(f"v-{CommandRuns.MAX_ENTRIES + 4}").command_execution_id == (
-        f"c-{CommandRuns.MAX_ENTRIES + 4}"
-    )
+    run = CommandRuns.lookup(f"v-{CommandRuns.MAX_ENTRIES + 4}")
+    assert run is not None
+    assert run.command_execution_id == f"c-{CommandRuns.MAX_ENTRIES + 4}"
 
 
 def test_v3_unavailability_is_remembered_for_the_window_then_retried():

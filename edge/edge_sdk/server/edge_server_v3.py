@@ -19,8 +19,11 @@ platform's id (see :mod:`edge_sdk.client.edge_gateway`).
 
 import logging
 from collections.abc import AsyncIterator
+from datetime import UTC
+from typing import Any, cast
 
 import grpc
+import grpc.aio
 from google.protobuf import struct_pb2, timestamp_pb2
 from zqnt_api.generated.zqnt.capability.v3 import capability_pb2, command_pb2
 from zqnt_api.generated.zqnt.common.v3 import common_pb2
@@ -72,12 +75,12 @@ def _struct(value: dict | None) -> struct_pb2.Struct | None:
 
 
 def _context(request_context, asset, command_execution_id: str | None = None) -> RequestContext:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     return RequestContext(
         tid=request_context.request_id,
         sn=asset.sn,
-        timestamp=datetime.now(tz=timezone.utc),
+        timestamp=datetime.now(tz=UTC),
         command_execution_id=command_execution_id or None,
     )
 
@@ -85,10 +88,14 @@ def _context(request_context, asset, command_execution_id: str | None = None) ->
 def _python(value):
     """A Struct value as plain Python, keeping NaN a float (json_format would turn it into "NaN")."""
     if isinstance(value, struct_pb2.Struct):
-        return {k: _python(v) for k, v in value.items()}
+        return _python_dict(value)
     if isinstance(value, struct_pb2.ListValue):
         return [_python(v) for v in value]
     return value
+
+
+def _python_dict(value: struct_pb2.Struct) -> dict[str, Any]:
+    return {k: _python(v) for k, v in value.items()}
 
 
 def _is_not_supported(response: CustomCommandResponse) -> bool:
@@ -188,7 +195,9 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
             if s is not None:
                 kwargs[key] = s
         if c.target is not None:
-            kwargs["target"] = capability_pb2.Target(type=int(c.target.type), ref=c.target.target_ref or "")
+            kwargs["target"] = capability_pb2.Target(
+                type=cast(capability_pb2.TargetType, int(c.target.type)), ref=c.target.target_ref or ""
+            )
         if c.completion is not CompletionMode.UNSPECIFIED:
             kwargs["completion"] = int(c.completion)
         if c.completion_event:
@@ -196,7 +205,7 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
         safety = c.safety or catalog_safety(c.command_id)
         if safety is not None:
             kwargs["safety"] = capability_pb2.CommandSafety(
-                risk=int(safety.risk),
+                risk=cast(capability_pb2.CommandRisk, int(safety.risk)),
                 reversible=safety.reversible,
                 undo_command_id=safety.undo_command_id or "",
                 preconditions=list(safety.preconditions),
@@ -211,7 +220,7 @@ def capability_set(caps: Capabilities) -> capability_pb2.CapabilitySet:
         telemetry_fields=[
             capability_pb2.TelemetryField(
                 key=f.key,
-                type=int(f.type),
+                type=cast(capability_pb2.TelemetryValueType, int(f.type)),
                 unit=f.unit,
                 description=f.description,
                 allowed_values=list(f.allowed_values),
@@ -242,7 +251,10 @@ def _payload(payload: Payload) -> capability_pb2.Payload:
         proto.slot_index = payload.slot_index
     if payload.mounted_on is not None:
         proto.mounted_on.CopyFrom(
-            capability_pb2.Target(type=int(payload.mounted_on.type), ref=payload.mounted_on.target_ref or "")
+            capability_pb2.Target(
+                type=cast(capability_pb2.TargetType, int(payload.mounted_on.type)),
+                ref=payload.mounted_on.target_ref or "",
+            )
         )
     return proto
 
@@ -267,7 +279,7 @@ class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
             return CompletionMode.UNSPECIFIED
         return capability.completion if capability is not None else CompletionMode.UNSPECIFIED
 
-    async def GetCapabilities(self, request, context):
+    async def GetCapabilities(self, request, context: grpc.aio.ServicerContext):
         try:
             caps = await self._adapter.get_capabilities(sn=request.asset.sn, asset_id=request.asset.id or None)
         except Exception as exc:
@@ -275,10 +287,10 @@ class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
             await context.abort(grpc.StatusCode.INTERNAL, str(exc))
         return edge_v3.GetCapabilitiesResponse(capabilities=capability_set(caps))
 
-    async def ExecuteCommand(self, request, context):
+    async def ExecuteCommand(self, request, context: grpc.aio.ServicerContext | None):
         command = request.command
         ctx = _context(request.context, command.asset, request.command_execution_id)
-        params = _python(command.params) if command.HasField("params") else {}
+        params = _python_dict(command.params) if command.HasField("params") else {}
         try:
             response = await self._adapter.execute_command(
                 ctx, CustomCommandRequest(command_type=command.command_id, params=params)
@@ -333,7 +345,7 @@ class EdgeAdapterV3Servicer(edge_v3_grpc.EdgeAdapterServiceServicer):
             )
         return response
 
-    async def StreamDetections(self, request, context):
+    async def StreamDetections(self, request, context: grpc.aio.ServicerContext):
         ctx = _context(common_pb2.RequestContext(), request.asset)
         try:
             async for batch in self._adapter.get_detections(ctx, request.stream_url or None):

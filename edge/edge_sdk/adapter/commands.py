@@ -24,10 +24,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import cache
 from importlib import resources
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from ..models.common import (
     CapabilityState,

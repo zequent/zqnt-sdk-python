@@ -1,5 +1,5 @@
 """
-Unit tests for TelemetryPublisher – no live gRPC connection required.
+Unit tests for TelemetryPublisher - no live gRPC connection required.
 
 Tests the queue lifecycle, publish guards, drop-on-full behaviour, and the
 stream generator stop conditions without starting a real gRPC stream.
@@ -61,6 +61,7 @@ async def test_publish_asset_enqueues_frame():
     pub = _FakePublisher()
     with patch.object(pub, "_build_asset_request", return_value="frame"):
         await pub.publish_asset_telemetry(AssetTelemetry(id="DOCK001"))
+    assert pub._queue is not None
     assert pub._queue.qsize() == 1
 
 
@@ -69,6 +70,7 @@ async def test_publish_subasset_enqueues_frame():
     pub = _FakePublisher()
     with patch.object(pub, "_build_subasset_request", return_value="frame"):
         await pub.publish_subasset_telemetry(SubAssetTelemetry(id="DRONE001"))
+    assert pub._queue is not None
     assert pub._queue.qsize() == 1
 
 
@@ -78,22 +80,25 @@ async def test_publish_multiple_frames_are_all_queued():
     with patch.object(pub, "_build_asset_request", return_value="frame"):
         for _ in range(5):
             await pub.publish_asset_telemetry(AssetTelemetry(id="DOCK001"))
+    assert pub._queue is not None
     assert pub._queue.qsize() == 5
 
 
 @pytest.mark.asyncio
 async def test_queue_full_drops_asset_frame_silently():
     pub = _FakePublisher(queue_max_size=1)
+    assert pub._queue is not None
     pub._queue.put_nowait("pre-existing")  # fill it up
     with patch.object(pub, "_build_asset_request", return_value="frame"):
-        # Must not raise – drop silently
+        # Must not raise - drop silently
         await pub.publish_asset_telemetry(AssetTelemetry(id="DOCK001"))
-    assert pub._queue.qsize() == 1  # still 1 – dropped
+    assert pub._queue.qsize() == 1  # still 1 - dropped
 
 
 @pytest.mark.asyncio
 async def test_queue_full_drops_subasset_frame_silently():
     pub = _FakePublisher(queue_max_size=1)
+    assert pub._queue is not None
     pub._queue.put_nowait("pre-existing")
     with patch.object(pub, "_build_subasset_request", return_value="frame"):
         await pub.publish_subasset_telemetry(SubAssetTelemetry(id="DRONE001"))
@@ -119,6 +124,7 @@ async def test_close_before_connect_does_not_raise():
 @pytest.mark.asyncio
 async def test_stream_generator_yields_queued_frames():
     pub = _FakePublisher()
+    assert pub._queue is not None
     gen_stop = asyncio.Event()
     pub._queue.put_nowait("frame1")
     pub._queue.put_nowait("frame2")
@@ -134,6 +140,7 @@ async def test_stream_generator_yields_queued_frames():
 @pytest.mark.asyncio
 async def test_stream_generator_stops_on_sentinel():
     pub = _FakePublisher()
+    assert pub._queue is not None
     gen_stop = asyncio.Event()
     pub._queue.put_nowait("frame1")
     pub._queue.put_nowait(_SENTINEL)
@@ -150,6 +157,7 @@ async def test_stream_generator_stops_on_sentinel():
 async def test_stream_generator_stops_when_already_closed():
     pub = _FakePublisher()
     pub._closed = True  # closed before generator is entered
+    assert pub._queue is not None
     gen_stop = asyncio.Event()
     pub._queue.put_nowait("frame1")
 
@@ -163,6 +171,7 @@ async def test_stream_generator_stops_when_already_closed():
 @pytest.mark.asyncio
 async def test_stream_generator_stops_when_gen_stop_set():
     pub = _FakePublisher()
+    assert pub._queue is not None
     gen_stop = asyncio.Event()
     gen_stop.set()  # already stopped before generator is entered
     pub._queue.put_nowait("frame1")
@@ -178,6 +187,7 @@ async def test_stream_generator_stops_when_gen_stop_set():
 async def test_stream_generator_restores_sentinel_to_queue():
     """After consuming SENTINEL the generator must put it back so close() can detect it."""
     pub = _FakePublisher()
+    assert pub._queue is not None
     gen_stop = asyncio.Event()
     pub._queue.put_nowait(_SENTINEL)
 

@@ -164,6 +164,7 @@ async def test_typed_rpc_without_registration_still_reports_not_supported():
     response = await _Bare().take_off(make_ctx(), Coordinates(latitude=1.0, longitude=2.0, altitude=3.0))
 
     assert not response.success
+    assert response.error is not None
     assert response.error.code is ErrorCode.SDK_ERROR
 
 
@@ -184,6 +185,7 @@ async def test_typed_rpc_propagates_a_handler_failure():
     response = await _Failing().take_off(make_ctx(), Coordinates(latitude=0.0, longitude=0.0, altitude=0.0))
 
     assert not response.success
+    assert response.error is not None
     assert response.error.message == "no GPS"
 
 

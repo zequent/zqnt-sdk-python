@@ -1,5 +1,5 @@
 """
-Unit tests for EdgeAdapter – no network, no gRPC.
+Unit tests for EdgeAdapter - no network, no gRPC.
 
 Tests the core SDK logic:
 - _auto_capabilities() reflects exactly what's overridden
@@ -150,7 +150,7 @@ def test_adapter_without_get_capabilities_raises():
         class _Bad(EdgeAdapter):
             pass  # no get_capabilities
 
-        _Bad()
+        _Bad()  # pyright: ignore[reportAbstractUsage] - the test asserts this raises
 
 
 def test_adapter_with_only_get_capabilities_is_instantiable():

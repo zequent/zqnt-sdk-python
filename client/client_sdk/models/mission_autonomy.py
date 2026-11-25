@@ -32,7 +32,7 @@ class MissionDTO:
     status: MissionStatus = MissionStatus.DRAFT
     type: MissionType = MissionType.STANDARD
     id: str | None = None
-    tasks: list["TaskDTO"] = field(default_factory=list)
+    tasks: list[TaskDTO] = field(default_factory=list)
     geo_json: str | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None

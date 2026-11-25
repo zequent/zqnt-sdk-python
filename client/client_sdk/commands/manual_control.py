@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 import grpc
 import grpc.aio
@@ -86,10 +87,8 @@ class ManualControlStream:
                 return self._accepted_inputs
             if not self._closed:
                 self._closed = True
-                try:
+                with contextlib.suppress(grpc.aio.AioRpcError, asyncio.InvalidStateError):
                     await self._call.done_writing()
-                except (grpc.aio.AioRpcError, asyncio.InvalidStateError):
-                    pass
             self._accepted_inputs = await self._answer()
             return self._accepted_inputs
 

@@ -38,10 +38,14 @@ import json
 import logging
 import os
 import time
+from collections.abc import Mapping
 from typing import Any
 
 import grpc
+import grpc.aio
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from .internal_tls import InternalTls
 from .platform_keys import PlatformKeySet
 
 logger = logging.getLogger(__name__)
@@ -65,13 +69,17 @@ def _b64url_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
-def _load_public_key(value: str):
+def _load_public_key(value: str) -> Ed25519PublicKey:
     from cryptography.hazmat.primitives.serialization import load_der_public_key, load_pem_public_key
 
     value = value.strip()
     if value.startswith("-----BEGIN"):
-        return load_pem_public_key(value.encode())
-    return load_der_public_key(base64.b64decode(value))
+        key = load_pem_public_key(value.encode())
+    else:
+        key = load_der_public_key(base64.b64decode(value))
+    if not isinstance(key, Ed25519PublicKey):
+        raise ValueError(f"expected an Ed25519 key, got {type(key).__name__}")
+    return key
 
 
 class UnknownSigningKeyError(TokenVerificationError):
@@ -86,11 +94,11 @@ class PlatformTokenVerifier:
     """Verifies the service token the platform puts on every call into this adapter."""
 
     def __init__(self, public_key: str | None = None, key_set: PlatformKeySet | None = None) -> None:
-        self._key = None
+        self._key: Ed25519PublicKey | None = None
         if public_key:
             try:
                 self._key = _load_public_key(public_key)
-            except Exception as exc:  # noqa: BLE001 - any parse failure is a configuration error
+            except Exception as exc:
                 raise ValueError(f"ZQNT_PLATFORM_PUBLIC_KEY is not a valid Ed25519 public key: {exc}") from exc
         self._key_set = key_set
 
@@ -118,7 +126,7 @@ class PlatformTokenVerifier:
             await asyncio.to_thread(self._key_set.refresh_if_due)
         return self._verify(token)
 
-    def _verification_key(self, kid: Any):
+    def _verification_key(self, kid: Any) -> Ed25519PublicKey:
         if kid is None:
             key = self._key or (self._key_set.key(None) if self._key_set is not None else None)
             if key is None:
@@ -143,7 +151,7 @@ class PlatformTokenVerifier:
             header = json.loads(_b64url_decode(parts[0]))
             payload = json.loads(_b64url_decode(parts[1]))
             signature = _b64url_decode(parts[2])
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise TokenVerificationError("token is not well-formed") from exc
         if not isinstance(header, dict) or not isinstance(payload, dict):
             raise TokenVerificationError("token is not well-formed")
@@ -191,7 +199,7 @@ class EdgeAuthConfig:
     disabled: bool = False
 
     @classmethod
-    def from_env(cls) -> "EdgeAuthConfig":
+    def from_env(cls) -> EdgeAuthConfig:
         return cls(
             edge_token=os.getenv("ZQNT_EDGE_TOKEN") or None,
             platform_public_key=os.getenv("ZQNT_PLATFORM_PUBLIC_KEY") or os.getenv("SERVICE_AUTH_PUBLIC_KEY") or None,
@@ -236,7 +244,7 @@ class _BearerUnaryUnary(_Bearer, grpc.aio.UnaryUnaryClientInterceptor):
 
 class _BearerUnaryStream(_Bearer, grpc.aio.UnaryStreamClientInterceptor):
     async def intercept_unary_stream(self, continuation, client_call_details, request):
-        return await continuation(self._details(client_call_details), request)
+        return await continuation(self._details(client_call_details), request)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 class _BearerStreamUnary(_Bearer, grpc.aio.StreamUnaryClientInterceptor):
@@ -246,7 +254,7 @@ class _BearerStreamUnary(_Bearer, grpc.aio.StreamUnaryClientInterceptor):
 
 class _BearerStreamStream(_Bearer, grpc.aio.StreamStreamClientInterceptor):
     async def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
-        return await continuation(self._details(client_call_details), request_iterator)
+        return await continuation(self._details(client_call_details), request_iterator)  # pyright: ignore[reportGeneralTypeIssues] - grpc-stubs: aio continuations are coroutines
 
 
 def bearer_interceptors(token: str) -> list:
@@ -259,20 +267,71 @@ def bearer_interceptors(token: str) -> list:
     ]
 
 
+#: How often an idle channel to the platform pings it (``ZQNT_GRPC_KEEPALIVE_TIME_MS`` overrides).
+#: The core serves gRPC on its Quarkus HTTP server, which closes a connection after 30 minutes
+#: without traffic (``quarkus.http.idle-timeout``). The telemetry and notification publishers hold
+#: one client stream each that can stay quiet for longer than that; without pings the server drops
+#: it every 30 minutes and whatever is sent in the reconnect gap is lost. Any frame resets that
+#: timer, an HTTP/2 PING included, so a ping a minute keeps the stream open. The Vert.x gRPC server
+#: has no grpc-java style ping policing (no ``too_many_pings`` GOAWAY), and the Java client SDK and
+#: the Go edge runtime already ping the same services every 20-30 s.
+KEEPALIVE_TIME_ENV = "ZQNT_GRPC_KEEPALIVE_TIME_MS"
+DEFAULT_KEEPALIVE_TIME_MS = 60_000
+#: How long a ping may go unanswered before the channel counts the connection as dead.
+KEEPALIVE_TIMEOUT_MS = 20_000
+#: Below this a ping interval is refused: servers with ping policing (gRPC Go/Java defaults)
+#: answer more frequent pings with GOAWAY.
+MIN_KEEPALIVE_TIME_MS = 10_000
+
+
+def platform_channel_options(env: Mapping[str, str] | None = None) -> list[tuple[str, Any]]:
+    """
+    gRPC options for a channel into the platform: keepalive pings, also while no call is open and
+    without data in between, so long-lived quiet streams outlive the server's idle timeout.
+    """
+    source = os.environ if env is None else env
+    keepalive_ms = DEFAULT_KEEPALIVE_TIME_MS
+    raw = (source.get(KEEPALIVE_TIME_ENV) or "").strip()
+    if raw:
+        try:
+            keepalive_ms = int(raw)
+        except ValueError:
+            keepalive_ms = -1
+        if keepalive_ms < MIN_KEEPALIVE_TIME_MS:
+            logger.warning(
+                "%s=%r is not a whole number of milliseconds >= %d; using %d",
+                KEEPALIVE_TIME_ENV,
+                raw,
+                MIN_KEEPALIVE_TIME_MS,
+                DEFAULT_KEEPALIVE_TIME_MS,
+            )
+            keepalive_ms = DEFAULT_KEEPALIVE_TIME_MS
+    return [
+        ("grpc.keepalive_time_ms", keepalive_ms),
+        ("grpc.keepalive_timeout_ms", KEEPALIVE_TIMEOUT_MS),
+        ("grpc.keepalive_permit_without_calls", 1),
+        # gRPC core otherwise stops pinging after two pings without data on a quiet stream.
+        ("grpc.http2.max_pings_without_data", 0),
+    ]
+
+
 def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channel:
     """
     A channel to a core service that carries ``token`` on every call. Without a token the calls go
-    out bare, and the platform refuses all but claim redemption — logged once per channel.
+    out bare, and the platform refuses all but claim redemption — logged once per channel. TLS with
+    the installation's CA when ``ZQNT_INTERNAL_TLS`` is on (see :mod:`edge_sdk.internal_tls`).
+    Keepalive pings keep it open while idle (:func:`platform_channel_options`).
     """
     target = f"{host}:{port}"
+    tls = InternalTls.from_env()
     if not token:
         logger.warning(
             "No ZQNT_EDGE_TOKEN: calls to %s carry no credential and the platform will refuse them "
             "(issue one in the console under Edge Credentials)",
             target,
         )
-        return grpc.aio.insecure_channel(target)
-    return grpc.aio.insecure_channel(target, interceptors=bearer_interceptors(token))
+        return tls.aio_channel(target, options=platform_channel_options())
+    return tls.aio_channel(target, options=platform_channel_options(), interceptors=bearer_interceptors(token))
 
 
 # ---------------------------------------------------------------------------
@@ -281,10 +340,19 @@ def platform_channel(host: str, port: int, token: str | None) -> grpc.aio.Channe
 
 
 class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
-    """Refuses every call into the adapter that does not carry a valid platform service token."""
+    """
+    Refuses every call into the adapter that does not carry a valid platform service token.
 
-    def __init__(self, config: EdgeAuthConfig, key_set: PlatformKeySet | None = None) -> None:
+    ``trust_unix_peers`` (an adapter attached to a local Edge Node, see :mod:`edge_sdk.node`) lets
+    calls from a Unix socket peer through unverified, because the node does not sign commands yet
+    (zqnt-api#40). Calls over TCP are verified as always.
+    """
+
+    def __init__(
+        self, config: EdgeAuthConfig, key_set: PlatformKeySet | None = None, *, trust_unix_peers: bool = False
+    ) -> None:
         self._disabled = config.disabled
+        self._trust_unix_peers = trust_unix_peers
         self._verifier: PlatformTokenVerifier | None = None
         self._misconfigured: str | None = None
         if self._disabled:
@@ -294,6 +362,8 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
             )
         elif not config.platform_public_key and not config.platform_keys_url and key_set is None:
             self._misconfigured = "neither ZQNT_PLATFORM_KEYS_URL nor ZQNT_PLATFORM_PUBLIC_KEY is configured"
+            if trust_unix_peers:
+                return
             logger.error(
                 "Neither ZQNT_PLATFORM_KEYS_URL nor ZQNT_PLATFORM_PUBLIC_KEY is set: every platform command will "
                 "be refused. Set ZQNT_PLATFORM_KEYS_URL to the platform's /api/admin-console/auth/service-keys "
@@ -339,6 +409,8 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
         if refusal is None or handler is None:
             return handler
         code, details = refusal
+        if self._trust_unix_peers:
+            return _unix_peers_only(handler, code, details)
 
         async def abort(_request, context):
             await context.abort(code, details)
@@ -354,3 +426,52 @@ class PlatformAuthServerInterceptor(grpc.aio.ServerInterceptor):
         if handler.response_streaming:
             return grpc.unary_stream_rpc_method_handler(abort, **kwargs)
         return grpc.unary_unary_rpc_method_handler(abort, **kwargs)
+
+
+def _is_unix_peer(context) -> bool:
+    return context.peer().startswith("unix:")
+
+
+def _unix_peers_only(handler, code: grpc.StatusCode, details: str):
+    """``handler`` for Unix socket peers; any other peer is refused with ``code``."""
+    kwargs = {
+        "request_deserializer": handler.request_deserializer,
+        "response_serializer": handler.response_serializer,
+    }
+    if handler.request_streaming and handler.response_streaming:
+        behavior = handler.stream_stream
+
+        async def stream_stream(request_iterator, context):
+            if not _is_unix_peer(context):
+                await context.abort(code, details)
+            async for response in behavior(request_iterator, context):
+                yield response
+
+        return grpc.stream_stream_rpc_method_handler(stream_stream, **kwargs)
+    if handler.response_streaming:
+        behavior = handler.unary_stream
+
+        async def unary_stream(request, context):
+            if not _is_unix_peer(context):
+                await context.abort(code, details)
+            async for response in behavior(request, context):
+                yield response
+
+        return grpc.unary_stream_rpc_method_handler(unary_stream, **kwargs)
+    if handler.request_streaming:
+        behavior = handler.stream_unary
+
+        async def stream_unary(request_iterator, context):
+            if not _is_unix_peer(context):
+                await context.abort(code, details)
+            return await behavior(request_iterator, context)
+
+        return grpc.stream_unary_rpc_method_handler(stream_unary, **kwargs)
+    behavior = handler.unary_unary
+
+    async def unary_unary(request, context):
+        if not _is_unix_peer(context):
+            await context.abort(code, details)
+        return await behavior(request, context)
+
+    return grpc.unary_unary_rpc_method_handler(unary_unary, **kwargs)

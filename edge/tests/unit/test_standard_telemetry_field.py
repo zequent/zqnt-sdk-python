@@ -20,5 +20,5 @@ def test_a_catalog_key_is_declared_as_the_platform_describes_it():
 
 
 def test_a_key_outside_the_catalog_is_refused():
-    with pytest.raises(ValueError, match="radar.mode"):
+    with pytest.raises(ValueError, match=r"radar\.mode"):
         _Adapter().declare_standard_telemetry_field("radar.mode")

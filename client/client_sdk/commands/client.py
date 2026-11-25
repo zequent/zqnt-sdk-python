@@ -192,7 +192,7 @@ class CommandsClient:
         """
         _require("asset_sn", asset_sn)
         logger.info("StreamManualControl: asset=%s", asset_sn)
-        return ManualControlStream(asset_sn, self._stub.StreamManualControl())
+        return ManualControlStream(asset_sn, self._stub.StreamManualControl())  # pyright: ignore[reportCallIssue] - grpc-stubs requires a request iterator, grpc.aio does not
 
     async def _watch(self, request: control_pb2.WatchCommandEventsRequest) -> AsyncIterator[command_pb2.CommandEvent]:
         call = self._stub.WatchCommandEvents(request)
